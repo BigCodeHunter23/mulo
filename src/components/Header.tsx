@@ -11,9 +11,14 @@ export default async function Header() {
 
   return (
     <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-      <Link href="/" className="text-lg font-bold">
-        MULO
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link href="/" className="text-lg font-bold">
+          MULO
+        </Link>
+        <Link href="/search" className="text-sm">
+          Search
+        </Link>
+      </div>
 
       {user ? (
         <div className="flex items-center gap-4 text-sm">
