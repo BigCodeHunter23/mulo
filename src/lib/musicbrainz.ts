@@ -15,6 +15,9 @@ function throttle<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
+/** Thrown when MusicBrainz has no such artist or release. */
+export class MbNotFoundError extends Error {}
+
 async function mbFetch<T>(path: string, attempt = 1): Promise<T> {
   const response = await throttle(() =>
     fetch(`${API}${path}`, {
@@ -29,6 +32,12 @@ async function mbFetch<T>(path: string, attempt = 1): Promise<T> {
   if (response.status === 503 && attempt <= 4) {
     await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
     return mbFetch<T>(path, attempt + 1);
+  }
+
+  // 404 = no such MBID; 400 = malformed MBID. Both arrive from a URL the
+  // visitor typed or followed, so both mean "no such page" to them.
+  if (response.status === 404 || response.status === 400) {
+    throw new MbNotFoundError(`Not found in MusicBrainz: ${path}`);
   }
 
   if (!response.ok) {

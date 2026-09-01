@@ -7,6 +7,7 @@ import {
   getArtistReleaseGroups,
   getReleaseGroup,
   getTracklist,
+  MbNotFoundError,
 } from "@/lib/musicbrainz";
 
 export type Artist = {
@@ -42,7 +43,14 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
 
   if (cached) return cached;
 
-  const mb = await getArtist(mbid);
+  let mb;
+  try {
+    mb = await getArtist(mbid);
+  } catch (error) {
+    if (error instanceof MbNotFoundError) return null;
+    throw error;
+  }
+
   const artist: Artist = {
     mbid: mb.id,
     name: mb.name,
@@ -98,7 +106,14 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
 
   if (cached && cached.genres.length > 0) return cached;
 
-  const mb = await getReleaseGroup(mbid);
+  let mb;
+  try {
+    mb = await getReleaseGroup(mbid);
+  } catch (error) {
+    if (error instanceof MbNotFoundError) return null;
+    throw error;
+  }
+
   const artistCredit = mb["artist-credit"]?.[0]?.artist;
 
   if (artistCredit) {
