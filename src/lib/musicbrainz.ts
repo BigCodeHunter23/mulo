@@ -52,6 +52,7 @@ export type MbArtist = {
   name: string;
   disambiguation?: string;
   country?: string;
+  score?: number;
 };
 
 export type MbReleaseGroup = {
@@ -62,6 +63,7 @@ export type MbReleaseGroup = {
   "secondary-types"?: string[];
   genres?: { name: string }[];
   "artist-credit"?: { artist: { id: string; name: string } }[];
+  score?: number;
 };
 
 export type MbTrack = {
@@ -74,16 +76,60 @@ export async function searchArtists(query: string): Promise<MbArtist[]> {
   const data = await mbFetch<{ artists: MbArtist[] }>(
     `/artist?query=${encodeURIComponent(query)}&limit=20&fmt=json`,
   );
-  return data.artists ?? [];
+  return (data.artists ?? []).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+}
+
+/** Escape characters that would otherwise be Lucene query syntax. */
+function escapeLucene(value: string) {
+  return value.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, "\\$&");
+}
+
+/**
+ * MusicBrainz ranks purely on text similarity with no notion of popularity,
+ * so a plain search buries famous albums under obscure ones. Nudge results
+ * that match the artist or title closely towards the top.
+ */
+/** Tribute, karaoke and novelty acts nobody is searching for. */
+const NOVELTY = /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|string quartet|piano tribute|made famous by/i;
+
+function relevance(group: MbReleaseGroup, query: string) {
+  const q = query.toLowerCase().trim();
+  const title = group.title.toLowerCase();
+  const artist = (
+    group["artist-credit"]?.[0]?.artist.name ?? ""
+  ).toLowerCase();
+
+  let boost = 0;
+  if (NOVELTY.test(artist) || NOVELTY.test(title)) boost -= 500;
+  if (artist === q) boost += 400;
+  else if (artist.startsWith(q)) boost += 250;
+  else if (artist.includes(q)) boost += 120;
+
+  if (title === q) boost += 300;
+  else if (title.startsWith(q)) boost += 150;
+
+  // Entries with no release date are usually incomplete stubs.
+  if (group["first-release-date"]) boost += 20;
+
+  return boost + (group.score ?? 0);
 }
 
 export async function searchReleaseGroups(
   query: string,
 ): Promise<MbReleaseGroup[]> {
+  // Match the query against either the artist or the album title, and ask
+  // only for albums so singles and EPs don't crowd out real records.
+  const escaped = escapeLucene(query);
+  const lucene = `(artist:(${escaped}) OR releasegroup:(${escaped})) AND primarytype:Album`;
+
   const data = await mbFetch<{ "release-groups": MbReleaseGroup[] }>(
-    `/release-group?query=${encodeURIComponent(query)}&limit=20&fmt=json`,
+    `/release-group?query=${encodeURIComponent(lucene)}&limit=100&fmt=json`,
   );
-  return data["release-groups"] ?? [];
+
+  return (data["release-groups"] ?? [])
+    .filter((g) => (g["secondary-types"] ?? []).length === 0)
+    .sort((a, b) => relevance(b, query) - relevance(a, query))
+    .slice(0, 20);
 }
 
 export async function getArtist(mbid: string): Promise<MbArtist> {

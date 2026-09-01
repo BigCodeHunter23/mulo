@@ -72,7 +72,9 @@ export async function getCachedArtistAlbums(
     .from("releases")
     .select("mbid, title, artist_mbid, release_date, cover_art_url, genres")
     .eq("artist_mbid", artistMbid)
-    .order("release_date", { ascending: false });
+    // nullsFirst: false keeps undated entries (usually unofficial odds and
+    // ends) at the bottom rather than above the real discography.
+    .order("release_date", { ascending: false, nullsFirst: false });
 
   if (cached && cached.length > 0) return cached;
 
@@ -90,9 +92,13 @@ export async function getCachedArtistAlbums(
     await createAdminClient().from("releases").upsert(releases);
   }
 
-  return releases.sort((a, b) =>
-    (b.release_date ?? "").localeCompare(a.release_date ?? ""),
-  );
+  // Newest first, with undated entries last.
+  return releases.sort((a, b) => {
+    if (!a.release_date && !b.release_date) return 0;
+    if (!a.release_date) return 1;
+    if (!b.release_date) return -1;
+    return b.release_date.localeCompare(a.release_date);
+  });
 }
 
 export async function getCachedRelease(mbid: string): Promise<Release | null> {

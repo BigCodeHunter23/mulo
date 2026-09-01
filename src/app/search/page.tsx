@@ -57,21 +57,29 @@ export default async function SearchPage({
       )}
 
       {artists.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-lg font-bold">Artists</h2>
-          <ul className="divide-y divide-gray-200">
-            {artists.map((artist) => (
+        <section className="mb-10">
+          <h2 className="mb-1 text-lg font-bold">Artists</h2>
+          <p className="mb-3 text-sm text-gray-500">
+            Open an artist to see their full album list.
+          </p>
+          <ul className="divide-y divide-gray-200 rounded border border-gray-200">
+            {artists.slice(0, 10).map((artist) => (
               <li key={artist.id}>
                 <Link
                   href={`/artist/${artist.id}`}
-                  className="block py-2 hover:bg-gray-50"
+                  className="flex items-baseline justify-between gap-3 px-3 py-3 hover:bg-gray-50"
                 >
-                  <span className="font-medium">{artist.name}</span>
-                  {artist.disambiguation && (
-                    <span className="ml-2 text-sm text-gray-500">
-                      {artist.disambiguation}
-                    </span>
-                  )}
+                  <span>
+                    <span className="font-medium">{artist.name}</span>
+                    {artist.disambiguation && (
+                      <span className="ml-2 text-sm text-gray-500">
+                        {artist.disambiguation}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-sm text-gray-400">
+                    View albums →
+                  </span>
                 </Link>
               </li>
             ))}
@@ -82,6 +90,10 @@ export default async function SearchPage({
       {albums.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-bold">Albums</h2>
+          <p className="mb-3 text-sm text-gray-500">
+            Matching album titles. If you&rsquo;re after a specific
+            artist&rsquo;s records, open them under Artists above.
+          </p>
           <ul className="divide-y divide-gray-200">
             {albums.map((album) => (
               <li key={album.id}>
