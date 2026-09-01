@@ -5,6 +5,11 @@ import {
   getCachedRelease,
   getCachedTracks,
 } from "@/lib/catalog";
+import { getOwnRating, getReleaseScores } from "@/lib/ratings";
+import { getReleaseReviews } from "@/lib/reviews";
+import { createClient } from "@/lib/supabase/server";
+import StarScore from "@/components/StarScore";
+import RatingForm from "./RatingForm";
 
 function formatDuration(ms: number | null) {
   if (!ms) return "";
@@ -24,9 +29,17 @@ export default async function AlbumPage({
   const release = await getCachedRelease(mbid);
   if (!release) notFound();
 
-  const [artist, tracks] = await Promise.all([
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [artist, tracks, scores, ownRating, reviews] = await Promise.all([
     release.artist_mbid ? getCachedArtist(release.artist_mbid) : null,
     getCachedTracks(mbid),
+    getReleaseScores(mbid),
+    getOwnRating(mbid),
+    getReleaseReviews(mbid),
   ]);
 
   return (
@@ -45,28 +58,75 @@ export default async function AlbumPage({
           )}
         </div>
 
-        <div>
-          <h1 className="text-3xl font-bold">{release.title}</h1>
-          {artist && (
-            <Link
-              href={`/artist/${artist.mbid}`}
-              className="mt-1 block text-lg text-gray-700 hover:underline"
-            >
-              {artist.name}
-            </Link>
-          )}
-          {release.release_date && (
-            <p className="mt-2 text-sm text-gray-500">
-              Released {release.release_date}
-            </p>
-          )}
-          {release.genres.length > 0 && (
-            <p className="mt-1 text-sm text-gray-500">
-              {release.genres.join(", ")}
-            </p>
-          )}
+        <div className="flex flex-col gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">{release.title}</h1>
+            {artist && (
+              <Link
+                href={`/artist/${artist.mbid}`}
+                className="mt-1 block text-lg text-gray-700 hover:underline"
+              >
+                {artist.name}
+              </Link>
+            )}
+            {release.release_date && (
+              <p className="mt-2 text-sm text-gray-500">
+                Released {release.release_date}
+              </p>
+            )}
+            {release.genres.length > 0 && (
+              <p className="mt-1 text-sm text-gray-500">
+                {release.genres.join(", ")}
+              </p>
+            )}
+          </div>
+
+          <StarScore
+            community={scores.community}
+            communityCount={scores.communityCount}
+            you={scores.you}
+            following={scores.following}
+            followingCount={scores.followingCount}
+          />
         </div>
       </header>
+
+      <div className="mb-10">
+        <RatingForm
+          releaseMbid={mbid}
+          signedIn={Boolean(user)}
+          existing={ownRating}
+        />
+      </div>
+
+      {reviews.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-lg font-bold">Reviews</h2>
+          <ul className="flex flex-col gap-4">
+            {reviews.map((review) => (
+              <li
+                key={review.username}
+                className="rounded border border-gray-200 p-4"
+              >
+                <div className="mb-1 flex items-baseline gap-2">
+                  <span className="font-medium">
+                    {review.display_name || review.username}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    @{review.username}
+                  </span>
+                  <span className="ml-auto font-semibold tabular-nums">
+                    {review.score}/10
+                  </span>
+                </div>
+                {review.review && (
+                  <p className="text-sm text-gray-700">{review.review}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <h2 className="mb-3 text-lg font-bold">Tracklist</h2>
       {tracks.length === 0 ? (

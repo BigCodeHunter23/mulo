@@ -22,7 +22,8 @@ export default async function Header() {
 
       {user ? (
         <div className="flex items-center gap-4 text-sm">
-          <Link href="/profile">Edit profile</Link>
+          <Link href="/ratings">My ratings</Link>
+          <Link href="/profile">Profile</Link>
           <form action={logout}>
             <button type="submit">Log out</button>
           </form>
