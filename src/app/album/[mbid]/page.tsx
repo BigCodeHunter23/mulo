@@ -109,9 +109,12 @@ export default async function AlbumPage({
                 className="rounded border border-gray-200 p-4"
               >
                 <div className="mb-1 flex items-baseline gap-2">
-                  <span className="font-medium">
+                  <Link
+                    href={`/u/${review.username}`}
+                    className="font-medium hover:underline"
+                  >
                     {review.display_name || review.username}
-                  </span>
+                  </Link>
                   <span className="text-sm text-gray-500">
                     @{review.username}
                   </span>
