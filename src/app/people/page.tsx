@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import FollowButton from "@/components/FollowButton";
+import SectionHeading from "@/components/SectionHeading";
 
 export default async function PeoplePage() {
   const supabase = await createClient();
@@ -19,8 +20,8 @@ export default async function PeoplePage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <h1 className="mb-1 text-2xl font-bold">People on MULO</h1>
-      <p className="mb-6 text-sm text-gray-500">
+      <SectionHeading>People on MULO</SectionHeading>
+      <p className="mb-6 text-sm text-mulo-muted">
         Follow someone to see their ratings in your feed.
       </p>
 

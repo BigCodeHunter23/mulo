@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnRatings } from "@/lib/ratings";
+import { Score } from "@/components/StarScore";
+import SectionHeading from "@/components/SectionHeading";
 
 const SORTS = [
   { key: "recent", label: "Most recent" },
@@ -31,54 +33,63 @@ export default async function MyRatingsPage({
   const ratings = await getOwnRatings(active);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <h1 className="mb-1 text-2xl font-bold">My ratings</h1>
-      <p className="mb-6 text-sm text-gray-500">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <SectionHeading
+        action={
+          ratings.length > 0 ? (
+            <div className="flex gap-1.5 text-sm">
+              {SORTS.map((s) => (
+                <Link
+                  key={s.key}
+                  href={`/ratings?sort=${s.key}`}
+                  className={`rounded border px-2.5 py-1 ${
+                    active === s.key
+                      ? "border-mulo-navy bg-mulo-navy text-white"
+                      : "border-gray-300 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  {s.label}
+                </Link>
+              ))}
+            </div>
+          ) : undefined
+        }
+      >
+        My Ratings
+      </SectionHeading>
+
+      <p className="mb-6 text-sm text-mulo-muted">
         {ratings.length === 0
           ? "Nothing rated yet."
-          : `${ratings.length} album${ratings.length === 1 ? "" : "s"} rated.`}
+          : `${ratings.length} title${ratings.length === 1 ? "" : "s"}`}
       </p>
 
-      {ratings.length > 0 && (
-        <div className="mb-6 flex gap-2 text-sm">
-          {SORTS.map((s) => (
-            <Link
-              key={s.key}
-              href={`/ratings?sort=${s.key}`}
-              className={`rounded border px-3 py-1.5 ${
-                active === s.key
-                  ? "border-black bg-black text-white"
-                  : "border-gray-300 text-gray-700 hover:border-gray-400"
-              }`}
-            >
-              {s.label}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {ratings.length === 0 ? (
-        <div className="rounded border border-gray-200 p-6 text-center">
-          <p className="mb-3 text-gray-600">
+        <div className="rounded border border-gray-200 p-8 text-center">
+          <p className="mb-4 text-mulo-muted">
             Find an album and give it a score out of 10.
           </p>
           <Link
             href="/search"
-            className="inline-block rounded bg-black px-4 py-2 text-white"
+            className="inline-block rounded bg-mulo-orange px-4 py-2 font-medium text-white hover:bg-mulo-orange-dark"
           >
             Search music
           </Link>
         </div>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {ratings.map((rating) => (
+        <ol className="flex flex-col">
+          {ratings.map((rating, index) => (
             <li
               key={rating.release.mbid}
-              className="flex gap-4 rounded border border-gray-200 p-4"
+              className="mulo-rule flex gap-4 py-5 first:border-t-2 first:border-t-mulo-rule first:pt-5"
             >
+              <span className="w-5 shrink-0 pt-1 text-right font-display text-lg text-mulo-muted tabular-nums">
+                {index + 1}
+              </span>
+
               <Link
                 href={`/album/${rating.release.mbid}`}
-                className="h-20 w-20 shrink-0 overflow-hidden rounded bg-gray-100"
+                className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100"
               >
                 {rating.release.cover_art_url && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -92,22 +103,22 @@ export default async function MyRatingsPage({
               </Link>
 
               <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-3">
-                  <Link
-                    href={`/album/${rating.release.mbid}`}
-                    className="font-medium hover:underline"
-                  >
-                    {rating.release.title}
-                  </Link>
-                  <span className="ml-auto shrink-0 font-semibold tabular-nums text-red-600">
-                    {rating.score}/10
-                  </span>
-                </div>
+                <Link
+                  href={`/album/${rating.release.mbid}`}
+                  className="font-display text-xl font-semibold text-mulo-navy hover:underline"
+                >
+                  {rating.release.title}
+                  {rating.release.release_date && (
+                    <span className="ml-1.5 font-normal text-mulo-muted">
+                      ({rating.release.release_date.slice(0, 4)})
+                    </span>
+                  )}
+                </Link>
 
                 {rating.release.artist && (
                   <Link
                     href={`/artist/${rating.release.artist.mbid}`}
-                    className="text-sm text-gray-600 hover:underline"
+                    className="block text-sm text-mulo-orange hover:underline"
                   >
                     {rating.release.artist.name}
                   </Link>
@@ -116,10 +127,19 @@ export default async function MyRatingsPage({
                 {rating.review && (
                   <p className="mt-2 text-sm text-gray-700">{rating.review}</p>
                 )}
+
+                <p className="mt-2 text-xs text-mulo-muted">
+                  Rated on{" "}
+                  {new Date(rating.created_at).toLocaleDateString("en-GB")}
+                </p>
+              </div>
+
+              <div className="shrink-0 pt-1">
+                <Score kind="you" value={rating.score} />
               </div>
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </main>
   );

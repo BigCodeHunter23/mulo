@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
+import SectionHeading from "@/components/SectionHeading";
 
 export default async function SearchPage({
   searchParams,
@@ -34,7 +35,10 @@ export default async function SearchPage({
           placeholder="Search artists and albums"
           className="flex-1 rounded border border-gray-300 px-3 py-2"
         />
-        <button type="submit" className="rounded bg-black px-4 py-2 text-white">
+        <button
+          type="submit"
+          className="rounded bg-mulo-orange px-4 py-2 font-medium text-white hover:bg-mulo-orange-dark"
+        >
           Search
         </button>
       </form>
@@ -58,8 +62,8 @@ export default async function SearchPage({
 
       {artists.length > 0 && (
         <section className="mb-10">
-          <h2 className="mb-1 text-lg font-bold">Artists</h2>
-          <p className="mb-3 text-sm text-gray-500">
+          <SectionHeading>Artists</SectionHeading>
+          <p className="mb-3 text-sm text-mulo-muted">
             Open an artist to see their full album list.
           </p>
           <ul className="divide-y divide-gray-200 rounded border border-gray-200">
@@ -89,8 +93,8 @@ export default async function SearchPage({
 
       {albums.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-bold">Albums</h2>
-          <p className="mb-3 text-sm text-gray-500">
+          <SectionHeading>Albums</SectionHeading>
+          <p className="mb-3 text-sm text-mulo-muted">
             Matching album titles. If you&rsquo;re after a specific
             artist&rsquo;s records, open them under Artists above.
           </p>

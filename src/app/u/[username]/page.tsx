@@ -8,6 +8,7 @@ import {
 import { getUserFeed } from "@/lib/feed";
 import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
+import SectionHeading from "@/components/SectionHeading";
 
 export default async function ProfilePage({
   params,
@@ -29,10 +30,10 @@ export default async function ProfilePage({
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="font-display text-4xl font-bold text-mulo-navy">
             {profile.display_name || profile.username}
           </h1>
-          <p className="text-gray-500">@{profile.username}</p>
+          <p className="text-mulo-orange">@{profile.username}</p>
           {profile.bio && (
             <p className="mt-3 max-w-prose text-gray-700">{profile.bio}</p>
           )}
@@ -72,10 +73,10 @@ export default async function ProfilePage({
         />
       </header>
 
-      <h2 className="mb-3 text-lg font-bold">Ratings</h2>
+      <SectionHeading>Ratings</SectionHeading>
 
       {ratings.length === 0 ? (
-        <p className="text-gray-600">
+        <p className="text-mulo-muted">
           {followState.isSelf ? (
             <>
               You haven&rsquo;t rated anything yet.{" "}
@@ -89,7 +90,7 @@ export default async function ProfilePage({
           )}
         </p>
       ) : (
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col">
           {ratings.map((item) => (
             <FeedItem key={item.id} item={item} showAuthor={false} />
           ))}

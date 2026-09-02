@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { login, signup, type AuthState } from "./actions";
@@ -103,6 +104,15 @@ export default function AuthForm() {
 
         <SubmitButton mode={mode} />
       </form>
+
+      {mode === "login" && (
+        <Link
+          href="/auth/reset"
+          className="text-sm text-gray-600 underline"
+        >
+          Forgotten your password?
+        </Link>
+      )}
     </div>
   );
 }

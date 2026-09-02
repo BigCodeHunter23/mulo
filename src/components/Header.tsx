@@ -17,37 +17,59 @@ export default async function Header() {
         .maybeSingle()
     : { data: null };
 
-  return (
-    <header className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3">
-      <div className="flex items-center gap-4">
-        <Link href="/" className="text-lg font-bold">
-          MULO
-        </Link>
-        <Link href="/search" className="text-sm">
-          Search
-        </Link>
-        <Link href="/people" className="text-sm">
-          People
-        </Link>
-      </div>
+  const navLink = "text-sm text-gray-300 hover:text-white transition-colors";
 
-      {user ? (
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/ratings">My ratings</Link>
-          {profile?.username ? (
-            <Link href={`/u/${profile.username}`}>Profile</Link>
-          ) : (
-            <Link href="/profile">Set up profile</Link>
-          )}
-          <form action={logout}>
-            <button type="submit">Log out</button>
-          </form>
+  return (
+    <header className="bg-black">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+        <div className="flex items-baseline gap-5">
+          <Link href="/" className="flex items-baseline gap-2">
+            <span className="font-display text-2xl font-bold leading-none tracking-tight text-mulo-orange">
+              MULO
+            </span>
+            <span className="hidden text-[10px] uppercase tracking-[0.2em] text-mulo-orange/70 sm:inline">
+              For Music Lovers
+            </span>
+          </Link>
+          <nav className="flex items-baseline gap-4">
+            <Link href="/search" className={navLink}>
+              Search
+            </Link>
+            <Link href="/people" className={navLink}>
+              People
+            </Link>
+          </nav>
         </div>
-      ) : (
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/login">Log in</Link>
-        </div>
-      )}
+
+        {user ? (
+          <div className="flex items-baseline gap-4">
+            <Link href="/ratings" className={navLink}>
+              My ratings
+            </Link>
+            {profile?.username ? (
+              <Link href={`/u/${profile.username}`} className={navLink}>
+                Profile
+              </Link>
+            ) : (
+              <Link href="/profile" className={navLink}>
+                Set up profile
+              </Link>
+            )}
+            <form action={logout}>
+              <button type="submit" className={navLink}>
+                Log out
+              </button>
+            </form>
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="rounded bg-mulo-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-mulo-orange-dark"
+          >
+            Log in
+          </Link>
+        )}
+      </div>
     </header>
   );
 }

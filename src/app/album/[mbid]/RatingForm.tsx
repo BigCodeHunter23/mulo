@@ -14,7 +14,7 @@ function SaveButton({ existing }: { existing: boolean }) {
       name="intent"
       value="save"
       disabled={pending}
-      className="rounded bg-black px-4 py-2 text-white disabled:opacity-60"
+      className="rounded bg-mulo-orange px-4 py-2 font-medium text-white hover:bg-mulo-orange-dark disabled:opacity-60"
     >
       {pending ? "Saving…" : existing ? "Update rating" : "Save rating"}
     </button>
@@ -76,7 +76,7 @@ export default function RatingForm({
 
   return (
     <div className="rounded border border-gray-200 p-4">
-      <h2 className="mb-3 font-bold">
+      <h2 className="mb-3 font-display text-lg font-semibold text-mulo-navy">
         {existing ? "Your rating" : "Rate this album"}
       </h2>
 
@@ -103,9 +103,9 @@ export default function RatingForm({
                 type="button"
                 onClick={() => setScore(n)}
                 aria-pressed={score === n}
-                className={`h-10 w-10 rounded border text-sm font-medium ${
+                className={`h-10 w-10 rounded border font-display text-base font-medium ${
                   score === n
-                    ? "border-red-500 bg-red-500 text-white"
+                    ? "border-score-you bg-score-you text-white"
                     : "border-gray-300 text-gray-700 hover:border-gray-400"
                 }`}
               >

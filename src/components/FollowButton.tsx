@@ -23,10 +23,10 @@ function Button({
     <button
       type="submit"
       disabled={pending}
-      className={`${base} border disabled:opacity-60 ${
+      className={`${base} border font-display font-medium disabled:opacity-60 ${
         isFollowing
-          ? "border-gray-300 text-gray-700 hover:border-gray-400"
-          : "border-black bg-black text-white"
+          ? "border-follow-green text-follow-green hover:bg-follow-green/5"
+          : "border-mulo-orange bg-mulo-orange text-white hover:bg-mulo-orange-dark"
       }`}
     >
       {pending ? "…" : isFollowing ? "Following" : "Follow"}
@@ -60,7 +60,7 @@ export default function FollowButton({
     return (
       <Link
         href="/login"
-        className="rounded border border-black bg-black px-4 py-2 text-sm text-white"
+        className="rounded border border-mulo-orange bg-mulo-orange px-4 py-2 font-display text-sm font-medium text-white"
       >
         Follow
       </Link>

@@ -1,12 +1,13 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
+/** Named to match the mockups: Ovr / You / Friends. */
 export type ReleaseScores = {
-  community: number | null;
-  communityCount: number;
+  overall: number | null;
+  overallCount: number;
   you: number | null;
-  following: number | null;
-  followingCount: number;
+  friends: number | null;
+  friendsCount: number;
 };
 
 export type OwnRating = {
@@ -43,8 +44,8 @@ export async function getReleaseScores(
     ? (all.find((r) => r.user_id === user.id)?.score ?? null)
     : null;
 
-  let following: number | null = null;
-  let followingCount = 0;
+  let friends: number | null = null;
+  let friendsCount = 0;
 
   if (user) {
     const { data: follows } = await supabase
@@ -57,17 +58,49 @@ export async function getReleaseScores(
       .filter((r) => followedIds.has(r.user_id))
       .map((r) => r.score);
 
-    following = average(followedScores);
-    followingCount = followedScores.length;
+    friends = average(followedScores);
+    friendsCount = followedScores.length;
   }
 
   return {
-    community: average(all.map((r) => r.score)),
-    communityCount: all.length,
+    overall: average(all.map((r) => r.score)),
+    overallCount: all.length,
     you,
-    following,
-    followingCount,
+    friends,
+    friendsCount,
   };
+}
+
+/**
+ * Overall scores for many releases in one query, for grids like the artist
+ * page. Returns a map of release mbid to average, omitting unrated releases.
+ */
+export async function getScoresForReleases(
+  releaseMbids: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (releaseMbids.length === 0) return result;
+
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("ratings")
+    .select("release_mbid, score")
+    .in("release_mbid", releaseMbids);
+
+  const grouped = new Map<string, number[]>();
+  for (const row of data ?? []) {
+    const scores = grouped.get(row.release_mbid) ?? [];
+    scores.push(row.score);
+    grouped.set(row.release_mbid, scores);
+  }
+
+  for (const [mbid, scores] of grouped) {
+    const mean = average(scores);
+    if (mean !== null) result.set(mbid, mean);
+  }
+
+  return result;
 }
 
 export async function getOwnRating(releaseMbid: string): Promise<OwnRating> {

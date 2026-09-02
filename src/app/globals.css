@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
+/*
+  MULO palette, taken from the brand mark and the original mockups.
+  Orange is the brand accent; navy carries headings and rules; the three
+  rating colours are fixed and meaningful, so they never change.
+*/
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #14142b;
+
+  --mulo-orange: #ee7a3c;
+  --mulo-orange-dark: #d8632a;
+  --mulo-navy: #14142b;
+  --mulo-rule: #2b2b5c;
+  --mulo-muted: #6b6b85;
+
+  --score-overall: #f5c518;
+  --score-you: #e63329;
+  --score-friends: #7b8fe8;
+  --follow-green: #17a34a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-mulo-orange: var(--mulo-orange);
+  --color-mulo-orange-dark: var(--mulo-orange-dark);
+  --color-mulo-navy: var(--mulo-navy);
+  --color-mulo-rule: var(--mulo-rule);
+  --color-mulo-muted: var(--mulo-muted);
+  --color-score-overall: var(--score-overall);
+  --color-score-you: var(--score-you);
+  --color-score-friends: var(--score-friends);
+  --color-follow-green: var(--follow-green);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-oswald);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Headings use the condensed display face from the mockups. */
+.font-display {
+  font-family: var(--font-oswald), var(--font-geist-sans), sans-serif;
+}
+
+/* The navy rule that separates rows throughout the mockups. */
+.mulo-rule {
+  border-bottom: 2px solid var(--mulo-rule);
 }
