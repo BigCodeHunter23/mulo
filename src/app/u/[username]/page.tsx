@@ -9,6 +9,7 @@ import { getUserFeed } from "@/lib/feed";
 import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import SectionHeading from "@/components/SectionHeading";
+import ReportButton from "@/components/ReportButton";
 
 export default async function ProfilePage({
   params,
@@ -64,13 +65,22 @@ export default async function ProfilePage({
           </div>
         </div>
 
-        <FollowButton
-          targetId={profile.id}
-          username={profile.username}
-          signedIn={followState.signedIn}
-          isSelf={followState.isSelf}
-          isFollowing={followState.isFollowing}
-        />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <FollowButton
+            targetId={profile.id}
+            username={profile.username}
+            signedIn={followState.signedIn}
+            isSelf={followState.isSelf}
+            isFollowing={followState.isFollowing}
+          />
+          {!followState.isSelf && (
+            <ReportButton
+              profileId={profile.id}
+              signedIn={followState.signedIn}
+              label="Report this user"
+            />
+          )}
+        </div>
       </header>
 
       <SectionHeading>Ratings</SectionHeading>

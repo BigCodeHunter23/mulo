@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
 export type Review = {
+  id: number;
   username: string;
   display_name: string | null;
   score: number;
@@ -17,13 +18,16 @@ export async function getReleaseReviews(
 
   const { data } = await supabase
     .from("ratings")
-    .select("score, review, created_at, profiles!inner ( username, display_name )")
+    .select(
+      "id, score, review, created_at, profiles!inner ( username, display_name )",
+    )
     .eq("release_mbid", releaseMbid)
     .not("review", "is", null)
     .order("created_at", { ascending: false })
     .limit(50);
 
   type Row = {
+    id: number;
     score: number;
     review: string | null;
     created_at: string;
@@ -31,6 +35,7 @@ export async function getReleaseReviews(
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
     username: row.profiles.username,
     display_name: row.profiles.display_name,
     score: row.score,

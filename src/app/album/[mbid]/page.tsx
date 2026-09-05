@@ -10,6 +10,7 @@ import { getReleaseReviews } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/server";
 import StarScore from "@/components/StarScore";
 import SectionHeading from "@/components/SectionHeading";
+import ReportButton from "@/components/ReportButton";
 import RatingForm from "./RatingForm";
 
 function formatDuration(ms: number | null) {
@@ -169,7 +170,7 @@ export default async function AlbumPage({
         ) : (
           <ul className="flex flex-col divide-y divide-gray-200">
             {reviews.map((review) => (
-              <li key={review.username} className="py-4">
+              <li key={review.id} className="py-4">
                 <div className="mb-1 flex items-baseline gap-2">
                   <Link
                     href={`/u/${review.username}`}
@@ -188,6 +189,13 @@ export default async function AlbumPage({
                 {review.review && (
                   <p className="text-sm text-gray-700">{review.review}</p>
                 )}
+                <div className="mt-2">
+                  <ReportButton
+                    ratingId={review.id}
+                    signedIn={Boolean(user)}
+                    label="Report this review"
+                  />
+                </div>
               </li>
             ))}
           </ul>
