@@ -93,7 +93,9 @@ export default function StarScore({
   size?: "normal" | "small";
 }) {
   return (
-    <div className={`flex items-start ${size === "small" ? "gap-4" : "gap-7"}`}>
+    <div
+      className={`flex items-start ${size === "small" ? "gap-3" : "gap-4 sm:gap-6"}`}
+    >
       <Score
         kind="overall"
         value={overall}

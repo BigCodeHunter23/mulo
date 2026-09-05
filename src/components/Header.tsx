@@ -17,12 +17,15 @@ export default async function Header() {
         .maybeSingle()
     : { data: null };
 
-  const navLink = "text-sm text-gray-300 hover:text-white transition-colors";
+  const navLink =
+    "text-sm whitespace-nowrap text-gray-300 hover:text-white transition-colors";
 
   return (
     <header className="bg-black">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <div className="flex items-baseline gap-5">
+      {/* Two rows on a phone (brand and account, then navigation) so the
+          links never wrap into an untidy stack. */}
+      <div className="mx-auto max-w-5xl px-4 py-2.5 sm:py-3">
+        <div className="flex items-center justify-between gap-4">
           <Link href="/" className="flex items-baseline gap-2">
             <span className="font-display text-2xl font-bold leading-none tracking-tight text-mulo-orange">
               MULO
@@ -31,7 +34,8 @@ export default async function Header() {
               For Music Lovers
             </span>
           </Link>
-          <nav className="flex items-baseline gap-4">
+
+          <nav className="hidden items-baseline gap-4 sm:flex">
             <Link href="/search" className={navLink}>
               Search
             </Link>
@@ -39,36 +43,44 @@ export default async function Header() {
               People
             </Link>
           </nav>
-        </div>
 
-        {user ? (
-          <div className="flex items-baseline gap-4">
-            <Link href="/ratings" className={navLink}>
-              My ratings
-            </Link>
-            {profile?.username ? (
-              <Link href={`/u/${profile.username}`} className={navLink}>
-                Profile
-              </Link>
+          <div className="ml-auto flex items-center gap-4">
+            {user ? (
+              <>
+                <Link href="/ratings" className={navLink}>
+                  Ratings
+                </Link>
+                <Link
+                  href={profile?.username ? `/u/${profile.username}` : "/profile"}
+                  className={navLink}
+                >
+                  {profile?.username ? "Profile" : "Set up profile"}
+                </Link>
+                <form action={logout}>
+                  <button type="submit" className={navLink}>
+                    Log out
+                  </button>
+                </form>
+              </>
             ) : (
-              <Link href="/profile" className={navLink}>
-                Set up profile
+              <Link
+                href="/login"
+                className="rounded bg-mulo-orange px-3 py-1.5 text-sm font-medium whitespace-nowrap text-white hover:bg-mulo-orange-dark"
+              >
+                Log in
               </Link>
             )}
-            <form action={logout}>
-              <button type="submit" className={navLink}>
-                Log out
-              </button>
-            </form>
           </div>
-        ) : (
-          <Link
-            href="/login"
-            className="rounded bg-mulo-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-mulo-orange-dark"
-          >
-            Log in
+        </div>
+
+        <nav className="mt-2 flex items-baseline gap-4 sm:hidden">
+          <Link href="/search" className={navLink}>
+            Search
           </Link>
-        )}
+          <Link href="/people" className={navLink}>
+            People
+          </Link>
+        </nav>
       </div>
     </header>
   );

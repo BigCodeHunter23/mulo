@@ -21,6 +21,41 @@ function formatDuration(ms: number | null) {
   return `${minutes}:${seconds}`;
 }
 
+function Details({
+  releaseDate,
+  runtime,
+  genres,
+  className,
+}: {
+  releaseDate: string | null;
+  runtime: string | null;
+  genres: string[];
+  className?: string;
+}) {
+  return (
+    <dl className={`space-y-2 text-sm ${className ?? ""}`}>
+      {releaseDate && (
+        <div className="flex gap-3">
+          <dt className="w-28 shrink-0 font-semibold">Release Date</dt>
+          <dd className="text-mulo-muted">{releaseDate}</dd>
+        </div>
+      )}
+      {runtime && (
+        <div className="flex gap-3">
+          <dt className="w-28 shrink-0 font-semibold">Duration</dt>
+          <dd className="text-mulo-muted">{runtime}</dd>
+        </div>
+      )}
+      {genres.length > 0 && (
+        <div className="flex gap-3">
+          <dt className="w-28 shrink-0 font-semibold">Genre</dt>
+          <dd className="text-mulo-orange">{genres.slice(0, 4).join(", ")}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
 function totalRuntime(tracks: { duration_ms: number | null }[]) {
   const ms = tracks.reduce((sum, t) => sum + (t.duration_ms ?? 0), 0);
   if (ms === 0) return null;
@@ -73,34 +108,22 @@ export default async function AlbumPage({
             )}
           </div>
 
-          <dl className="mt-5 space-y-2 text-sm">
-            {release.release_date && (
-              <div className="flex gap-3">
-                <dt className="w-28 shrink-0 font-semibold">Release Date</dt>
-                <dd className="text-mulo-muted">{release.release_date}</dd>
-              </div>
-            )}
-            {runtime && (
-              <div className="flex gap-3">
-                <dt className="w-28 shrink-0 font-semibold">Duration</dt>
-                <dd className="text-mulo-muted">{runtime}</dd>
-              </div>
-            )}
-            {release.genres.length > 0 && (
-              <div className="flex gap-3">
-                <dt className="w-28 shrink-0 font-semibold">Genre</dt>
-                <dd className="text-mulo-orange">
-                  {release.genres.slice(0, 4).join(", ")}
-                </dd>
-              </div>
-            )}
-          </dl>
+          {/* Beside the cover on a wide screen; below the title on a phone,
+              so the album name is the first thing read. */}
+          <Details
+            releaseDate={release.release_date}
+            runtime={runtime}
+            genres={release.genres}
+            className="mt-5 hidden sm:block"
+          />
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="font-display text-4xl font-bold leading-tight text-mulo-navy">
+          {/* Wraps rather than overflowing: the title and three scores only
+              sit side by side once there is genuinely room for both. */}
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl font-bold leading-tight text-mulo-navy sm:text-4xl">
                 {release.title}
                 {year && (
                   <span className="ml-2 font-normal text-mulo-muted">
@@ -118,14 +141,23 @@ export default async function AlbumPage({
               )}
             </div>
 
-            <StarScore
-              overall={scores.overall}
-              overallCount={scores.overallCount}
-              you={scores.you}
-              friends={scores.friends}
-              friendsCount={scores.friendsCount}
-            />
+            <div className="shrink-0">
+              <StarScore
+                overall={scores.overall}
+                overallCount={scores.overallCount}
+                you={scores.you}
+                friends={scores.friends}
+                friendsCount={scores.friendsCount}
+              />
+            </div>
           </div>
+
+          <Details
+            releaseDate={release.release_date}
+            runtime={runtime}
+            genres={release.genres}
+            className="mt-6 sm:hidden"
+          />
 
           <div className="mt-6">
             <RatingForm
