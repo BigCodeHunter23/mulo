@@ -1,15 +1,12 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingFeed, getGlobalFeed } from "@/lib/feed";
 import FeedItem from "@/components/FeedItem";
 import SectionHeading from "@/components/SectionHeading";
 
 export default async function Home() {
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     const recent = await getGlobalFeed(10);

@@ -7,7 +7,7 @@ import {
 } from "@/lib/catalog";
 import { getOwnRating, getReleaseScores } from "@/lib/ratings";
 import { getReleaseReviews } from "@/lib/reviews";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import StarScore from "@/components/StarScore";
 import SectionHeading from "@/components/SectionHeading";
 import ReportButton from "@/components/ReportButton";
@@ -75,10 +75,7 @@ export default async function AlbumPage({
   const release = await getCachedRelease(mbid);
   if (!release) notFound();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const [artist, tracks, scores, ownRating, reviews] = await Promise.all([
     release.artist_mbid ? getCachedArtist(release.artist_mbid) : null,

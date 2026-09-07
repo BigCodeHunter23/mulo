@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 /** Named to match the mockups: Ovr / You / Friends. */
 export type ReleaseScores = {
@@ -29,9 +29,7 @@ export async function getReleaseScores(
 ): Promise<ReleaseScores> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const { data: ratings } = await supabase
     .from("ratings")
@@ -106,9 +104,7 @@ export async function getScoresForReleases(
 export async function getOwnRating(releaseMbid: string): Promise<OwnRating> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) return null;
 
@@ -142,9 +138,7 @@ export async function getOwnRatings(
 ): Promise<RatingWithRelease[]> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) return [];
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 export type PublicProfile = {
   id: string;
@@ -64,9 +64,7 @@ export async function getFollowState(
 ): Promise<{ signedIn: boolean; isSelf: boolean; isFollowing: boolean }> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) return { signedIn: false, isSelf: false, isFollowing: false };
   if (user.id === targetUserId)

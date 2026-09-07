@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnRatings } from "@/lib/ratings";
 import { Score } from "@/components/StarScore";
 import SectionHeading from "@/components/SectionHeading";
@@ -23,10 +23,7 @@ export default async function MyRatingsPage({
     ? (sort as SortKey)
     : "recent";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) redirect("/login");
 
