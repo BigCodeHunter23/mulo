@@ -5,6 +5,7 @@ export type Review = {
   id: number;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   score: number;
   review: string | null;
   created_at: string;
@@ -19,7 +20,7 @@ export async function getReleaseReviews(
   const { data } = await supabase
     .from("ratings")
     .select(
-      "id, score, review, created_at, profiles!inner ( username, display_name )",
+      "id, score, review, created_at, profiles!inner ( username, display_name, avatar_url )",
     )
     .eq("release_mbid", releaseMbid)
     .not("review", "is", null)
@@ -31,13 +32,14 @@ export async function getReleaseReviews(
     score: number;
     review: string | null;
     created_at: string;
-    profiles: { username: string; display_name: string | null };
+    profiles: { username: string; display_name: string | null; avatar_url: string | null };
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
     id: row.id,
     username: row.profiles.username,
     display_name: row.profiles.display_name,
+    avatar_url: row.profiles.avatar_url,
     score: row.score,
     review: row.review,
     created_at: row.created_at,

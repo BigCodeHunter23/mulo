@@ -5,6 +5,7 @@ export type PublicProfile = {
   id: string;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   bio: string | null;
   created_at: string;
 };
@@ -23,7 +24,7 @@ export async function getProfileByUsername(
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, display_name, bio, created_at")
+    .select("id, username, display_name, avatar_url, bio, created_at")
     .eq("username", username)
     .maybeSingle();
 
@@ -89,7 +90,7 @@ export async function listProfiles(): Promise<PublicProfile[]> {
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, display_name, bio, created_at")
+    .select("id, username, display_name, avatar_url, bio, created_at")
     .order("created_at", { ascending: false })
     .limit(200);
 

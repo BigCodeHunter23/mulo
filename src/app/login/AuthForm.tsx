@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { login, signup, type AuthState } from "./actions";
+import { buttonClass, Field, fieldClass, Notice } from "@/components/ui";
 
 function SubmitButton({ mode }: { mode: "login" | "signup" }) {
   const { pending } = useFormStatus();
@@ -12,7 +13,7 @@ function SubmitButton({ mode }: { mode: "login" | "signup" }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-black px-3 py-2 text-white disabled:opacity-60"
+      className={`${buttonClass()} w-full`}
     >
       {pending
         ? mode === "login"
@@ -28,79 +29,67 @@ function SubmitButton({ mode }: { mode: "login" | "signup" }) {
 export default function AuthForm() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const action = mode === "login" ? login : signup;
-
   const [state, formAction] = useActionState<AuthState, FormData>(action, {});
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex rounded border border-gray-300 p-1 text-sm">
-        <button
-          type="button"
-          onClick={() => setMode("login")}
-          className={`flex-1 rounded px-3 py-1.5 ${
-            mode === "login" ? "bg-black text-white" : "text-gray-600"
-          }`}
-        >
-          Log in
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("signup")}
-          className={`flex-1 rounded px-3 py-1.5 ${
-            mode === "signup" ? "bg-black text-white" : "text-gray-600"
-          }`}
-        >
-          Sign up
-        </button>
+    <div className="flex flex-col gap-7">
+      <div className="text-center">
+        <h1 className="display text-3xl text-text">
+          {mode === "login" ? "Welcome back" : "Join MULO"}
+        </h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          {mode === "login"
+            ? "Log in to rate and review music."
+            : "Start rating the music you listen to."}
+        </p>
       </div>
 
-      <h1 className="text-2xl font-bold">
-        {mode === "login" ? "Log in to MULO" : "Create your MULO account"}
-      </h1>
+      <div className="flex rounded-lg border border-border bg-surface p-1">
+        {(["login", "signup"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === m
+                ? "bg-surface-raised text-text"
+                : "text-text-muted hover:text-text"
+            }`}
+          >
+            {m === "login" ? "Log in" : "Sign up"}
+          </button>
+        ))}
+      </div>
 
-      {state.message && (
-        <p className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-900">
-          {state.message}
-        </p>
-      )}
-      {state.error && (
-        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-900">
-          {state.error}
-        </p>
-      )}
+      {state.message && <Notice tone="info">{state.message}</Notice>}
+      {state.error && <Notice tone="error">{state.error}</Notice>}
 
-      <form action={formAction} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
+      <form action={formAction} className="flex flex-col gap-5">
+        <Field label="Email">
           <input
             id="email"
             name="email"
             type="email"
             autoComplete="email"
             required
-            className="rounded border border-gray-300 px-3 py-2"
+            className={fieldClass}
           />
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Password
+        <Field
+          label="Password"
+          hint={mode === "signup" ? "At least 6 characters." : undefined}
+        >
           <input
             id="password"
             name="password"
             type="password"
-            autoComplete={
-              mode === "login" ? "current-password" : "new-password"
-            }
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
             required
             minLength={6}
-            className="rounded border border-gray-300 px-3 py-2"
+            className={fieldClass}
           />
-          {mode === "signup" && (
-            <span className="text-xs text-gray-500">
-              At least 6 characters.
-            </span>
-          )}
-        </label>
+        </Field>
 
         <SubmitButton mode={mode} />
       </form>
@@ -108,7 +97,7 @@ export default function AuthForm() {
       {mode === "login" && (
         <Link
           href="/auth/reset"
-          className="text-sm text-gray-600 underline"
+          className="text-center text-sm text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
         >
           Forgotten your password?
         </Link>

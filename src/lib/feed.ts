@@ -6,7 +6,7 @@ export type FeedItem = {
   score: number;
   review: string | null;
   created_at: string;
-  author: { username: string; display_name: string | null };
+  author: { username: string; display_name: string | null; avatar_url: string | null };
   release: {
     mbid: string;
     title: string;
@@ -20,7 +20,7 @@ type FeedRow = {
   score: number;
   review: string | null;
   created_at: string;
-  profiles: { username: string; display_name: string | null };
+  profiles: { username: string; display_name: string | null; avatar_url: string | null };
   releases: {
     mbid: string;
     title: string;
@@ -31,7 +31,7 @@ type FeedRow = {
 
 const SELECT = `
   id, score, review, created_at,
-  profiles!inner ( username, display_name ),
+  profiles!inner ( username, display_name, avatar_url ),
   releases!inner ( mbid, title, cover_art_url, artists ( mbid, name ) )
 `;
 
@@ -44,6 +44,7 @@ function toFeedItems(rows: FeedRow[]): FeedItem[] {
     author: {
       username: row.profiles.username,
       display_name: row.profiles.display_name,
+      avatar_url: row.profiles.avatar_url,
     },
     release: {
       mbid: row.releases.mbid,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { toggleFollow, type FollowState } from "@/app/u/[username]/actions";
+import { buttonClass } from "@/components/ui";
 
 function Button({
   isFollowing,
@@ -13,20 +14,16 @@ function Button({
   size: "normal" | "small";
 }) {
   const { pending } = useFormStatus();
-
-  const base =
-    size === "small"
-      ? "rounded px-3 py-1.5 text-sm"
-      : "rounded px-4 py-2 text-sm";
+  const dimensions = size === "small" ? "h-8 px-3" : "h-10 px-4";
 
   return (
     <button
       type="submit"
       disabled={pending}
-      className={`${base} border font-display font-medium disabled:opacity-60 ${
+      className={`inline-flex items-center justify-center rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 ${dimensions} ${
         isFollowing
-          ? "border-follow-green text-follow-green hover:bg-follow-green/5"
-          : "border-mulo-orange bg-mulo-orange text-white hover:bg-mulo-orange-dark"
+          ? "border-border-strong bg-transparent text-text-secondary hover:border-score-you/50 hover:text-score-you"
+          : "border-accent bg-accent text-[#0b0b0e] hover:bg-accent-hover"
       }`}
     >
       {pending ? "…" : isFollowing ? "Following" : "Follow"}
@@ -60,7 +57,7 @@ export default function FollowButton({
     return (
       <Link
         href="/login"
-        className="rounded border border-mulo-orange bg-mulo-orange px-4 py-2 font-display text-sm font-medium text-white"
+        className={buttonClass({ size: size === "small" ? "sm" : "md" })}
       >
         Follow
       </Link>
@@ -68,7 +65,7 @@ export default function FollowButton({
   }
 
   return (
-    <form action={formAction} className="flex flex-col items-start gap-1">
+    <form action={formAction} className="flex flex-col items-end gap-1">
       <input type="hidden" name="target_id" value={targetId} />
       <input type="hidden" name="username" value={username} />
       <input
@@ -77,7 +74,9 @@ export default function FollowButton({
         value={isFollowing ? "unfollow" : "follow"}
       />
       <Button isFollowing={isFollowing} size={size} />
-      {state.error && <p className="text-xs text-red-700">{state.error}</p>}
+      {state.error && (
+        <p className="text-xs text-score-you">{state.error}</p>
+      )}
     </form>
   );
 }

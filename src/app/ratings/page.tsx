@@ -2,13 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnRatings } from "@/lib/ratings";
-import { Score } from "@/components/StarScore";
-import SectionHeading from "@/components/SectionHeading";
+import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 const SORTS = [
-  { key: "recent", label: "Most recent" },
-  { key: "highest", label: "Highest rated" },
-  { key: "lowest", label: "Lowest rated" },
+  { key: "recent", label: "Recent" },
+  { key: "highest", label: "Highest" },
+  { key: "lowest", label: "Lowest" },
 ] as const;
 
 type SortKey = (typeof SORTS)[number]["key"];
@@ -24,25 +23,24 @@ export default async function MyRatingsPage({
     : "recent";
 
   const user = await getCurrentUser();
-
   if (!user) redirect("/login");
 
   const ratings = await getOwnRatings(active);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <SectionHeading
         action={
           ratings.length > 0 ? (
-            <div className="flex gap-1.5 text-sm">
+            <div className="flex gap-1">
               {SORTS.map((s) => (
                 <Link
                   key={s.key}
                   href={`/ratings?sort=${s.key}`}
-                  className={`rounded border px-2.5 py-1 ${
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                     active === s.key
-                      ? "border-mulo-navy bg-mulo-navy text-white"
-                      : "border-gray-300 text-gray-700 hover:border-gray-400"
+                      ? "bg-surface-raised text-text"
+                      : "text-text-muted hover:text-text"
                   }`}
                 >
                   {s.label}
@@ -52,41 +50,30 @@ export default async function MyRatingsPage({
           ) : undefined
         }
       >
-        My Ratings
+        My ratings
+        {ratings.length > 0 && (
+          <span className="ml-2 text-sm font-normal text-text-muted">
+            {ratings.length}
+          </span>
+        )}
       </SectionHeading>
 
-      <p className="mb-6 text-sm text-mulo-muted">
-        {ratings.length === 0
-          ? "Nothing rated yet."
-          : `${ratings.length} title${ratings.length === 1 ? "" : "s"}`}
-      </p>
-
       {ratings.length === 0 ? (
-        <div className="rounded border border-gray-200 p-8 text-center">
-          <p className="mb-4 text-mulo-muted">
-            Find an album and give it a score out of 10.
-          </p>
-          <Link
-            href="/search"
-            className="inline-block rounded bg-mulo-orange px-4 py-2 font-medium text-white hover:bg-mulo-orange-dark"
-          >
-            Search music
-          </Link>
-        </div>
+        <EmptyState
+          title="Nothing rated yet"
+          body="Find an album and give it a score out of 10."
+          action={<ButtonLink href="/search">Search music</ButtonLink>}
+        />
       ) : (
-        <ol className="flex flex-col">
-          {ratings.map((rating, index) => (
+        <ol className="grid gap-3 sm:grid-cols-2">
+          {ratings.map((rating) => (
             <li
               key={rating.release.mbid}
-              className="mulo-rule flex gap-4 py-5 first:border-t-2 first:border-t-mulo-rule first:pt-5"
+              className="group flex gap-4 rounded-xl border border-border bg-surface p-3.5 transition-colors hover:border-border-strong"
             >
-              <span className="w-5 shrink-0 pt-1 text-right font-display text-lg text-mulo-muted tabular-nums">
-                {index + 1}
-              </span>
-
               <Link
                 href={`/album/${rating.release.mbid}`}
-                className="h-28 w-28 shrink-0 overflow-hidden bg-gray-100"
+                className="artwork h-20 w-20 shrink-0 overflow-hidden rounded-lg transition-transform group-hover:scale-[1.02]"
               >
                 {rating.release.cover_art_url && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -100,39 +87,33 @@ export default async function MyRatingsPage({
               </Link>
 
               <div className="min-w-0 flex-1">
-                <Link
-                  href={`/album/${rating.release.mbid}`}
-                  className="font-display text-xl font-semibold text-mulo-navy hover:underline"
-                >
-                  {rating.release.title}
-                  {rating.release.release_date && (
-                    <span className="ml-1.5 font-normal text-mulo-muted">
-                      ({rating.release.release_date.slice(0, 4)})
-                    </span>
-                  )}
-                </Link>
+                <div className="flex items-start gap-3">
+                  <Link
+                    href={`/album/${rating.release.mbid}`}
+                    className="display-sm min-w-0 flex-1 truncate text-sm text-text transition-colors hover:text-accent"
+                  >
+                    {rating.release.title}
+                  </Link>
+                  <span className="display-sm shrink-0 tabular-nums text-score-you">
+                    {rating.score}
+                    <span className="text-[10px] text-text-muted">/10</span>
+                  </span>
+                </div>
 
                 {rating.release.artist && (
                   <Link
                     href={`/artist/${rating.release.artist.mbid}`}
-                    className="block text-sm text-mulo-orange hover:underline"
+                    className="block truncate text-sm text-text-secondary transition-colors hover:text-text"
                   >
                     {rating.release.artist.name}
                   </Link>
                 )}
 
                 {rating.review && (
-                  <p className="mt-2 text-sm text-gray-700">{rating.review}</p>
+                  <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-text-muted">
+                    {rating.review}
+                  </p>
                 )}
-
-                <p className="mt-2 text-xs text-mulo-muted">
-                  Rated on{" "}
-                  {new Date(rating.created_at).toLocaleDateString("en-GB")}
-                </p>
-              </div>
-
-              <div className="shrink-0 pt-1">
-                <Score kind="you" value={rating.score} />
               </div>
             </li>
           ))}

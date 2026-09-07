@@ -1,30 +1,25 @@
 /**
- * MULO's signature three-score display, following the original mockups.
+ * MULO's signature three-score display.
  *
- * Yellow "Ovr"     — the overall community score
- * Red "You"        — the signed-in user's own score
- * Blue "Friends"   — the average among people they follow
+ * Gold "Ovr"     — the overall community score
+ * Red "You"      — the signed-in user's own score
+ * Blue "Friends" — the average among people they follow
  *
- * Out of 10 to one decimal place. Missing scores read "NA", as in the
- * mockups, rather than collapsing the layout.
+ * Out of 10 to one decimal place. These are the only saturated colours on a
+ * page besides the artwork, which is what makes them read at a glance.
  */
 
 export type ScoreKind = "overall" | "you" | "friends";
 
-const STYLES: Record<ScoreKind, { label: string; fill: string }> = {
-  overall: { label: "Ovr", fill: "text-score-overall" },
-  you: { label: "You", fill: "text-score-you" },
-  friends: { label: "Friends", fill: "text-score-friends" },
+const STYLES: Record<ScoreKind, { label: string; color: string }> = {
+  overall: { label: "Ovr", color: "text-score-overall" },
+  you: { label: "You", color: "text-score-you" },
+  friends: { label: "Friends", color: "text-score-friends" },
 };
 
-function Star({ className, size }: { className: string; size: string }) {
+function Star({ className }: { className: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={`${size} ${className}`}
-      fill="currentColor"
-    >
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
       <path d="M12 2.5l2.9 6.13 6.6.92-4.8 4.76 1.16 6.69L12 17.77l-5.86 3.23L7.3 14.3 2.5 9.55l6.6-.92L12 2.5z" />
     </svg>
   );
@@ -34,43 +29,37 @@ export function Score({
   kind,
   value,
   count,
-  size = "normal",
+  size = "md",
   showLabel = true,
 }: {
   kind: ScoreKind;
   value: number | null;
   count?: number;
-  size?: "normal" | "small";
+  size?: "sm" | "md" | "lg";
   showLabel?: boolean;
 }) {
   const style = STYLES[kind];
-  const hasValue = value !== null && !Number.isNaN(value);
+  const has = value !== null && !Number.isNaN(value);
 
-  const starSize = size === "small" ? "h-4 w-4" : "h-7 w-7";
-  const numberSize = size === "small" ? "text-base" : "text-2xl";
+  const star = { sm: "h-3.5 w-3.5", md: "h-5 w-5", lg: "h-6 w-6" }[size];
+  const num = { sm: "text-sm", md: "text-xl", lg: "text-3xl" }[size];
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="flex items-baseline gap-1.5">
-        <Star
-          className={hasValue ? style.fill : "text-gray-300"}
-          size={`${starSize} self-center`}
-        />
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1.5">
+        <Star className={`${star} ${has ? style.color : "text-text-muted/40"}`} />
         <span
-          className={`font-display font-semibold tabular-nums ${numberSize} ${
-            hasValue ? "text-mulo-navy" : "text-mulo-muted"
+          className={`display-sm tabular-nums ${num} ${
+            has ? "text-text" : "text-text-muted"
           }`}
         >
-          {hasValue ? value.toFixed(1) : "NA"}
+          {has ? value.toFixed(1) : "—"}
         </span>
-        {hasValue && size === "normal" && (
-          <span className="text-xs text-mulo-muted">/10</span>
-        )}
       </div>
       {showLabel && (
-        <span className="text-[11px] uppercase tracking-wide text-mulo-muted">
+        <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
           {style.label}
-          {typeof count === "number" && count > 0 && ` (${count})`}
+          {typeof count === "number" && count > 0 && ` · ${count}`}
         </span>
       )}
     </div>
@@ -83,32 +72,20 @@ export default function StarScore({
   you,
   friends,
   friendsCount,
-  size = "normal",
 }: {
   overall: number | null;
   overallCount?: number;
   you: number | null;
   friends: number | null;
   friendsCount?: number;
-  size?: "normal" | "small";
 }) {
   return (
-    <div
-      className={`flex items-start ${size === "small" ? "gap-3" : "gap-4 sm:gap-6"}`}
-    >
-      <Score
-        kind="overall"
-        value={overall}
-        count={overallCount}
-        size={size}
-      />
-      <Score kind="you" value={you} size={size} />
-      <Score
-        kind="friends"
-        value={friends}
-        count={friendsCount}
-        size={size}
-      />
+    <div className="flex items-start gap-5 rounded-xl border border-border bg-surface/60 px-5 py-3 backdrop-blur-sm sm:gap-7">
+      <Score kind="overall" value={overall} count={overallCount} />
+      <div className="w-px self-stretch bg-border" />
+      <Score kind="you" value={you} />
+      <div className="w-px self-stretch bg-border" />
+      <Score kind="friends" value={friends} count={friendsCount} />
     </div>
   );
 }
