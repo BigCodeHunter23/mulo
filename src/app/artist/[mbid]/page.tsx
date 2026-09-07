@@ -20,13 +20,29 @@ export default async function ArtistPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <header className="mb-10">
-        <h1 className="font-display text-4xl font-bold leading-tight text-mulo-navy">
-          {artist.name}
-        </h1>
-        {artist.bio && (
-          <p className="mt-2 max-w-prose text-mulo-muted">{artist.bio}</p>
+      <header className="mb-10 flex flex-col gap-6 sm:flex-row">
+        {artist.image_url && (
+          <div className="w-full shrink-0 overflow-hidden bg-gray-100 sm:h-44 sm:w-44">
+            {/* Wikimedia Commons photo, served from their CDN. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={artist.image_url}
+              alt={artist.name}
+              className="h-56 w-full object-cover object-top sm:h-44 sm:w-44"
+            />
+          </div>
         )}
+
+        <div className="min-w-0">
+          <h1 className="font-display text-4xl font-bold leading-tight text-mulo-navy">
+            {artist.name}
+          </h1>
+          {artist.bio && (
+            <p className="mt-2 max-w-prose text-sm leading-relaxed text-gray-700">
+              {artist.bio}
+            </p>
+          )}
+        </div>
       </header>
 
       <SectionHeading>

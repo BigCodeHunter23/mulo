@@ -53,6 +53,7 @@ export type MbArtist = {
   disambiguation?: string;
   country?: string;
   score?: number;
+  relations?: { type: string; url?: { resource?: string } }[];
 };
 
 export type MbReleaseGroup = {
@@ -133,7 +134,20 @@ export async function searchReleaseGroups(
 }
 
 export async function getArtist(mbid: string): Promise<MbArtist> {
-  return mbFetch<MbArtist>(`/artist/${mbid}?fmt=json`);
+  return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels&fmt=json`);
+}
+
+/**
+ * MusicBrainz records a Wikidata link for most notable artists, which is the
+ * way through to a photo and a real biography.
+ */
+export function wikidataQid(artist: MbArtist): string | null {
+  const url = artist.relations?.find((r) => r.type === "wikidata")?.url
+    ?.resource;
+  if (!url) return null;
+
+  const qid = url.split("/").pop();
+  return qid && /^Q\d+$/.test(qid) ? qid : null;
 }
 
 export async function getArtistReleaseGroups(

@@ -7,8 +7,10 @@ import {
   getArtistReleaseGroups,
   getReleaseGroup,
   getTracklist,
+  wikidataQid,
   MbNotFoundError,
 } from "@/lib/musicbrainz";
+import { getArtistExtras } from "@/lib/wikidata";
 
 export type Artist = {
   mbid: string;
@@ -39,23 +41,32 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
     .from("artists")
     .select("mbid, name, image_url, bio")
     .eq("mbid", mbid)
-    .single();
+    .maybeSingle();
 
-  if (cached) return cached;
+  // image_url null means we have never looked for a photo; an empty string
+  // means we looked and there wasn't one, so we don't ask again every visit.
+  if (cached && cached.image_url !== null) return cached;
 
   let mb;
   try {
     mb = await getArtist(mbid);
   } catch (error) {
     if (error instanceof MbNotFoundError) return null;
+    // Already cached and MusicBrainz is unhappy: show what we have.
+    if (cached) return cached;
     throw error;
   }
+
+  const qid = wikidataQid(mb);
+  const extras = qid
+    ? await getArtistExtras(qid)
+    : { imageUrl: null, bio: null };
 
   const artist: Artist = {
     mbid: mb.id,
     name: mb.name,
-    image_url: null,
-    bio: mb.disambiguation || null,
+    image_url: extras.imageUrl ?? "",
+    bio: extras.bio || mb.disambiguation || null,
   };
 
   await createAdminClient().from("artists").upsert(artist);
