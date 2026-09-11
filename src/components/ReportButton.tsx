@@ -5,6 +5,10 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitReport, type ReportState } from "@/app/report/actions";
 import { REPORT_REASONS } from "@/lib/report-reasons";
+import { buttonClass, fieldClass } from "@/components/ui";
+
+const quietLink =
+  "text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -13,7 +17,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-mulo-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-mulo-orange-dark disabled:opacity-60"
+      className={buttonClass({ size: "sm" })}
     >
       {pending ? "Sending…" : "Send report"}
     </button>
@@ -43,23 +47,19 @@ export default function ReportButton({
 
   if (!signedIn) {
     return (
-      <Link href="/login" className="text-xs text-mulo-muted underline">
+      <Link href="/login" className={quietLink}>
         {label}
       </Link>
     );
   }
 
   if (state.message) {
-    return <span className="text-xs text-mulo-muted">{state.message}</span>;
+    return <span className="text-xs text-text-muted">{state.message}</span>;
   }
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-xs text-mulo-muted underline hover:text-mulo-navy"
-      >
+      <button type="button" onClick={() => setOpen(true)} className={quietLink}>
         {label}
       </button>
     );
@@ -68,7 +68,7 @@ export default function ReportButton({
   return (
     <form
       action={formAction}
-      className="mt-2 flex flex-col gap-2 rounded border border-gray-200 p-3"
+      className="mt-2 flex w-full min-w-[15rem] flex-col gap-3 rounded-lg border border-border bg-surface-raised p-3 text-left"
     >
       {ratingId !== undefined && (
         <input type="hidden" name="rating_id" value={ratingId} />
@@ -77,47 +77,44 @@ export default function ReportButton({
         <input type="hidden" name="profile_id" value={profileId} />
       )}
 
-      <p className="text-sm font-medium">What&rsquo;s wrong with this?</p>
+      <p className="text-sm font-medium text-text">
+        What&rsquo;s wrong with this?
+      </p>
 
-      <label className="flex flex-col gap-1 text-sm">
-        Reason
-        <select
-          name="reason"
-          required
-          defaultValue=""
-          className="rounded border border-gray-300 px-2 py-1.5"
-        >
-          <option value="" disabled>
-            Choose a reason
+      <select
+        name="reason"
+        required
+        defaultValue=""
+        aria-label="Reason"
+        className={fieldClass}
+      >
+        <option value="" disabled>
+          Choose a reason
+        </option>
+        {REPORT_REASONS.map((reason) => (
+          <option key={reason} value={reason}>
+            {reason}
           </option>
-          {REPORT_REASONS.map((reason) => (
-            <option key={reason} value={reason}>
-              {reason}
-            </option>
-          ))}
-        </select>
-      </label>
+        ))}
+      </select>
 
-      <label className="flex flex-col gap-1 text-sm">
-        Anything to add <span className="text-xs text-mulo-muted">(optional)</span>
-        <textarea
-          name="detail"
-          rows={2}
-          maxLength={500}
-          className="rounded border border-gray-300 px-2 py-1.5"
-        />
-      </label>
+      <textarea
+        name="detail"
+        rows={2}
+        maxLength={500}
+        placeholder="Anything to add? (optional)"
+        aria-label="Details"
+        className={`${fieldClass} resize-y`}
+      />
 
-      {state.error && (
-        <p className="text-xs text-red-700">{state.error}</p>
-      )}
+      {state.error && <p className="text-xs text-score-you">{state.error}</p>}
 
       <div className="flex items-center gap-3">
         <SubmitButton />
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-xs text-mulo-muted underline"
+          className={quietLink}
         >
           Cancel
         </button>

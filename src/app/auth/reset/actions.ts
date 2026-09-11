@@ -5,6 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ResetState = { error?: string; message?: string };
 
+/** This site's own origin, for building the link that goes in the email. */
+async function siteOrigin() {
+  const h = await headers();
+  const origin = h.get("origin");
+  if (origin) return origin;
+
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const protocol = h.get("x-forwarded-proto") ?? "https";
+  return `${protocol}://${host}`;
+}
+
 export async function requestReset(
   _prev: ResetState,
   formData: FormData,
@@ -14,10 +25,8 @@ export async function requestReset(
 
   if (!email) return { error: "Enter the email address on your account." };
 
-  const origin = (await headers()).get("origin");
-
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm?next=/auth/update-password`,
+    redirectTo: `${await siteOrigin()}/auth/confirm?next=/auth/update-password`,
   });
 
   if (error) {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { updatePassword, type UpdatePasswordState } from "./actions";
+import { buttonClass, Field, fieldClass, Notice } from "@/components/ui";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -12,7 +13,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-black px-3 py-2 text-white disabled:opacity-60"
+      className={`${buttonClass()} w-full`}
     >
       {pending ? "Saving…" : "Set new password"}
     </button>
@@ -26,45 +27,53 @@ export default function UpdatePasswordPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-12">
-      <h1 className="text-2xl font-bold">Choose a new password</h1>
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-7 px-4 py-12">
+      <div className="text-center">
+        <h1 className="display text-3xl text-text">Choose a new password</h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          You&rsquo;ll stay logged in once it&rsquo;s saved.
+        </p>
+      </div>
 
       {state.error && (
-        <div className="rounded bg-red-50 px-3 py-2 text-sm text-red-900">
-          <p>{state.error}</p>
-          <Link href="/auth/reset" className="mt-1 inline-block underline">
-            Request a new link
-          </Link>
+        <div className="flex flex-col gap-2">
+          <Notice tone="error">{state.error}</Notice>
+          {state.expired && (
+            <Link
+              href="/auth/reset"
+              className="text-center text-sm font-medium text-accent underline-offset-4 hover:underline"
+            >
+              Request a new link
+            </Link>
+          )}
         </div>
       )}
 
-      <form action={formAction} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          New password
+      <form action={formAction} className="flex flex-col gap-5">
+        <Field label="New password" hint="At least 6 characters.">
           <input
             name="password"
             type="password"
             autoComplete="new-password"
             required
             minLength={6}
-            className="rounded border border-gray-300 px-3 py-2"
+            className={fieldClass}
           />
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Confirm new password
+        <Field label="Confirm new password">
           <input
             name="confirm"
             type="password"
             autoComplete="new-password"
             required
             minLength={6}
-            className="rounded border border-gray-300 px-3 py-2"
+            className={fieldClass}
           />
-        </label>
+        </Field>
 
         <SubmitButton />
       </form>
-    </div>
+    </main>
   );
 }

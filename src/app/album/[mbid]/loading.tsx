@@ -1,20 +1,18 @@
+import { SkeletonLine } from "@/components/Skeleton";
+
 export default function Loading() {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <div className="mb-8 flex flex-col gap-6 sm:flex-row">
-        <div className="aspect-square w-full shrink-0 animate-pulse rounded bg-gray-200 sm:w-56" />
-        <div className="flex flex-col gap-3">
-          <div className="h-9 w-56 animate-pulse rounded bg-gray-200" />
-          <div className="h-6 w-40 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-10 sm:px-6">
+      <div className="flex flex-col gap-7 sm:flex-row sm:gap-9">
+        <div className="aspect-square w-44 shrink-0 animate-pulse rounded-xl bg-surface-raised sm:w-60" />
+        <div className="flex flex-1 flex-col gap-4 pt-2">
+          <SkeletonLine className="w-16" />
+          <div className="h-12 w-3/4 max-w-md animate-pulse rounded bg-surface-raised" />
+          <SkeletonLine className="w-64" />
+          <div className="mt-2 h-16 w-72 animate-pulse rounded-xl bg-surface-raised" />
         </div>
       </div>
-      <div className="mb-3 h-6 w-24 animate-pulse rounded bg-gray-200" />
-      <div className="flex flex-col gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-8 animate-pulse rounded bg-gray-200" />
-        ))}
-      </div>
+      <div className="mt-12 h-40 animate-pulse rounded-xl bg-surface-raised" />
     </main>
   );
 }
