@@ -25,9 +25,11 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refreshes the session cookie if it's expired. Do not add logic
-  // between createServerClient and this call.
-  await supabase.auth.getUser();
+  // Refreshes an expired session and verifies the token. getClaims() checks
+  // the token's signature locally where it can, instead of asking Supabase
+  // over the network on every page load as getUser() does.
+  // Do not add logic between createServerClient and this call.
+  await supabase.auth.getClaims();
 
   return supabaseResponse;
 }

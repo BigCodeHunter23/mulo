@@ -32,15 +32,25 @@ export const createClient = cache(async () => {
   );
 });
 
+export type CurrentUser = { id: string; email: string | null };
+
 /**
- * getUser() verifies the token with Supabase over the network, so calling it
- * from the header, the page and each data helper meant several round trips
- * for one render. Cached, it happens once per request.
+ * The signed-in user, looked up once per request.
+ *
+ * getClaims() verifies the session token's signature locally when the project
+ * signs tokens with asymmetric keys, and otherwise falls back to asking
+ * Supabase. Either way the token is verified, never merely trusted from the
+ * cookie, but in the common case it skips a network round trip that
+ * getUser() would make on every page.
  */
-export const getCurrentUser = cache(async () => {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (error || !data?.claims?.sub) return null;
+
+  return {
+    id: data.claims.sub,
+    email: typeof data.claims.email === "string" ? data.claims.email : null,
+  };
 });

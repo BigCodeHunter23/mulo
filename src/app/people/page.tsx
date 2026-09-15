@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
 import { EmptyState, SectionHeading } from "@/components/ui";
+
+export const metadata: Metadata = { title: "People" };
 
 export default async function PeoplePage() {
   const user = await getCurrentUser();

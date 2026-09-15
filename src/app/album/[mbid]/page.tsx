@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -8,11 +9,46 @@ import {
 import { getOwnRating, getReleaseScores } from "@/lib/ratings";
 import { getReleaseReviews } from "@/lib/reviews";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
 import { SectionHeading } from "@/components/ui";
 import RatingForm from "./RatingForm";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ mbid: string }>;
+}): Promise<Metadata> {
+  const { mbid } = await params;
+  const { data } = await createPublicClient()
+    .from("releases")
+    .select("title, release_date, artists ( name )")
+    .eq("mbid", mbid)
+    .maybeSingle();
+
+  if (!data) return { title: "Album" };
+
+  // Without generated database types, supabase-js can't tell this join is
+  // many-to-one and types it as a list, so handle either shape.
+  const joined = data.artists as unknown as
+    | { name: string }
+    | { name: string }[]
+    | null;
+  const artist = Array.isArray(joined) ? joined[0]?.name : joined?.name;
+  const year = (data.release_date as string | null)?.slice(0, 4);
+  const title = artist ? `${data.title} — ${artist}` : String(data.title);
+  const description = `${data.title}${artist ? ` by ${artist}` : ""}${
+    year ? ` (${year})` : ""
+  }. Rate and review it on MULO.`;
+
+  return {
+    title,
+    description,
+    openGraph: { type: "website", siteName: "MULO", title, description },
+  };
+}
 
 function formatDuration(ms: number | null) {
   if (!ms) return "";
@@ -145,6 +181,7 @@ export default async function AlbumPage({
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6">
         <div className="mb-12">
           <RatingForm
+            key={mbid}
             releaseMbid={mbid}
             signedIn={Boolean(user)}
             existing={ownRating}

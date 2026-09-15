@@ -1,9 +1,40 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
 import { getScoresForReleases } from "@/lib/ratings";
+import { createPublicClient } from "@/lib/supabase/public";
 import { Score } from "@/components/StarScore";
 import { SectionHeading } from "@/components/ui";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ mbid: string }>;
+}): Promise<Metadata> {
+  const { mbid } = await params;
+  const { data } = await createPublicClient()
+    .from("artists")
+    .select("name, bio")
+    .eq("mbid", mbid)
+    .maybeSingle();
+
+  if (!data) return { title: "Artist" };
+
+  const name = String(data.name);
+  const bio = (data.bio as string | null) ?? "";
+  const description = bio
+    ? bio.length > 160
+      ? `${bio.slice(0, 157).trimEnd()}…`
+      : bio
+    : `Albums by ${name}, rated and reviewed on MULO.`;
+
+  return {
+    title: name,
+    description,
+    openGraph: { type: "website", siteName: "MULO", title: name, description },
+  };
+}
 
 export default async function ArtistPage({
   params,

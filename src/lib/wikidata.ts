@@ -1,6 +1,7 @@
 import "server-only";
 
-const USER_AGENT = "MULO/0.1 (alexbacskos@gmail.com)";
+// Wikimedia asks requests to identify the app; the site address is the contact.
+const USER_AGENT = "MULO/0.1 ( https://mulo-plum.vercel.app )";
 
 export type ArtistExtras = {
   /** Commons image URL, or null when the artist has no photo available. */

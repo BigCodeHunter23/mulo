@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Header from "@/components/Header";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -9,10 +10,31 @@ const inter = Inter({
   display: "swap",
 });
 
+const description =
+  "Rate and review the music you listen to, and see what the people you follow are playing.";
+
 export const metadata: Metadata = {
-  title: "MULO — For Music Lovers",
-  description:
-    "Rate and review the music you listen to, and see what the people you follow are playing.",
+  metadataBase: new URL(siteUrl()),
+  title: { default: "MULO — For Music Lovers", template: "%s · MULO" },
+  description,
+  applicationName: "MULO",
+  openGraph: {
+    type: "website",
+    siteName: "MULO",
+    title: "MULO — For Music Lovers",
+    description,
+  },
+  twitter: { card: "summary_large_image" },
+  appleWebApp: {
+    capable: true,
+    title: "MULO",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0b0e",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,5 +1,7 @@
 const API = "https://musicbrainz.org/ws/2";
-const USER_AGENT = "MULO/0.1 (alexbacskos@gmail.com)";
+// MusicBrainz requires requests to identify the app and a way to reach it.
+// The site address serves as the contact rather than a personal email.
+const USER_AGENT = "MULO/0.1 ( https://mulo-plum.vercel.app )";
 const MIN_INTERVAL_MS = 1100;
 
 // MusicBrainz allows ~1 request/second. Chain every call through a single

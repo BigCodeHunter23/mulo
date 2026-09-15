@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getOwnRatings } from "@/lib/ratings";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+
+export const metadata: Metadata = { title: "My ratings" };
 
 const SORTS = [
   { key: "recent", label: "Recent" },

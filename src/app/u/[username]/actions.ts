@@ -1,50 +1,45 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
-export type FollowState = { error?: string };
+export type FollowResult =
+  | { ok: true }
+  | { ok: false; error: string; needsLogin?: boolean };
 
-export async function toggleFollow(
-  _prev: FollowState,
-  formData: FormData,
-): Promise<FollowState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const targetId = String(formData.get("target_id") ?? "");
-  const username = String(formData.get("username") ?? "");
-  const intent = String(formData.get("intent") ?? "");
-
+/** Follows or unfollows; called directly when the button is tapped. */
+export async function setFollowing(
+  targetId: string,
+  username: string,
+  follow: boolean,
+): Promise<FollowResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, error: "Log in to follow people.", needsLogin: true };
+  }
   if (targetId === user.id) {
-    return { error: "You can't follow yourself." };
+    return { ok: false, error: "You can't follow yourself." };
   }
 
-  if (intent === "unfollow") {
-    const { error } = await supabase
-      .from("follows")
-      .delete()
-      .eq("follower_id", user.id)
-      .eq("following_id", targetId);
+  const supabase = await createClient();
 
-    if (error) return { error: error.message };
-  } else {
-    const { error } = await supabase
-      .from("follows")
-      .insert({ follower_id: user.id, following_id: targetId });
+  const { error } = follow
+    ? await supabase
+        .from("follows")
+        .insert({ follower_id: user.id, following_id: targetId })
+    : await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", user.id)
+        .eq("following_id", targetId);
 
-    // Following twice is harmless, not an error worth showing.
-    if (error && error.code !== "23505") return { error: error.message };
+  // Following someone twice is harmless, not an error worth showing.
+  if (error && error.code !== "23505") {
+    return { ok: false, error: "Couldn't update that. Please try again." };
   }
 
   revalidatePath(`/u/${username}`);
-  revalidatePath("/");
   revalidatePath("/people");
-  return {};
+  revalidatePath("/");
+  return { ok: true };
 }

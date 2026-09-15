@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import AuthForm from "./AuthForm";
 
-export default async function LoginPage() {
+export const metadata: Metadata = { title: "Log in" };
 
+export default async function LoginPage() {
   const user = await getCurrentUser();
 
   // Already signed in — no reason to show a login form.

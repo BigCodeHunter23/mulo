@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   getFollowState,
@@ -5,11 +6,38 @@ import {
   getProfileStats,
 } from "@/lib/social";
 import { getUserFeed } from "@/lib/feed";
+import { createPublicClient } from "@/lib/supabase/public";
 import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const { data } = await createPublicClient()
+    .from("profiles")
+    .select("username, display_name, bio")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (!data) return { title: "Profile" };
+
+  const name = String(data.display_name || data.username);
+  const title = `${name} (@${data.username})`;
+  const description =
+    (data.bio as string | null) || `See what ${name} is rating on MULO.`;
+
+  return {
+    title,
+    description,
+    openGraph: { type: "website", siteName: "MULO", title, description },
+  };
+}
 
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
