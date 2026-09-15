@@ -2,42 +2,56 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { rateAlbum } from "@/app/album/[mbid]/actions";
-import type { AlbumSummary } from "@/lib/discover";
-import { coverSrc } from "@/lib/cover-url";
+import { rate } from "@/app/ratings/actions";
 import { buttonClass } from "@/components/ui";
+
+export type QuickRateItem = {
+  mbid: string;
+  title: string;
+  subtitle: string | null;
+  /** A ready-sized image address, or null for none. */
+  image: string | null;
+};
+
+type Kind = "artist" | "album";
 
 const GOAL = 5;
 
 /**
- * Tap a cover to open its scores, tap a score to save it. Each rating is
- * shown straight away and rolls back if the save fails.
+ * Artists and albums a new person is likely to know, in two tabs. Tap one to
+ * open its scores, tap a score to save it. Each rating shows straight away
+ * and rolls back if the save fails.
  */
 export default function QuickRateGrid({
+  artists,
   albums,
   initialScores,
 }: {
-  albums: AlbumSummary[];
+  artists: QuickRateItem[];
+  albums: QuickRateItem[];
+  /** Keyed "artist:<mbid>" or "album:<mbid>". */
   initialScores: Record<string, number>;
 }) {
-  const [scores, setScores] = useState<Record<string, number>>(initialScores);
+  const [tab, setTab] = useState<Kind>("artist");
+  const [scores, setScores] = useState(initialScores);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function rate(mbid: string, value: number) {
-    const previous = scores[mbid];
-    setScores((current) => ({ ...current, [mbid]: value }));
+  function save(kind: Kind, mbid: string, value: number) {
+    const key = `${kind}:${mbid}`;
+    const previous = scores[key];
+    setScores((current) => ({ ...current, [key]: value }));
     setOpen(null);
     setError(null);
 
     startTransition(async () => {
-      const result = await rateAlbum(mbid, value);
+      const result = await rate(kind, mbid, value);
       if (!result.ok) {
         setScores((current) => {
           const next = { ...current };
-          if (previous === undefined) delete next[mbid];
-          else next[mbid] = previous;
+          if (previous === undefined) delete next[key];
+          else next[key] = previous;
           return next;
         });
         setError(result.error);
@@ -48,42 +62,79 @@ export default function QuickRateGrid({
   const count = Object.keys(scores).length;
   const progress =
     count === 0
-      ? "Tap an album to rate it."
+      ? "Tap an artist or album to rate it."
       : count < GOAL
         ? `${count} rated · ${GOAL - count} more to go`
         : `${count} rated · you're set`;
 
+  const items = tab === "artist" ? artists : albums;
+  const round = tab === "artist";
+
   return (
     <>
+      <div
+        role="tablist"
+        aria-label="What to rate"
+        className="mb-7 flex gap-1 rounded-lg border border-border bg-surface p-1 sm:w-fit"
+      >
+        {(["artist", "album"] as const).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            role="tab"
+            aria-selected={tab === kind}
+            onClick={() => {
+              setTab(kind);
+              setOpen(null);
+            }}
+            className={`flex-1 rounded-md px-5 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
+              tab === kind ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
+            }`}
+          >
+            {kind === "artist" ? "Artists" : "Albums"}
+          </button>
+        ))}
+      </div>
+
       <ul className="grid grid-cols-2 gap-x-4 gap-y-6 pb-28 sm:grid-cols-3 lg:grid-cols-5">
-        {albums.map((album, i) => {
-          const score = scores[album.mbid];
-          const isOpen = open === album.mbid;
-          const src = coverSrc(album.cover_art_url, 250);
+        {items.map((item, i) => {
+          const key = `${tab}:${item.mbid}`;
+          const score = scores[key];
+          const isOpen = open === key;
 
           return (
-            <li key={album.mbid}>
+            <li key={key}>
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setOpen(isOpen ? null : album.mbid)}
+                  onClick={() => setOpen(isOpen ? null : key)}
                   aria-expanded={isOpen}
-                  aria-label={`Rate ${album.title}`}
-                  className="artwork relative block aspect-square w-full overflow-hidden rounded-lg transition-transform active:scale-[0.98]"
+                  aria-label={`Rate ${item.title}`}
+                  className={`artwork relative block aspect-square w-full overflow-hidden transition-transform active:scale-[0.98] ${
+                    round ? "rounded-full" : "rounded-lg"
+                  }`}
                 >
-                  {src && (
+                  {item.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={src}
+                      src={item.image}
                       alt=""
                       loading={i < 10 ? "eager" : "lazy"}
                       className={`h-full w-full object-cover transition-opacity ${
-                        isOpen ? "opacity-25" : ""
-                      }`}
+                        round ? "object-top" : ""
+                      } ${isOpen ? "opacity-25" : ""}`}
                     />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-text-muted">
+                      {item.title.charAt(0).toUpperCase()}
+                    </span>
                   )}
                   {score !== undefined && !isOpen && (
-                    <span className="absolute right-2 top-2 rounded-md bg-score-you px-2 py-0.5 text-sm font-bold tabular-nums text-[#0b0b0e] shadow-lg">
+                    <span
+                      className={`absolute rounded-md bg-score-you px-2 py-0.5 text-sm font-bold tabular-nums text-[#0b0b0e] shadow-lg ${
+                        round ? "bottom-2 left-1/2 -translate-x-1/2" : "right-2 top-2"
+                      }`}
+                    >
                       {score}
                     </span>
                   )}
@@ -92,14 +143,14 @@ export default function QuickRateGrid({
                 {isOpen && (
                   <div
                     role="group"
-                    aria-label={`Score for ${album.title}`}
+                    aria-label={`Score for ${item.title}`}
                     className="absolute inset-0 grid grid-cols-5 content-center gap-1.5 p-2.5"
                   >
                     {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
                       <button
                         key={n}
                         type="button"
-                        onClick={() => rate(album.mbid, n)}
+                        onClick={() => save(tab, item.mbid, n)}
                         aria-pressed={score === n}
                         className={`aspect-square rounded-md text-sm font-semibold tabular-nums transition-colors ${
                           score === n
@@ -114,10 +165,16 @@ export default function QuickRateGrid({
                 )}
               </div>
 
-              <p className="display-sm mt-2 line-clamp-1 text-sm text-text">
-                {album.title}
+              <p
+                className={`display-sm mt-2 line-clamp-1 text-sm text-text ${
+                  round ? "text-center" : ""
+                }`}
+              >
+                {item.title}
               </p>
-              <p className="truncate text-xs text-text-muted">{album.artist}</p>
+              {item.subtitle && (
+                <p className="truncate text-xs text-text-muted">{item.subtitle}</p>
+              )}
             </li>
           );
         })}

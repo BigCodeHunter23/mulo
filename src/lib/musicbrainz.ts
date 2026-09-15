@@ -81,6 +81,17 @@ export type MbTrack = {
   position: number;
   title: string;
   length?: number;
+  /** The song itself, shared by every release it appears on. */
+  recording?: { id: string; title: string; length?: number };
+};
+
+/** One edition of an album, as listed before its tracks are fetched. */
+type MbEdition = {
+  id: string;
+  status?: string;
+  date?: string;
+  country?: string;
+  media?: { "track-count"?: number }[];
 };
 
 /** The artist credit as printed on a release, e.g. "JAY-Z & Kanye West". */
@@ -211,16 +222,65 @@ export async function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {
   );
 }
 
+function trackCount(edition: MbEdition) {
+  return (edition.media ?? []).reduce((sum, m) => sum + (m["track-count"] ?? 0), 0);
+}
+
+// Worldwide and big English-language releases carry the titles people know.
+const PREFERRED_COUNTRIES = ["XW", "US", "GB", "XE", "CA", "AU"];
+
+/**
+ * An album comes in many editions: deluxe versions with bonus tracks, promo
+ * samplers, pressings for different countries. The standard edition is the
+ * one released most often, so take the most common official track count,
+ * then the best-placed, earliest release with that count.
+ */
+function standardEdition(editions: MbEdition[]): MbEdition | null {
+  const usable = editions.filter((e) => trackCount(e) > 0);
+  const official = usable.filter((e) => e.status === "Official");
+  const pool = official.length > 0 ? official : usable;
+
+  const byCount = new Map<number, MbEdition[]>();
+  for (const edition of pool) {
+    const count = trackCount(edition);
+    byCount.set(count, [...(byCount.get(count) ?? []), edition]);
+  }
+
+  const date = (e: MbEdition) => e.date || "9999";
+  const earliest = (group: MbEdition[]) => group.map(date).sort()[0];
+  const groups = [...byCount.values()].sort(
+    (a, b) => b.length - a.length || earliest(a).localeCompare(earliest(b)),
+  );
+
+  const place = (e: MbEdition) => {
+    const index = PREFERRED_COUNTRIES.indexOf(e.country ?? "");
+    return index === -1 ? PREFERRED_COUNTRIES.length : index;
+  };
+
+  return (
+    (groups[0] ?? []).sort(
+      (a, b) => place(a) - place(b) || date(a).localeCompare(date(b)),
+    )[0] ?? null
+  );
+}
+
+/**
+ * The tracklist of an album's standard edition, each track carrying the id
+ * of its song. Two requests: the album's editions, then the chosen one.
+ */
 export async function getTracklist(
   releaseGroupMbid: string,
 ): Promise<MbTrack[]> {
-  const data = await mbFetch<{
-    releases: { media: { tracks: MbTrack[] }[] }[];
-  }>(
-    `/release?release-group=${releaseGroupMbid}&inc=recordings&limit=1&fmt=json`,
+  const { releases = [] } = await mbFetch<{ releases?: MbEdition[] }>(
+    `/release?release-group=${releaseGroupMbid}&inc=media&limit=100&fmt=json`,
   );
 
-  const media = data.releases?.[0]?.media ?? [];
+  const edition = standardEdition(releases);
+  if (!edition) return [];
+
+  const { media = [] } = await mbFetch<{ media?: { tracks?: MbTrack[] }[] }>(
+    `/release/${edition.id}?inc=recordings&fmt=json`,
+  );
   return media.flatMap((m) => m.tracks ?? []);
 }
 

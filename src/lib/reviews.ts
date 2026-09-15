@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { RATING_TABLES } from "@/lib/rating-kinds";
 
 export type Review = {
   id: number;
@@ -11,18 +12,23 @@ export type Review = {
   created_at: string;
 };
 
-/** Written reviews for a release, newest first. Ratings without text are skipped. */
-export async function getReleaseReviews(
-  releaseMbid: string,
+/**
+ * Written reviews of an album or an artist, newest first. Ratings without
+ * text are skipped; songs don't take reviews.
+ */
+export async function getReviews(
+  kind: "album" | "artist",
+  mbid: string,
 ): Promise<Review[]> {
   const supabase = await createClient();
+  const { table, column } = RATING_TABLES[kind];
 
   const { data } = await supabase
-    .from("ratings")
+    .from(table)
     .select(
       "id, score, review, created_at, profiles!inner ( username, display_name, avatar_url )",
     )
-    .eq("release_mbid", releaseMbid)
+    .eq(column, mbid)
     .not("review", "is", null)
     .order("created_at", { ascending: false })
     .limit(50);

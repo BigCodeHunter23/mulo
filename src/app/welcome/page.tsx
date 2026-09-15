@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { mostPlayedAlbums } from "@/lib/discover";
+import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
+import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
@@ -17,13 +18,13 @@ type Step = (typeof STEPS)[number];
 
 const LABELS: Record<Step, string> = {
   profile: "Your profile",
-  rate: "Rate albums",
+  rate: "Rate music",
   follow: "Follow people",
 };
 
 /**
- * First run for a new account: pick a username, rate a handful of albums
- * you know, follow some people. A minute in, the feed and the scores around
+ * First run for a new account: pick a username, rate a handful of artists
+ * and albums you know, follow some people. A minute in, the feed and the scores around
  * MULO have something in them.
  */
 export default async function WelcomePage({
@@ -106,24 +107,41 @@ function ProfileStep() {
 
 async function RateStep({ userId }: { userId: string }) {
   const supabase = await createClient();
-  const [albums, { data: rated }] = await Promise.all([
-    mostPlayedAlbums(30),
-    supabase.from("ratings").select("release_mbid, score").eq("user_id", userId),
-  ]);
+  const [artists, albums, { data: ratedArtists }, { data: ratedAlbums }] =
+    await Promise.all([
+      popularArtists(20),
+      mostPlayedAlbums(30),
+      supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId),
+      supabase.from("ratings").select("release_mbid, score").eq("user_id", userId),
+    ]);
 
-  const scores: Record<string, number> = Object.fromEntries(
-    (rated ?? []).map((r) => [r.release_mbid, r.score]),
-  );
+  const scores: Record<string, number> = {};
+  for (const r of ratedArtists ?? []) scores[`artist:${r.artist_mbid}`] = r.score;
+  for (const r of ratedAlbums ?? []) scores[`album:${r.release_mbid}`] = r.score;
 
   return (
     <div>
-      <h1 className="display text-3xl text-text">Rate a few albums you know</h1>
+      <h1 className="display text-3xl text-text">Rate some music you know</h1>
       <p className="mt-2 max-w-xl text-sm text-text-secondary">
-        Tap an album, then a score out of 10. Skip anything you haven&rsquo;t
-        heard; five or so is plenty to start.
+        Tap an artist or an album, then a score out of 10. Skip anything you
+        don&rsquo;t know; five or so is plenty to start.
       </p>
       <div className="mt-8">
-        <QuickRateGrid albums={albums} initialScores={scores} />
+        <QuickRateGrid
+          artists={artists.map((a) => ({
+            mbid: a.mbid,
+            title: a.name,
+            subtitle: null,
+            image: artistPhotoSrc(a.image_url, 300),
+          }))}
+          albums={albums.map((a) => ({
+            mbid: a.mbid,
+            title: a.title,
+            subtitle: a.artist,
+            image: coverSrc(a.cover_art_url, 250),
+          }))}
+          initialScores={scores}
+        />
       </div>
     </div>
   );
@@ -143,7 +161,7 @@ async function FollowStep({ userId }: { userId: string }) {
       <h1 className="display text-3xl text-text">Follow some people</h1>
       <p className="mt-2 text-sm text-text-secondary">
         Their ratings fill your feed, and they make up the blue
-        &ldquo;Friends&rdquo; score on every album.
+        &ldquo;Friends&rdquo; score on every album and artist.
       </p>
 
       {others.length === 0 ? (

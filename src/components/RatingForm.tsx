@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import {
-  rateAlbum,
+  rate,
   removeRating,
   saveReview,
   type RatingResult,
-} from "./actions";
+} from "@/app/ratings/actions";
 import { buttonClass, fieldClass } from "@/components/ui";
 
 type Status =
@@ -15,18 +15,25 @@ type Status =
   | { tone: "error"; text: string; needsProfile?: boolean }
   | null;
 
+const COPY = {
+  album: { noun: "album", prompt: "What did you make of it?" },
+  artist: { noun: "artist", prompt: "What do you make of their music?" },
+} as const;
+
 /**
- * Tapping a score saves it straight away, with no Save button and no reload.
- * The score shows as chosen immediately and rolls back if the save fails.
- * A review is typed, so it gets an explicit save that only appears once
- * there's something new to save.
+ * Rates an album or an artist. Tapping a score saves it straight away, with
+ * no Save button and no reload. The score shows as chosen immediately and
+ * rolls back if the save fails. A review is typed, so it gets an explicit
+ * save that only appears once there's something new to save.
  */
 export default function RatingForm({
-  releaseMbid,
+  kind,
+  mbid,
   signedIn,
   existing,
 }: {
-  releaseMbid: string;
+  kind: "album" | "artist";
+  mbid: string;
   signedIn: boolean;
   existing: { score: number; review: string | null } | null;
 }) {
@@ -43,6 +50,8 @@ export default function RatingForm({
     return () => clearTimeout(timer);
   }, [status]);
 
+  const { noun, prompt } = COPY[kind];
+
   if (!signedIn) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface/40 px-5 py-6 text-center">
@@ -53,7 +62,7 @@ export default function RatingForm({
           >
             Log in
           </Link>{" "}
-          to rate and review this album.
+          to rate and review this {noun}.
         </p>
       </div>
     );
@@ -78,7 +87,7 @@ export default function RatingForm({
     setScore(value);
     setStatus(null);
     startTransition(async () => {
-      if (!settle(await rateAlbum(releaseMbid, value), "Saved")) {
+      if (!settle(await rate(kind, mbid, value), "Saved")) {
         setScore(previous);
       }
     });
@@ -87,7 +96,7 @@ export default function RatingForm({
   function commitReview() {
     const text = draft.trim();
     startTransition(async () => {
-      if (settle(await saveReview(releaseMbid, text), "Review saved")) {
+      if (settle(await saveReview(kind, mbid, text), "Review saved")) {
         setSavedReview(text);
       }
     });
@@ -99,7 +108,7 @@ export default function RatingForm({
     setDraft("");
     setSavedReview("");
     startTransition(async () => {
-      if (!settle(await removeRating(releaseMbid), "Rating removed")) {
+      if (!settle(await removeRating(kind, mbid), "Rating removed")) {
         setScore(previous.score);
         setDraft(previous.draft);
         setSavedReview(previous.savedReview);
@@ -113,7 +122,7 @@ export default function RatingForm({
     <div className="rounded-xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="display-sm text-base text-text">
-          {score === null ? "Rate this album" : "Your rating"}
+          {score === null ? `Rate this ${noun}` : "Your rating"}
         </h2>
         <div className="flex items-center gap-4 text-sm">
           <span aria-live="polite" className="text-text-muted">
@@ -180,18 +189,18 @@ export default function RatingForm({
       ) : (
         <div className="mt-5 flex flex-col gap-2">
           <label
-            htmlFor={`review-${releaseMbid}`}
+            htmlFor={`review-${mbid}`}
             className="text-xs font-medium uppercase tracking-wider text-text-secondary"
           >
             Review <span className="normal-case text-text-muted">optional</span>
           </label>
           <textarea
-            id={`review-${releaseMbid}`}
+            id={`review-${mbid}`}
             rows={3}
             maxLength={1000}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="What did you make of it?"
+            placeholder={prompt}
             className={`${fieldClass} resize-y`}
           />
           {reviewChanged && (

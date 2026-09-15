@@ -17,7 +17,7 @@ const STYLES: Record<ScoreKind, { label: string; color: string }> = {
   friends: { label: "Friends", color: "text-score-friends" },
 };
 
-function Star({ className }: { className: string }) {
+export function Star({ className }: { className: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
       <path d="M12 2.5l2.9 6.13 6.6.92-4.8 4.76 1.16 6.69L12 17.77l-5.86 3.23L7.3 14.3 2.5 9.55l6.6-.92L12 2.5z" />

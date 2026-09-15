@@ -21,6 +21,7 @@ export async function submitReport(
   const reason = String(formData.get("reason") ?? "");
   const detail = String(formData.get("detail") ?? "").trim();
   const ratingId = formData.get("rating_id");
+  const artistRatingId = formData.get("artist_rating_id");
   const profileId = formData.get("profile_id");
 
   if (!REPORT_REASONS.includes(reason as ReportReason)) {
@@ -30,6 +31,7 @@ export async function submitReport(
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
     reported_rating_id: ratingId ? Number(ratingId) : null,
+    reported_artist_rating_id: artistRatingId ? Number(artistRatingId) : null,
     reported_profile_id: profileId ? String(profileId) : null,
     reason,
     detail: detail || null,

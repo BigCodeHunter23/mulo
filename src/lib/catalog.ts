@@ -35,6 +35,8 @@ export type Track = {
   position: number;
   title: string;
   duration_ms: number | null;
+  /** The song, for rating. Null on a tracklist saved before songs existed. */
+  song_mbid: string | null;
 };
 
 const RELEASE_COLUMNS =
@@ -245,33 +247,73 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
 export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
   const supabase = await createClient();
 
-  const { data: cached } = await supabase
-    .from("tracks")
-    .select("position, title, duration_ms")
-    .eq("release_mbid", releaseMbid)
-    .order("position");
+  const [{ data: release }, { data: cached }] = await Promise.all([
+    supabase
+      .from("releases")
+      .select("tracks_cached_at")
+      .eq("mbid", releaseMbid)
+      .maybeSingle(),
+    supabase
+      .from("tracks")
+      .select("position, title, duration_ms, song_mbid")
+      .eq("release_mbid", releaseMbid)
+      .order("position"),
+  ]);
 
-  if (cached && cached.length > 0) return cached;
+  // Only a tracklist taken from the standard edition, with its songs, is
+  // final. One saved before that gets replaced.
+  if (release?.tracks_cached_at) return cached ?? [];
 
   let mbTracks;
   try {
     mbTracks = await getTracklist(releaseMbid);
   } catch {
-    // No tracklist is better than a broken page; it's retried next visit.
-    return [];
+    // The old tracklist, or none, beats a broken page. Retried next visit.
+    return cached ?? [];
   }
+  if (mbTracks.length === 0) return cached ?? [];
 
   // Numbered straight through, so a double album doesn't repeat 1, 2, 3.
-  const tracks = mbTracks.map((t, i) => ({
+  const tracks: Track[] = mbTracks.map((t, i) => ({
     position: i + 1,
     title: t.title,
     duration_ms: t.length ?? null,
+    song_mbid: t.recording?.id ?? null,
   }));
 
-  if (tracks.length > 0) {
-    await createAdminClient()
-      .from("tracks")
-      .insert(tracks.map((t) => ({ ...t, release_mbid: releaseMbid })));
+  // A song can appear twice on one album; save it once.
+  const songs = new Map<string, { mbid: string; title: string; duration_ms: number | null }>();
+  for (const t of mbTracks) {
+    if (t.recording) {
+      songs.set(t.recording.id, {
+        mbid: t.recording.id,
+        title: t.recording.title,
+        duration_ms: t.recording.length ?? null,
+      });
+    }
+  }
+
+  const admin = createAdminClient();
+  if (songs.size > 0) {
+    const { error } = await admin
+      .from("songs")
+      .upsert([...songs.values()], { onConflict: "mbid" });
+    if (error) return cached ?? [];
+  }
+
+  // Ratings belong to songs, not to these rows, so replacing them is safe.
+  await admin.from("tracks").delete().eq("release_mbid", releaseMbid);
+  const { error } = await admin
+    .from("tracks")
+    .insert(tracks.map((t) => ({ ...t, release_mbid: releaseMbid })));
+
+  // An error here usually means someone else saved it a moment ago; theirs
+  // stands and marks it done.
+  if (!error) {
+    await admin
+      .from("releases")
+      .update({ tracks_cached_at: new Date().toISOString() })
+      .eq("mbid", releaseMbid);
   }
 
   return tracks;

@@ -133,7 +133,7 @@ export default async function ProfilePage({
           title="Nothing rated yet"
           body={
             followState.isSelf
-              ? "Find an album and give it a score out of 10."
+              ? "Find an artist, album or song and give it a score out of 10."
               : undefined
           }
           action={
@@ -145,7 +145,7 @@ export default async function ProfilePage({
       ) : (
         <ul className="flex flex-col gap-3">
           {ratings.map((item) => (
-            <FeedItem key={item.id} item={item} showAuthor={false} />
+            <FeedItem key={item.key} item={item} showAuthor={false} />
           ))}
         </ul>
       )}

@@ -34,7 +34,7 @@ export async function getProfileByUsername(
 export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const supabase = await createClient();
 
-  const [followers, following, ratings] = await Promise.all([
+  const [followers, following, albums, artists, songs] = await Promise.all([
     supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
@@ -44,9 +44,14 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
       .select("*", { count: "exact", head: true })
       .eq("follower_id", userId),
     supabase.from("ratings").select("score").eq("user_id", userId),
+    supabase.from("artist_ratings").select("score").eq("user_id", userId),
+    supabase.from("song_ratings").select("score").eq("user_id", userId),
   ]);
 
-  const scores = (ratings.data ?? []).map((r) => r.score);
+  // Albums, artists and songs all count.
+  const scores: number[] = [albums, artists, songs].flatMap((result) =>
+    (result.data ?? []).map((r) => r.score),
+  );
 
   return {
     followers: followers.count ?? 0,

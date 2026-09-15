@@ -25,16 +25,19 @@ function SubmitButton() {
 }
 
 /**
- * Reports a review or a profile. Kept deliberately quiet in the interface:
- * a small text link that opens the form only when needed.
+ * Reports an album review, an artist review or a profile. Kept deliberately
+ * quiet in the interface: a small text link that opens the form only when
+ * needed.
  */
 export default function ReportButton({
   ratingId,
+  artistRatingId,
   profileId,
   signedIn,
   label = "Report",
 }: {
   ratingId?: number;
+  artistRatingId?: number;
   profileId?: string;
   signedIn: boolean;
   label?: string;
@@ -72,6 +75,9 @@ export default function ReportButton({
     >
       {ratingId !== undefined && (
         <input type="hidden" name="rating_id" value={ratingId} />
+      )}
+      {artistRatingId !== undefined && (
+        <input type="hidden" name="artist_rating_id" value={artistRatingId} />
       )}
       {profileId !== undefined && (
         <input type="hidden" name="profile_id" value={profileId} />

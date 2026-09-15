@@ -90,7 +90,7 @@ export default async function DiscoverSections() {
           <SectionHeading>Just rated</SectionHeading>
           <ul className="grid gap-3 md:grid-cols-2">
             {recent.map((item) => (
-              <FeedItem key={item.id} item={item} />
+              <FeedItem key={item.key} item={item} />
             ))}
           </ul>
         </section>

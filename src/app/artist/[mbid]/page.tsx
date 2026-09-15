@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
-import { getScoresForReleases } from "@/lib/ratings";
+import {
+  getOwnRating,
+  getScores,
+  getScoresForReleases,
+  getTopSongs,
+} from "@/lib/ratings";
+import { getReviews } from "@/lib/reviews";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
+import RatingForm from "@/components/RatingForm";
+import ReviewList from "@/components/ReviewList";
+import StarScore from "@/components/StarScore";
+import TopSongs from "@/components/TopSongs";
 import { SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -26,7 +37,7 @@ export async function generateMetadata({
     ? bio.length > 160
       ? `${bio.slice(0, 157).trimEnd()}…`
       : bio
-    : `Albums by ${name}, rated and reviewed on MULO.`;
+    : `${name}, their albums and songs, rated and reviewed on MULO.`;
 
   return {
     title: name,
@@ -45,8 +56,20 @@ export default async function ArtistPage({
   const artist = await getCachedArtist(mbid);
   if (!artist) notFound();
 
-  const albums = await getCachedArtistAlbums(mbid);
-  const scores = await getScoresForReleases(albums.map((a) => a.mbid));
+  const user = await getCurrentUser();
+  const signedIn = Boolean(user);
+
+  const [albums, scores, ownRating, reviews, topSongs] = await Promise.all([
+    getCachedArtistAlbums(mbid),
+    getScores("artist", mbid),
+    getOwnRating("artist", mbid),
+    getReviews("artist", mbid),
+    getTopSongs(mbid),
+  ]);
+  const albumScores = await getScoresForReleases(albums.map((a) => a.mbid));
+
+  // A "top songs" list isn't worth a section until a few songs have scores.
+  const showTopSongs = topSongs.length >= 3;
 
   return (
     <>
@@ -84,6 +107,15 @@ export default async function ArtistPage({
                   {albums.length} album{albums.length === 1 ? "" : "s"}
                 </p>
               )}
+              <div className="mt-5 w-fit">
+                <StarScore
+                  overall={scores.overall}
+                  overallCount={scores.overallCount}
+                  you={scores.you}
+                  friends={scores.friends}
+                  friendsCount={scores.friendsCount}
+                />
+              </div>
             </div>
           </div>
 
@@ -95,7 +127,34 @@ export default async function ArtistPage({
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-12 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6">
+        <div className="mb-12">
+          <RatingForm
+            key={mbid}
+            kind="artist"
+            mbid={mbid}
+            signedIn={signedIn}
+            existing={ownRating}
+          />
+        </div>
+
+        {(showTopSongs || reviews.length > 0) && (
+          <div className="mb-14 grid gap-12 lg:grid-cols-2">
+            {showTopSongs && (
+              <section>
+                <SectionHeading>Top songs on MULO</SectionHeading>
+                <TopSongs songs={topSongs} />
+              </section>
+            )}
+            {reviews.length > 0 && (
+              <section>
+                <SectionHeading>Reviews</SectionHeading>
+                <ReviewList reviews={reviews} kind="artist" signedIn={signedIn} />
+              </section>
+            )}
+          </div>
+        )}
+
         <SectionHeading>Albums</SectionHeading>
 
         {albums.length === 0 ? (
@@ -111,7 +170,7 @@ export default async function ArtistPage({
                   title={album.title}
                   year={album.release_date?.slice(0, 4) ?? null}
                   coverUrl={album.cover_art_url}
-                  score={scores.get(album.mbid) ?? null}
+                  score={albumScores.get(album.mbid) ?? null}
                   eager={i < 5}
                 />
               </li>

@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import {
   getCachedArtist,
   getCachedRelease,
   getCachedTracks,
 } from "@/lib/catalog";
-import { getOwnRating, getReleaseScores } from "@/lib/ratings";
-import { getReleaseReviews } from "@/lib/reviews";
+import { getOwnRating, getScores, getSongScores } from "@/lib/ratings";
+import { getReviews } from "@/lib/reviews";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
-import Avatar from "@/components/Avatar";
-import ReportButton from "@/components/ReportButton";
+import RatingForm from "@/components/RatingForm";
+import ReviewList from "@/components/ReviewList";
+import { SkeletonLine } from "@/components/Skeleton";
 import { SectionHeading } from "@/components/ui";
-import RatingForm from "./RatingForm";
+import SongList from "./SongList";
 
 export async function generateMetadata({
   params,
@@ -50,12 +52,6 @@ export async function generateMetadata({
   };
 }
 
-function formatDuration(ms: number | null) {
-  if (!ms) return "";
-  const totalSeconds = Math.round(ms / 1000);
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
-}
-
 function totalRuntime(tracks: { duration_ms: number | null }[]) {
   const ms = tracks.reduce((sum, t) => sum + (t.duration_ms ?? 0), 0);
   if (ms === 0) return null;
@@ -75,16 +71,15 @@ export default async function AlbumPage({
   if (!release) notFound();
 
   const user = await getCurrentUser();
+  const signedIn = Boolean(user);
 
-  const [artist, tracks, scores, ownRating, reviews] = await Promise.all([
+  const [artist, scores, ownRating, reviews] = await Promise.all([
     release.artist_mbid ? getCachedArtist(release.artist_mbid) : null,
-    getCachedTracks(mbid),
-    getReleaseScores(mbid),
-    getOwnRating(mbid),
-    getReleaseReviews(mbid),
+    getScores("album", mbid),
+    getOwnRating("album", mbid),
+    getReviews("album", mbid),
   ]);
 
-  const runtime = totalRuntime(tracks);
   const year = release.release_date?.slice(0, 4);
 
   return (
@@ -136,18 +131,6 @@ export default async function AlbumPage({
                       <span>{year}</span>
                     </>
                   )}
-                  {runtime && (
-                    <>
-                      <span className="text-text-muted">·</span>
-                      <span>{runtime}</span>
-                    </>
-                  )}
-                  {tracks.length > 0 && (
-                    <>
-                      <span className="text-text-muted">·</span>
-                      <span>{tracks.length} tracks</span>
-                    </>
-                  )}
                 </div>
 
                 {release.genres.length > 0 && (
@@ -182,41 +165,20 @@ export default async function AlbumPage({
         <div className="mb-12">
           <RatingForm
             key={mbid}
-            releaseMbid={mbid}
-            signedIn={Boolean(user)}
+            kind="album"
+            mbid={mbid}
+            signedIn={signedIn}
             existing={ownRating}
           />
         </div>
 
         <div className="grid gap-12 lg:grid-cols-[1fr_minmax(0,380px)]">
           <section>
-            <SectionHeading>Tracklist</SectionHeading>
-            {tracks.length === 0 ? (
-              <p className="text-sm text-text-secondary">
-                No tracklist available for this release.
-              </p>
-            ) : (
-              <ol className="overflow-hidden rounded-xl border border-border">
-                {tracks.map((track, i) => (
-                  <li
-                    key={track.position}
-                    className={`flex items-center gap-4 px-4 py-2.5 text-sm transition-colors hover:bg-surface ${
-                      i % 2 ? "bg-surface/40" : ""
-                    }`}
-                  >
-                    <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
-                      {track.position}
-                    </span>
-                    <span className="flex-1 truncate text-text">
-                      {track.title}
-                    </span>
-                    <span className="shrink-0 text-xs tabular-nums text-text-muted">
-                      {formatDuration(track.duration_ms)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
+            {/* The first visit to an album fetches its tracklist from
+                MusicBrainz, so it streams in rather than holding up the page. */}
+            <Suspense fallback={<TracklistPlaceholder />}>
+              <Tracklist releaseMbid={mbid} signedIn={signedIn} />
+            </Suspense>
           </section>
 
           <section>
@@ -226,55 +188,72 @@ export default async function AlbumPage({
                 No written reviews yet. Be the first.
               </p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {reviews.map((review) => (
-                  <li
-                    key={review.id}
-                    className="rounded-xl border border-border bg-surface p-4"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Avatar
-                        url={review.avatar_url}
-                        name={review.display_name || review.username}
-                        size="sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/u/${review.username}`}
-                          className="block truncate text-sm font-medium text-text transition-colors hover:text-accent"
-                        >
-                          {review.display_name || review.username}
-                        </Link>
-                        <span className="text-xs text-text-muted">
-                          @{review.username}
-                        </span>
-                      </div>
-                      <span className="display-sm shrink-0 tabular-nums text-score-you">
-                        {review.score}
-                        <span className="text-xs text-text-muted">/10</span>
-                      </span>
-                    </div>
-
-                    {review.review && (
-                      <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                        {review.review}
-                      </p>
-                    )}
-
-                    <div className="mt-3">
-                      <ReportButton
-                        ratingId={review.id}
-                        signedIn={Boolean(user)}
-                        label="Report"
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <ReviewList reviews={reviews} kind="album" signedIn={signedIn} />
             )}
           </section>
         </div>
       </main>
+    </>
+  );
+}
+
+async function Tracklist({
+  releaseMbid,
+  signedIn,
+}: {
+  releaseMbid: string;
+  signedIn: boolean;
+}) {
+  const tracks = await getCachedTracks(releaseMbid);
+  const scores = await getSongScores(
+    tracks.flatMap((t) => (t.song_mbid ? [t.song_mbid] : [])),
+  );
+  const runtime = totalRuntime(tracks);
+
+  return (
+    <>
+      <SectionHeading
+        action={
+          tracks.length > 0 ? (
+            <span className="text-xs tabular-nums text-text-muted">
+              {tracks.length} songs{runtime ? ` · ${runtime}` : ""}
+            </span>
+          ) : undefined
+        }
+      >
+        Tracklist
+      </SectionHeading>
+
+      {tracks.length === 0 ? (
+        <p className="text-sm text-text-secondary">
+          No tracklist available for this album.
+        </p>
+      ) : (
+        <SongList
+          key={releaseMbid}
+          releaseMbid={releaseMbid}
+          tracks={tracks}
+          community={scores.community}
+          initialOwn={scores.own}
+          signedIn={signedIn}
+        />
+      )}
+    </>
+  );
+}
+
+function TracklistPlaceholder() {
+  return (
+    <>
+      <SectionHeading>Tracklist</SectionHeading>
+      <div className="space-y-4 rounded-xl border border-border p-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonLine
+            key={i}
+            className={["w-2/3", "w-1/2", "w-3/5", "w-2/5"][i % 4]}
+          />
+        ))}
+      </div>
     </>
   );
 }

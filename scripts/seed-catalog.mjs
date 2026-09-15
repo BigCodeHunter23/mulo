@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Pre-loads MULO's catalogue with the most-listened-to studio albums: their
- * artists (photo, biography, complete album list), genres and tracklists, so
- * the records people are most likely to look up open instantly.
+ * artists (photo, biography, complete album list), genres, and the tracklist
+ * of each album's standard edition, so the records people are most likely to
+ * look up open instantly and every song can be rated.
  *
  * Popularity comes from ListenBrainz, MusicBrainz's sister project. Metadata
  * comes from MusicBrainz at its limit of about one request a second, so a big
@@ -244,16 +245,119 @@ async function seedArtist(mbid, popularity, albumListens) {
   }`;
 }
 
+const trackCount = (edition) =>
+  (edition.media ?? []).reduce((sum, m) => sum + (m["track-count"] ?? 0), 0);
+
+// Worldwide and big English-language releases carry the titles people know.
+const PREFERRED_COUNTRIES = ["XW", "US", "GB", "XE", "CA", "AU"];
+
+/**
+ * An album comes in many editions: deluxe versions with bonus tracks, promo
+ * samplers, pressings for different countries. The standard edition is the
+ * one released most often, so take the most common official track count,
+ * then the best-placed, earliest release with that count. The app makes the
+ * same choice in src/lib/musicbrainz.ts.
+ */
+function standardEdition(editions) {
+  const usable = editions.filter((e) => trackCount(e) > 0);
+  const official = usable.filter((e) => e.status === "Official");
+  const pool = official.length > 0 ? official : usable;
+
+  const byCount = new Map();
+  for (const edition of pool) {
+    const count = trackCount(edition);
+    byCount.set(count, [...(byCount.get(count) ?? []), edition]);
+  }
+
+  const date = (e) => e.date || "9999";
+  const earliest = (group) => group.map(date).sort()[0];
+  const groups = [...byCount.values()].sort(
+    (a, b) => b.length - a.length || earliest(a).localeCompare(earliest(b)),
+  );
+
+  const place = (e) => {
+    const index = PREFERRED_COUNTRIES.indexOf(e.country ?? "");
+    return index === -1 ? PREFERRED_COUNTRIES.length : index;
+  };
+
+  return (
+    (groups[0] ?? []).sort(
+      (a, b) => place(a) - place(b) || date(a).localeCompare(date(b)),
+    )[0] ?? null
+  );
+}
+
+/** Replaces an album's tracklist with its standard edition's, songs and all. */
+async function seedTracklist(releaseMbid) {
+  const list = await musicbrainz(
+    `/release?release-group=${releaseMbid}&inc=media&limit=100&fmt=json`,
+  );
+  const edition = standardEdition(list?.releases ?? []);
+  if (!edition) return "no tracklist";
+
+  const release = await musicbrainz(`/release/${edition.id}?inc=recordings&fmt=json`);
+  const tracks = (release?.media ?? []).flatMap((m) => m.tracks ?? []);
+  if (tracks.length === 0) return "no tracklist";
+
+  // A song can appear twice on one album; save it once.
+  const songs = new Map();
+  for (const t of tracks) {
+    if (t.recording) {
+      songs.set(t.recording.id, {
+        mbid: t.recording.id,
+        title: t.recording.title,
+        duration_ms: t.recording.length ?? null,
+      });
+    }
+  }
+
+  if (songs.size > 0) {
+    const { error } = await supabase
+      .from("songs")
+      .upsert([...songs.values()], { onConflict: "mbid" });
+    if (error) throw new Error(error.message);
+  }
+
+  // Ratings belong to songs, not to these rows, so replacing them is safe.
+  const { error: clearError } = await supabase
+    .from("tracks")
+    .delete()
+    .eq("release_mbid", releaseMbid);
+  if (clearError) throw new Error(clearError.message);
+
+  // Numbered straight through, so a double album doesn't repeat 1, 2, 3.
+  const { error: trackError } = await supabase.from("tracks").insert(
+    tracks.map((t, i) => ({
+      release_mbid: releaseMbid,
+      position: i + 1,
+      title: t.title,
+      duration_ms: t.length ?? null,
+      song_mbid: t.recording?.id ?? null,
+    })),
+  );
+  if (trackError) throw new Error(trackError.message);
+
+  await supabase
+    .from("releases")
+    .update({ tracks_cached_at: new Date().toISOString() })
+    .eq("mbid", releaseMbid);
+
+  return `${tracks.length} songs from the ${edition.date ?? "undated"} ${
+    edition.country ?? "worldwide"
+  } edition`;
+}
+
 async function seedAlbumDetails(group, listens) {
   const { data: existing } = await supabase
     .from("releases")
-    .select("mbid, details_cached_at")
+    .select("mbid, details_cached_at, tracks_cached_at")
     .eq("mbid", group.id)
     .maybeSingle();
 
   if (existing?.details_cached_at) {
     await supabase.from("releases").update({ popularity: listens }).eq("mbid", group.id);
-    return "already prepared";
+    if (existing.tracks_cached_at) return "already prepared";
+    return await seedTracklist(group.id);
   }
 
   const full = await musicbrainz(
@@ -294,32 +398,7 @@ async function seedAlbumDetails(group, listens) {
         );
   if (error) throw new Error(error.message);
 
-  const { count } = await supabase
-    .from("tracks")
-    .select("id", { count: "exact", head: true })
-    .eq("release_mbid", full.id);
-
-  if (count) return `${row.genres.length} genres, tracklist already cached`;
-
-  const releases = await musicbrainz(
-    `/release?release-group=${full.id}&inc=recordings&limit=1&fmt=json`,
-  );
-  const tracks = (releases?.releases?.[0]?.media ?? []).flatMap((m) => m.tracks ?? []);
-
-  if (tracks.length > 0) {
-    // Numbered straight through, so a double album doesn't repeat 1, 2, 3.
-    const { error: trackError } = await supabase.from("tracks").insert(
-      tracks.map((t, i) => ({
-        release_mbid: full.id,
-        position: i + 1,
-        title: t.title,
-        duration_ms: t.length ?? null,
-      })),
-    );
-    if (trackError) throw new Error(trackError.message);
-  }
-
-  return `${row.genres.length} genres, ${tracks.length} tracks`;
+  return `${row.genres.length} genres, ${await seedTracklist(full.id)}`;
 }
 
 async function main() {
