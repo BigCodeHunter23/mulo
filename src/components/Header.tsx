@@ -21,12 +21,15 @@ export default async function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-bg/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:gap-6 sm:px-6">
         <Link href="/" className="flex items-baseline gap-1.5">
           <span className="display text-xl text-accent">MULO</span>
         </Link>
 
-        <nav className="flex items-center gap-5">
+        <nav className="flex items-center gap-4 sm:gap-5">
+          <Link href="/discover" className={navLink}>
+            Discover
+          </Link>
           <Link href="/search" className={navLink}>
             Search
           </Link>
@@ -49,7 +52,7 @@ export default async function Header() {
                 </button>
               </form>
               <Link
-                href={profile?.username ? `/u/${profile.username}` : "/profile"}
+                href={profile?.username ? `/u/${profile.username}` : "/welcome"}
                 className="transition-opacity hover:opacity-80"
                 aria-label="Your profile"
               >

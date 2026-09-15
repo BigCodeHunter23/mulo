@@ -66,7 +66,7 @@ export async function signup(
   // When email confirmation is switched off, Supabase signs the user straight
   // in and returns a session. Otherwise they need to click the emailed link.
   if (data.session) {
-    redirect("/profile");
+    redirect("/welcome");
   }
 
   return {

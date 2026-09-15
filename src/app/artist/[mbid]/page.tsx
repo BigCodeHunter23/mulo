@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
 import { getScoresForReleases } from "@/lib/ratings";
 import { createPublicClient } from "@/lib/supabase/public";
-import { Score } from "@/components/StarScore";
+import AlbumCard from "@/components/AlbumCard";
 import { SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -105,44 +104,18 @@ export default async function ArtistPage({
           </p>
         ) : (
           <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-            {albums.map((album) => {
-              const score = scores.get(album.mbid) ?? null;
-
-              return (
-                <li key={album.mbid} className="group">
-                  <Link href={`/album/${album.mbid}`} className="block">
-                    <div className="artwork aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03]">
-                      {album.cover_art_url && (
-                        /* Cover Art Archive redirects to archive.org, so
-                           Next's optimizer adds nothing here. */
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={album.cover_art_url}
-                          alt={album.title}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      )}
-                    </div>
-                    <p className="display-sm mt-2.5 line-clamp-2 text-sm text-text transition-colors group-hover:text-accent">
-                      {album.title}
-                    </p>
-                  </Link>
-
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="text-xs tabular-nums text-text-muted">
-                      {album.release_date?.slice(0, 4) ?? "—"}
-                    </span>
-                    <Score
-                      kind="overall"
-                      value={score}
-                      size="sm"
-                      showLabel={false}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+            {albums.map((album, i) => (
+              <li key={album.mbid}>
+                <AlbumCard
+                  mbid={album.mbid}
+                  title={album.title}
+                  year={album.release_date?.slice(0, 4) ?? null}
+                  coverUrl={album.cover_art_url}
+                  score={scores.get(album.mbid) ?? null}
+                  eager={i < 5}
+                />
+              </li>
+            ))}
           </ul>
         )}
       </main>

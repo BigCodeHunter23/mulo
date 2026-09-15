@@ -1,17 +1,18 @@
-import { getCurrentUser } from "@/lib/supabase/server";
-import { getFollowingFeed, getGlobalFeed } from "@/lib/feed";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getFollowingFeed } from "@/lib/feed";
 import FeedItem from "@/components/FeedItem";
+import DiscoverSections from "@/components/DiscoverSections";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export default async function Home() {
   const user = await getCurrentUser();
 
   if (!user) {
-    const recent = await getGlobalFeed(8);
-
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-16 sm:px-6">
-        <section className="mb-16 text-center">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-14 sm:px-6">
+        <section className="mx-auto mb-16 max-w-3xl text-center">
           <h1 className="display text-5xl text-text sm:text-6xl">
             Every record,
             <br />
@@ -23,70 +24,61 @@ export default async function Home() {
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <ButtonLink href="/login">Get started</ButtonLink>
-            <ButtonLink href="/search" variant="secondary">
-              Browse music
+            <ButtonLink href="/discover" variant="secondary">
+              Explore music
             </ButtonLink>
           </div>
         </section>
 
-        {recent.length > 0 && (
-          <section>
-            <SectionHeading>Recently rated</SectionHeading>
-            <ul className="flex flex-col gap-3">
-              {recent.map((item) => (
-                <FeedItem key={item.id} item={item} />
-              ))}
-            </ul>
-          </section>
-        )}
+        <DiscoverSections />
       </main>
     );
   }
 
-  const feed = await getFollowingFeed(user.id);
+  const supabase = await createClient();
+  const [{ data: profile }, feed] = await Promise.all([
+    supabase.from("profiles").select("id").eq("id", user.id).maybeSingle(),
+    getFollowingFeed(user.id),
+  ]);
+
+  // A new account hasn't picked a username yet, so nothing else would work.
+  if (!profile) redirect("/welcome");
+
+  if (feed.length === 0) {
+    return (
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-8 sm:px-6">
+        <div className="mb-14">
+          <SectionHeading>Your feed</SectionHeading>
+          <EmptyState
+            title="Your feed fills up as you follow people"
+            body="Their ratings and reviews show up here, newest first."
+            action={<ButtonLink href="/people">Find people to follow</ButtonLink>}
+          />
+        </div>
+        <DiscoverSections />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      {feed.length === 0 ? (
-        <EmptyFeed />
-      ) : (
-        <>
-          <SectionHeading>Your feed</SectionHeading>
-          <ul className="flex flex-col gap-3">
-            {feed.map((item) => (
-              <FeedItem key={item.id} item={item} />
-            ))}
-          </ul>
-        </>
-      )}
+      <SectionHeading
+        action={
+          <Link
+            href="/discover"
+            className="text-xs text-text-muted transition-colors hover:text-text"
+          >
+            Discover more →
+          </Link>
+        }
+      >
+        Your feed
+      </SectionHeading>
+      <ul className="flex flex-col gap-3">
+        {feed.map((item) => (
+          <FeedItem key={item.id} item={item} />
+        ))}
+      </ul>
     </main>
-  );
-}
-
-async function EmptyFeed() {
-  const recent = await getGlobalFeed(8);
-
-  return (
-    <div className="flex flex-col gap-12">
-      <div>
-        <SectionHeading>Your feed</SectionHeading>
-        <EmptyState
-          title="Nothing here yet"
-          body="Follow other people and their ratings will show up here."
-          action={<ButtonLink href="/people">Find people to follow</ButtonLink>}
-        />
-      </div>
-
-      {recent.length > 0 && (
-        <section>
-          <SectionHeading>Recently rated</SectionHeading>
-          <ul className="flex flex-col gap-3">
-            {recent.map((item) => (
-              <FeedItem key={item.id} item={item} />
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
   );
 }

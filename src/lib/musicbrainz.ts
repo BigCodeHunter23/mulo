@@ -49,12 +49,20 @@ async function mbFetch<T>(path: string, attempt = 1): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type MbCredit = {
+  /** The name as printed on the release, which can differ from the artist's. */
+  name?: string;
+  joinphrase?: string;
+  artist: { id: string; name: string };
+};
+
 export type MbArtist = {
   id: string;
   name: string;
   disambiguation?: string;
   country?: string;
   score?: number;
+  aliases?: { name: string }[];
   relations?: { type: string; url?: { resource?: string } }[];
 };
 
@@ -65,7 +73,7 @@ export type MbReleaseGroup = {
   "primary-type"?: string;
   "secondary-types"?: string[];
   genres?: { name: string }[];
-  "artist-credit"?: { artist: { id: string; name: string } }[];
+  "artist-credit"?: MbCredit[];
   score?: number;
 };
 
@@ -74,6 +82,16 @@ export type MbTrack = {
   title: string;
   length?: number;
 };
+
+/** The artist credit as printed on a release, e.g. "JAY-Z & Kanye West". */
+export function creditText(credit: MbCredit[] = []): string | null {
+  return (
+    credit
+      .map((c) => `${c.name ?? c.artist.name}${c.joinphrase ?? ""}`)
+      .join("")
+      .trim() || null
+  );
+}
 
 export async function searchArtists(query: string): Promise<MbArtist[]> {
   const data = await mbFetch<{ artists: MbArtist[] }>(
@@ -87,14 +105,14 @@ function escapeLucene(value: string) {
   return value.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, "\\$&");
 }
 
+/** Tribute, karaoke and novelty acts nobody is searching for. */
+const NOVELTY = /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|string quartet|piano tribute|made famous by/i;
+
 /**
  * MusicBrainz ranks purely on text similarity with no notion of popularity,
  * so a plain search buries famous albums under obscure ones. Nudge results
  * that match the artist or title closely towards the top.
  */
-/** Tribute, karaoke and novelty acts nobody is searching for. */
-const NOVELTY = /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|string quartet|piano tribute|made famous by/i;
-
 function relevance(group: MbReleaseGroup, query: string) {
   const q = query.toLowerCase().trim();
   const title = group.title.toLowerCase();
@@ -136,7 +154,7 @@ export async function searchReleaseGroups(
 }
 
 export async function getArtist(mbid: string): Promise<MbArtist> {
-  return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels&fmt=json`);
+  return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels+aliases&fmt=json`);
 }
 
 /**
@@ -152,18 +170,39 @@ export function wikidataQid(artist: MbArtist): string | null {
   return qid && /^Q\d+$/.test(qid) ? qid : null;
 }
 
+const MAX_ALBUM_PAGES = 3;
+
+/**
+ * An artist's studio albums, following further pages for prolific artists.
+ * MusicBrainz lumps live albums, bootlegs, compilations and interviews in
+ * with studio albums; anything carrying a secondary type isn't what people
+ * mean by "an album", so those are dropped.
+ */
 export async function getArtistReleaseGroups(
   mbid: string,
 ): Promise<MbReleaseGroup[]> {
-  const data = await mbFetch<{ "release-groups": MbReleaseGroup[] }>(
-    `/release-group?artist=${mbid}&type=album&limit=100&fmt=json`,
-  );
-  const groups = data["release-groups"] ?? [];
+  const albums: MbReleaseGroup[] = [];
 
-  // MusicBrainz lumps live albums, bootlegs, compilations and interviews in
-  // with studio albums. Anything carrying a secondary type isn't what people
-  // mean by "an album", so drop those.
-  return groups.filter((g) => (g["secondary-types"] ?? []).length === 0);
+  for (let page = 0; page < MAX_ALBUM_PAGES; page++) {
+    const offset = page * 100;
+    const data = await mbFetch<{
+      "release-groups": MbReleaseGroup[];
+      "release-group-count"?: number;
+    }>(
+      `/release-group?artist=${mbid}&type=album&inc=artist-credits&limit=100&offset=${offset}&fmt=json`,
+    );
+
+    const groups = data["release-groups"] ?? [];
+    albums.push(
+      ...groups.filter((g) => (g["secondary-types"] ?? []).length === 0),
+    );
+
+    if (groups.length < 100 || offset + 100 >= (data["release-group-count"] ?? 0)) {
+      break;
+    }
+  }
+
+  return albums;
 }
 
 export async function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {

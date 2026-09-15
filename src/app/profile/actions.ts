@@ -10,6 +10,12 @@ export type ProfileState = { error?: string; message?: string };
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+/** Only ever continue to a path on this site, never to another domain. */
+function safeNext(value: FormDataEntryValue | null) {
+  const next = typeof value === "string" ? value : "";
+  return next.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
 /**
  * Uploads with the service role from the server, so the storage bucket needs
  * no client-facing write policy. Returns the public URL, or an error string.
@@ -79,7 +85,8 @@ export async function saveProfile(
     id: user.id,
     username,
     display_name: display_name || null,
-    bio: bio || null,
+    // The welcome step has no bio field; don't wipe one on its account.
+    ...(formData.has("bio") ? { bio: bio || null } : {}),
     ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
   });
 
@@ -92,5 +99,9 @@ export async function saveProfile(
 
   revalidatePath("/profile");
   revalidatePath("/", "layout");
+
+  const next = safeNext(formData.get("next"));
+  if (next) redirect(next);
+
   return { message: "Profile saved." };
 }

@@ -1,8 +1,11 @@
 import "server-only";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { copyCoverToStorage } from "@/lib/cover-storage";
 import {
   coverArtUrl,
+  creditText,
   getArtist,
   getArtistReleaseGroups,
   getReleaseGroup,
@@ -33,6 +36,24 @@ export type Track = {
   title: string;
   duration_ms: number | null;
 };
+
+const RELEASE_COLUMNS =
+  "mbid, title, artist_mbid, release_date, cover_art_url, genres";
+
+/** Newest first, with undated entries last. */
+function byNewest(a: Release, b: Release) {
+  if (!a.release_date && !b.release_date) return 0;
+  if (!a.release_date) return 1;
+  if (!b.release_date) return -1;
+  return b.release_date.localeCompare(a.release_date);
+}
+
+/** A cover still served by the archive gets copied to our storage, later. */
+function copyCoverLater(release: Pick<Release, "mbid" | "cover_art_url">) {
+  if (release.cover_art_url?.includes("coverartarchive.org")) {
+    after(() => copyCoverToStorage(release.mbid));
+  }
+}
 
 export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   const supabase = await createClient();
@@ -69,7 +90,14 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
     bio: extras.bio || mb.disambiguation || null,
   };
 
-  await createAdminClient().from("artists").upsert(artist);
+  // Aliases too, so "Kanye West" still finds the artist now called Ye.
+  const searchNames = [
+    ...new Set([mb.name, ...(mb.aliases ?? []).map((a) => a.name)].filter(Boolean)),
+  ].join(" | ");
+
+  await createAdminClient()
+    .from("artists")
+    .upsert({ ...artist, search_names: searchNames });
 
   return artist;
 }
@@ -79,37 +107,68 @@ export async function getCachedArtistAlbums(
 ): Promise<Release[]> {
   const supabase = await createClient();
 
-  const { data: cached } = await supabase
-    .from("releases")
-    .select("mbid, title, artist_mbid, release_date, cover_art_url, genres")
-    .eq("artist_mbid", artistMbid)
-    // nullsFirst: false keeps undated entries (usually unofficial odds and
-    // ends) at the bottom rather than above the real discography.
-    .order("release_date", { ascending: false, nullsFirst: false });
+  const [{ data: artist }, { data: cached }] = await Promise.all([
+    supabase
+      .from("artists")
+      .select("albums_cached_at")
+      .eq("mbid", artistMbid)
+      .maybeSingle(),
+    supabase
+      .from("releases")
+      .select(RELEASE_COLUMNS)
+      .eq("artist_mbid", artistMbid)
+      .order("release_date", { ascending: false, nullsFirst: false }),
+  ]);
 
-  if (cached && cached.length > 0) return cached;
+  // Albums get cached one at a time as people open them, so having some is
+  // not the same as having all of them. Only trust the list once the whole
+  // discography has been fetched.
+  if (artist?.albums_cached_at) return cached ?? [];
 
-  const groups = await getArtistReleaseGroups(artistMbid);
-  const releases: Release[] = groups.map((g) => ({
-    mbid: g.id,
-    title: g.title,
-    artist_mbid: artistMbid,
-    release_date: g["first-release-date"] || null,
-    cover_art_url: coverArtUrl(g.id),
-    genres: [],
-  }));
-
-  if (releases.length > 0) {
-    await createAdminClient().from("releases").upsert(releases);
+  let groups;
+  try {
+    groups = await getArtistReleaseGroups(artistMbid);
+  } catch (error) {
+    if (cached && cached.length > 0) return cached;
+    throw error;
   }
 
-  // Newest first, with undated entries last.
-  return releases.sort((a, b) => {
-    if (!a.release_date && !b.release_date) return 0;
-    if (!a.release_date) return 1;
-    if (!b.release_date) return -1;
-    return b.release_date.localeCompare(a.release_date);
-  });
+  const presentIds = new Set((cached ?? []).map((r) => r.mbid));
+  const fresh = groups
+    .filter((g) => !presentIds.has(g.id))
+    .map((g) => ({
+      mbid: g.id,
+      title: g.title,
+      artist_mbid: artistMbid,
+      release_date: g["first-release-date"] || null,
+      cover_art_url: coverArtUrl(g.id),
+      artist_credit: creditText(g["artist-credit"]),
+    }));
+
+  const admin = createAdminClient();
+  if (fresh.length > 0) {
+    await admin
+      .from("releases")
+      .upsert(fresh, { onConflict: "mbid", ignoreDuplicates: true });
+  }
+  await admin
+    .from("artists")
+    .update({ albums_cached_at: new Date().toISOString() })
+    .eq("mbid", artistMbid);
+
+  const releases: Release[] = [
+    ...(cached ?? []),
+    ...fresh.map((r) => ({
+      mbid: r.mbid,
+      title: r.title,
+      artist_mbid: r.artist_mbid,
+      release_date: r.release_date,
+      cover_art_url: r.cover_art_url,
+      genres: [],
+    })),
+  ];
+
+  return releases.sort(byNewest);
 }
 
 export async function getCachedRelease(mbid: string): Promise<Release | null> {
@@ -117,39 +176,69 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
 
   const { data: cached } = await supabase
     .from("releases")
-    .select("mbid, title, artist_mbid, release_date, cover_art_url, genres")
+    .select(`${RELEASE_COLUMNS}, details_cached_at`)
     .eq("mbid", mbid)
-    .single();
+    .maybeSingle();
 
-  if (cached && cached.genres.length > 0) return cached;
+  // A release listed on an artist's page has a title and date but no genres
+  // yet; only one whose details were fetched is complete.
+  if (cached?.details_cached_at) {
+    copyCoverLater(cached);
+    return cached;
+  }
 
   let mb;
   try {
     mb = await getReleaseGroup(mbid);
   } catch (error) {
     if (error instanceof MbNotFoundError) return null;
+    if (cached) return cached;
     throw error;
   }
 
-  const artistCredit = mb["artist-credit"]?.[0]?.artist;
+  const credit = mb["artist-credit"] ?? [];
+  const primary = credit[0]?.artist;
+  const admin = createAdminClient();
 
-  if (artistCredit) {
-    await createAdminClient()
+  if (primary) {
+    await admin
       .from("artists")
-      .upsert({ mbid: artistCredit.id, name: artistCredit.name });
+      .upsert(
+        { mbid: primary.id, name: primary.name },
+        { onConflict: "mbid", ignoreDuplicates: true },
+      );
+  }
+
+  const details = {
+    title: mb.title,
+    artist_mbid: primary?.id ?? null,
+    release_date: mb["first-release-date"] || null,
+    genres: (mb.genres ?? []).map((g) => g.name),
+    artist_credit: creditText(credit),
+    details_cached_at: new Date().toISOString(),
+  };
+
+  // An existing row keeps its cover, which may already be in our storage.
+  const cover: string | null = cached ? cached.cover_art_url : coverArtUrl(mb.id);
+
+  if (cached) {
+    await admin.from("releases").update(details).eq("mbid", mb.id);
+  } else {
+    await admin
+      .from("releases")
+      .upsert({ mbid: mb.id, cover_art_url: cover, ...details }, { onConflict: "mbid" });
   }
 
   const release: Release = {
     mbid: mb.id,
-    title: mb.title,
-    artist_mbid: artistCredit?.id ?? null,
-    release_date: mb["first-release-date"] || null,
-    cover_art_url: coverArtUrl(mb.id),
-    genres: (mb.genres ?? []).map((g) => g.name),
+    title: details.title,
+    artist_mbid: details.artist_mbid,
+    release_date: details.release_date,
+    cover_art_url: cover,
+    genres: details.genres,
   };
 
-  await createAdminClient().from("releases").upsert(release);
-
+  copyCoverLater(release);
   return release;
 }
 
@@ -164,9 +253,17 @@ export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
 
   if (cached && cached.length > 0) return cached;
 
-  const mbTracks = await getTracklist(releaseMbid);
-  const tracks = mbTracks.map((t) => ({
-    position: t.position,
+  let mbTracks;
+  try {
+    mbTracks = await getTracklist(releaseMbid);
+  } catch {
+    // No tracklist is better than a broken page; it's retried next visit.
+    return [];
+  }
+
+  // Numbered straight through, so a double album doesn't repeat 1, 2, 3.
+  const tracks = mbTracks.map((t, i) => ({
+    position: i + 1,
     title: t.title,
     duration_ms: t.length ?? null,
   }));

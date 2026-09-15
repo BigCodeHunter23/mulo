@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
+import { coverSrc } from "@/lib/cover-url";
 import type { FeedItem as Item } from "@/lib/feed";
 
 function timeAgo(iso: string) {
@@ -36,6 +37,8 @@ export default function FeedItem({
   item: Item;
   showAuthor?: boolean;
 }) {
+  const cover = coverSrc(item.release.cover_art_url, 250);
+
   return (
     <li className="group rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong">
       {showAuthor && (
@@ -62,10 +65,10 @@ export default function FeedItem({
           href={`/album/${item.release.mbid}`}
           className="artwork h-20 w-20 shrink-0 overflow-hidden rounded-lg transition-transform group-hover:scale-[1.02]"
         >
-          {item.release.cover_art_url && (
+          {cover && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={item.release.cover_art_url}
+              src={cover}
               alt={item.release.title}
               loading="lazy"
               className="h-full w-full object-cover"
