@@ -103,81 +103,106 @@ export async function getPublicTopPicks(
   return ((data ?? []) as unknown as AlbumRow[]).map(toAlbumPick);
 }
 
+export type PickSuggestions = {
+  /** "rated": their own ratings, best first. "popular": a start for new accounts. */
+  source: "rated" | "popular";
+  picks: (TopPick & { score: number | null })[];
+};
+
+const RATED_LIMIT = 100;
+const POPULAR_LIMIT = 12;
+
 /**
- * A starting shortlist for the picker: what this person has rated highest,
- * topped up with well-known names so a new account has something to pick from.
+ * What the picker offers. Anyone who has rated artists (or albums) sees every
+ * one of them, highest score first, since their GOAT is almost certainly in
+ * there. Anyone who hasn't gets well-known names to start from.
  */
 export async function getPickSuggestions(
   userId: string,
   kind: PickKind,
-  limit = 12,
-): Promise<TopPick[]> {
+): Promise<PickSuggestions> {
   const supabase = await createClient();
-
-  const rated =
-    kind === "artist"
-      ? await supabase
-          .from("artist_ratings")
-          .select("score, artists!inner ( mbid, name, image_url )")
-          .eq("user_id", userId)
-          .order("score", { ascending: false })
-          .limit(limit)
-      : await supabase
-          .from("ratings")
-          .select(
-            "score, releases!inner ( mbid, title, artist_credit, cover_art_url, artists ( name ) )",
-          )
-          .eq("user_id", userId)
-          .order("score", { ascending: false })
-          .limit(limit);
-
-  const picks =
-    kind === "artist"
-      ? ((rated.data ?? []) as unknown as ArtistRow[]).map(toArtistPick)
-      : ((rated.data ?? []) as unknown as AlbumRow[]).map(toAlbumPick);
-
-  if (picks.length >= limit) return picks;
-
-  // Top up with the most-played names in the catalogue.
-  const seen = new Set(picks.map((p) => p.mbid));
-  const publicClient = createPublicClient();
+  const best = { ascending: false } as const;
 
   if (kind === "artist") {
-    const { data } = await publicClient
+    const { data } = await supabase
+      .from("artist_ratings")
+      .select("score, artists!inner ( mbid, name, image_url )")
+      .eq("user_id", userId)
+      .order("score", best)
+      .order("created_at", best)
+      .limit(RATED_LIMIT);
+
+    const rated = (data ?? []) as unknown as {
+      score: number;
+      artists: ArtistRow["artists"];
+    }[];
+
+    if (rated.length > 0) {
+      return {
+        source: "rated",
+        picks: rated.map((row) => ({
+          ...toArtistPick({ position: 0, artists: row.artists }),
+          score: row.score,
+        })),
+      };
+    }
+
+    const { data: popular } = await createPublicClient()
       .from("artists")
       .select("mbid, name, image_url")
       .not("popularity", "is", null)
       .neq("image_url", "")
-      .order("popularity", { ascending: false })
-      .limit(limit * 2);
+      .order("popularity", best)
+      .limit(POPULAR_LIMIT);
 
-    for (const row of (data ?? []) as ArtistRow["artists"][]) {
-      if (picks.length >= limit) break;
-      if (seen.has(row.mbid)) continue;
-      picks.push({
-        mbid: row.mbid,
-        title: row.name,
-        subtitle: null,
-        image: artistPhotoSrc(row.image_url, 300),
-      });
-    }
-
-    return picks;
+    return {
+      source: "popular",
+      picks: ((popular ?? []) as ArtistRow["artists"][]).map((artist) => ({
+        ...toArtistPick({ position: 0, artists: artist }),
+        score: null,
+      })),
+    };
   }
 
-  const { data } = await publicClient
+  const { data } = await supabase
+    .from("ratings")
+    .select(
+      "score, releases!inner ( mbid, title, artist_credit, cover_art_url, artists ( name ) )",
+    )
+    .eq("user_id", userId)
+    .order("score", best)
+    .order("created_at", best)
+    .limit(RATED_LIMIT);
+
+  const rated = (data ?? []) as unknown as {
+    score: number;
+    releases: AlbumRow["releases"];
+  }[];
+
+  if (rated.length > 0) {
+    return {
+      source: "rated",
+      picks: rated.map((row) => ({
+        ...toAlbumPick({ position: 0, releases: row.releases }),
+        score: row.score,
+      })),
+    };
+  }
+
+  const { data: popular } = await createPublicClient()
     .from("releases")
     .select("mbid, title, artist_credit, cover_art_url, artists ( name )")
     .not("popularity", "is", null)
     .neq("cover_art_url", "")
-    .order("popularity", { ascending: false })
-    .limit(limit * 2);
+    .order("popularity", best)
+    .limit(POPULAR_LIMIT);
 
-  for (const row of (data ?? []) as unknown as AlbumRow["releases"][]) {
-    if (picks.length >= limit) break;
-    if (seen.has(row.mbid)) continue;
-    picks.push(toAlbumPick({ position: 0, releases: row }));
-  }
-
-  return picks;
+  return {
+    source: "popular",
+    picks: ((popular ?? []) as unknown as AlbumRow["releases"][]).map((release) => ({
+      ...toAlbumPick({ position: 0, releases: release }),
+      score: null,
+    })),
+  };
 }

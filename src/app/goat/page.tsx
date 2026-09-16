@@ -72,7 +72,8 @@ export default async function GoatPage({
           key={pickKind}
           kind={pickKind}
           initial={picks}
-          suggestions={suggestions}
+          suggestions={suggestions.picks}
+          suggestionSource={suggestions.source}
           username={profile.username}
         />
       </div>

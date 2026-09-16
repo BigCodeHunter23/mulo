@@ -178,8 +178,8 @@ export default async function MixtapePage({
       {rated === 0 ? (
         <div className="mt-10">
           <EmptyState
-            title="Blank tape"
-            body={`Nothing rated in ${tape.label} yet.`}
+            title={`Nothing rated in ${tape.label}`}
+            body={`${name} hasn't rated anything this month yet.`}
             action={<ButtonLink href={path(previous)}>See {monthLabel(previous)}</ButtonLink>}
           />
         </div>

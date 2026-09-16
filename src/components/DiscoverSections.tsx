@@ -27,23 +27,23 @@ export default function DiscoverSections() {
         <Rotation />
       </Suspense>
       <Suspense fallback={null}>
-        <Undisputed />
+        <TopRated />
       </Suspense>
-      <Suspense fallback={<GridPlaceholder title="Staples" />}>
-        <Staples />
+      <Suspense fallback={<GridPlaceholder title="Most-played albums" />}>
+        <MostPlayed />
       </Suspense>
-      <Suspense fallback={<GridPlaceholder title="Dig Deeper" round />}>
-        <DigDeeper />
+      <Suspense fallback={<GridPlaceholder title="Artists to explore" round />}>
+        <ArtistsToExplore />
       </Suspense>
       <Suspense
         fallback={
           <section>
-            <SectionHeading>Word on the Street</SectionHeading>
+            <SectionHeading>Just rated</SectionHeading>
             <SkeletonRows count={2} />
           </section>
         }
       >
-        <WordOnTheStreet />
+        <JustRated />
       </Suspense>
     </div>
   );
@@ -74,18 +74,14 @@ async function Rotation() {
   return rotation ? <HeavyRotation rotation={rotation} /> : null;
 }
 
-async function Undisputed() {
+async function TopRated() {
   const topRated = await topRatedOnMulo(10);
   // Only worth showing once enough albums have been rated to rank.
   if (topRated.length < 4) return null;
 
   return (
     <section>
-      <SectionHeading
-        action={<span className="text-xs text-text-muted">Highest rated on MULO</span>}
-      >
-        Undisputed
-      </SectionHeading>
+      <SectionHeading>Top rated on MULO</SectionHeading>
       <ul className={ALBUM_GRID}>
         {topRated.map((album, i) => (
           <li key={album.mbid}>
@@ -104,7 +100,7 @@ async function Undisputed() {
   );
 }
 
-async function Staples() {
+async function MostPlayed() {
   const mostPlayed = await mostPlayedAlbums(15);
   if (mostPlayed.length === 0) return null;
 
@@ -113,7 +109,7 @@ async function Staples() {
       <SectionHeading
         action={<span className="text-xs text-text-muted">By listens on ListenBrainz</span>}
       >
-        Staples
+        Most-played albums
       </SectionHeading>
       <ul className={ALBUM_GRID}>
         {mostPlayed.map((album, i) => (
@@ -133,13 +129,13 @@ async function Staples() {
   );
 }
 
-async function DigDeeper() {
+async function ArtistsToExplore() {
   const artists = await popularArtists(10);
   if (artists.length === 0) return null;
 
   return (
     <section>
-      <SectionHeading>Dig Deeper</SectionHeading>
+      <SectionHeading>Artists to explore</SectionHeading>
       <ul className={ARTIST_GRID}>
         {artists.map((artist) => (
           <li key={artist.mbid}>
@@ -151,13 +147,13 @@ async function DigDeeper() {
   );
 }
 
-async function WordOnTheStreet() {
+async function JustRated() {
   const [recent, user] = await Promise.all([getGlobalFeed(6), getCurrentUser()]);
   if (recent.length === 0) return null;
 
   return (
     <section>
-      <SectionHeading>Word on the Street</SectionHeading>
+      <SectionHeading>Just rated</SectionHeading>
       <ul className="grid gap-3 md:grid-cols-2">
         {recent.map((item) => (
           <FeedItem key={item.key} item={item} signedIn={Boolean(user)} />

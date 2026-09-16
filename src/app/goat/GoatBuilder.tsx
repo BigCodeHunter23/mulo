@@ -13,6 +13,8 @@ export type PickItem = {
   title: string;
   subtitle: string | null;
   image: string | null;
+  /** Their own score, when the suggestion comes from their ratings. */
+  score?: number | null;
 };
 
 const LIMIT = 10;
@@ -109,11 +111,14 @@ export default function GoatBuilder({
   kind,
   initial,
   suggestions,
+  suggestionSource,
   username,
 }: {
   kind: Kind;
   initial: PickItem[];
   suggestions: PickItem[];
+  /** Whether the suggestions are their own ratings or popular names. */
+  suggestionSource: "rated" | "popular";
   username: string;
 }) {
   const [items, setItems] = useState(initial);
@@ -294,9 +299,13 @@ export default function GoatBuilder({
   }
 
   const full = items.length >= LIMIT;
-  const shortlist = suggestions.filter(
-    (s) => !items.some((item) => item.mbid === s.mbid),
-  );
+  const picked = (item: PickItem) => items.some((i) => i.mbid === item.mbid);
+  const searchingByName = query.trim().length >= 2;
+  // Typing searches everything; otherwise the pool is their own ratings, best
+  // first, or popular names for somebody who hasn't rated any yet.
+  const showing = searchingByName
+    ? results.filter((item) => !picked(item)).slice(0, 10)
+    : suggestions.filter((item) => !picked(item));
 
   return (
     <div>
@@ -428,38 +437,51 @@ export default function GoatBuilder({
           </p>
         )}
 
-        {!full && (results.length > 0 || shortlist.length > 0) && (
-          <>
-            {query.trim().length < 2 && shortlist.length > 0 && (
-              <p className="mt-5 text-xs text-text-muted">
-                From what you have rated highest
-              </p>
-            )}
-            <ul className="mt-3 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-5">
-              {(results.length > 0 ? results : shortlist)
-                .filter((item) => !items.some((picked) => picked.mbid === item.mbid))
-                .slice(0, 10)
-                .map((item) => (
-                  <li key={item.mbid}>
-                    <button
-                      type="button"
-                      onClick={() => add(item)}
-                      className="group flex w-full flex-col items-center gap-2 text-center"
+        {!full && !searchingByName && showing.length > 0 && (
+          <p className="mt-5 text-xs text-text-muted">
+            {suggestionSource === "rated"
+              ? `Every ${kind} you've rated, highest first`
+              : "Popular picks to start you off"}
+          </p>
+        )}
+
+        {!full && searchingByName && !searching && showing.length === 0 && (
+          <p className="mt-5 text-xs text-text-muted">
+            Nothing on MULO matches that yet.
+          </p>
+        )}
+
+        {!full && showing.length > 0 && (
+          <ul className="mt-3 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-5">
+            {showing.map((item) => (
+              <li key={item.mbid}>
+                <button
+                  type="button"
+                  onClick={() => add(item)}
+                  className="group flex w-full flex-col items-center gap-2 text-center"
+                >
+                  <span className="relative block w-full">
+                    <Art item={item} round={round} size="aspect-square w-full" />
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center bg-bg/70 text-2xl font-bold text-accent opacity-0 transition-opacity group-hover:opacity-100 ${
+                        round ? "rounded-full" : "rounded-lg"
+                      }`}
                     >
-                      <span className="relative block w-full">
-                        <Art item={item} round={round} size="aspect-square w-full" />
-                        <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-bg/70 text-2xl font-bold text-accent opacity-0 transition-opacity group-hover:opacity-100">
-                          +
-                        </span>
+                      +
+                    </span>
+                    {item.score != null && (
+                      <span className="absolute right-0 top-0 rounded-md bg-score-you px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-[#0b0b0e]">
+                        {item.score}
                       </span>
-                      <span className="line-clamp-2 text-xs text-text transition-colors group-hover:text-accent">
-                        {item.title}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-            </ul>
-          </>
+                    )}
+                  </span>
+                  <span className="line-clamp-2 text-xs text-text transition-colors group-hover:text-accent">
+                    {item.title}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
