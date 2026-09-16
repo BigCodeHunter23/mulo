@@ -5,9 +5,12 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { getFollowingIds, listProfiles } from "@/lib/social";
+import { getRaisedOn } from "@/lib/raised-on";
+import { isRecordAvatar } from "@/lib/record-avatar";
 import FollowButton from "@/components/FollowButton";
 import InviteButton from "@/components/InviteButton";
 import Avatar from "@/components/Avatar";
+import RaisedOnPicker from "@/components/RaisedOnPicker";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import WelcomeProfileForm from "./WelcomeProfileForm";
 import QuickRateGrid from "./QuickRateGrid";
@@ -15,19 +18,20 @@ import IntroCards from "./IntroCards";
 
 export const metadata: Metadata = { title: "Welcome" };
 
-const STEPS = ["profile", "rate", "follow"] as const;
+const STEPS = ["profile", "raised", "rate", "follow"] as const;
 type Step = (typeof STEPS)[number];
 
 const LABELS: Record<Step, string> = {
   profile: "Your profile",
+  raised: "Raised on",
   rate: "Rate music",
   follow: "Follow people",
 };
 
 /**
- * First run for a new account: pick a username, rate a handful of artists
- * and albums you know, follow some people. A minute in, the feed and the scores around
- * MULO have something in them.
+ * First run for a new account: pick a username and the record you were raised
+ * on, rate a handful of artists and albums you know, follow some people. A
+ * minute in, the feed and the scores around MULO have something in them.
  */
 export default async function WelcomePage({
   searchParams,
@@ -48,8 +52,8 @@ export default async function WelcomePage({
   // Ratings and follows hang off a profile, so a username always comes first.
   const step: Step = !profile
     ? "profile"
-    : requested === "follow"
-      ? "follow"
+    : requested === "follow" || requested === "raised"
+      ? requested
       : "rate";
 
   return (
@@ -58,6 +62,7 @@ export default async function WelcomePage({
       {intro === "1" && <IntroCards />}
       <Progress step={step} />
       {step === "profile" && <ProfileStep />}
+      {step === "raised" && <RaisedStep userId={user.id} />}
       {step === "rate" && <RateStep userId={user.id} />}
       {step === "follow" && <FollowStep userId={user.id} />}
     </main>
@@ -104,6 +109,43 @@ function ProfileStep() {
       </p>
       <div className="mt-7">
         <WelcomeProfileForm />
+      </div>
+    </div>
+  );
+}
+
+async function RaisedStep({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const [{ data: profile }, raisedOn] = await Promise.all([
+    supabase.from("profiles").select("avatar_url").eq("id", userId).maybeSingle(),
+    getRaisedOn(userId),
+  ]);
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <h1 className="display text-3xl text-text">What were you raised on?</h1>
+      <p className="mt-2 max-w-xl text-sm text-text-secondary">
+        Pick a decade, a scene, then the record that made you. Any decade
+        counts. It becomes your profile picture, pressed onto vinyl, until you
+        add a photo.
+      </p>
+      <div className="mt-8">
+        <RaisedOnPicker
+          mode="welcome"
+          hasPhoto={!isRecordAvatar(profile?.avatar_url)}
+          initial={
+            raisedOn
+              ? {
+                  mbid: raisedOn.album.mbid,
+                  title: raisedOn.album.title,
+                  artist: raisedOn.album.artist,
+                  cover: raisedOn.album.cover,
+                  era: raisedOn.era?.id ?? null,
+                  scene: raisedOn.scene?.id ?? null,
+                }
+              : null
+          }
+        />
       </div>
     </div>
   );

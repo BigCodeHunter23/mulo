@@ -30,6 +30,10 @@ explaining, or reads like it's trying, it's the wrong name.
 | Mixtape | Somebody's monthly recap: album and track of the month, on repeat, full tracklist |
 | Top Shelf | Somebody's highest-scored albums, on their profile |
 | Love / Nah | Reactions to somebody else's rating |
+| Your Sound | The genres somebody rates highest, on their profile |
+| Daily Versus | Two artists from the same era and lane, one pick a day. "Who you got?" |
+| Raised On | The record somebody grew up on, picked by decade and scene; it becomes their picture |
+| Rank-off | Head-to-head rounds that settle a tie for album or track of the month |
 
 ## Badges
 

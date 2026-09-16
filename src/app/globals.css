@@ -171,11 +171,23 @@ select {
   transform-origin: right;
 }
 
+/* Raised On: the record you picked turns slowly, like it's on the platter. */
+@keyframes record-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.record-spin {
+  animation: record-spin 6s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .goat-reveal,
   .goat-crown,
   .versus-bar-left,
-  .versus-bar-right {
+  .versus-bar-right,
+  .record-spin {
     animation: none;
   }
 }

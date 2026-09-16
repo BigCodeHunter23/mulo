@@ -13,6 +13,7 @@ import { getBadges } from "@/lib/badges";
 import { getSound } from "@/lib/sound";
 import { getTasteMatch } from "@/lib/taste";
 import { getHighestRatedAlbums } from "@/lib/ratings";
+import { getRaisedOn, type RaisedOn } from "@/lib/raised-on";
 import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
 import Badges from "@/components/Badges";
@@ -52,6 +53,56 @@ export async function generateMetadata({
   };
 }
 
+function RecordIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={2}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+/** "Raised on Illmatic · Golden-era hip hop", or a nudge on your own profile. */
+function RaisedOnLine({ raisedOn, isSelf }: { raisedOn: RaisedOn | null; isSelf: boolean }) {
+  if (!raisedOn) {
+    return isSelf ? (
+      <Link
+        href="/profile/raised-on"
+        className="mt-2 inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-accent"
+      >
+        <RecordIcon />
+        What were you raised on?
+      </Link>
+    ) : null;
+  }
+
+  const place = raisedOn.scene?.name ?? raisedOn.era?.label;
+
+  return (
+    <p className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-text-secondary">
+      <RecordIcon />
+      <span className="truncate">
+        Raised on{" "}
+        <Link
+          href={`/album/${raisedOn.album.mbid}`}
+          className="font-medium text-text transition-colors hover:text-accent"
+        >
+          {raisedOn.album.title}
+        </Link>
+        {place && <span className="text-text-muted">{` · ${place}`}</span>}
+      </span>
+      {isSelf && (
+        <Link
+          href="/profile/raised-on"
+          className="shrink-0 text-text-muted transition-colors hover:text-text"
+        >
+          Change
+        </Link>
+      )}
+    </p>
+  );
+}
+
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col">
@@ -78,9 +129,10 @@ export default async function ProfilePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [stats, followState] = await Promise.all([
+  const [stats, followState, raisedOn] = await Promise.all([
     getProfileStats(profile.id),
     getFollowState(profile.id),
+    getRaisedOn(profile.id),
   ]);
 
   const name = profile.display_name || profile.username;
@@ -94,6 +146,7 @@ export default async function ProfilePage({
           <div className="min-w-0 flex-1">
             <h1 className="display text-2xl text-text sm:text-3xl">{name}</h1>
             <p className="text-sm text-text-muted">@{profile.username}</p>
+            <RaisedOnLine raisedOn={raisedOn} isSelf={followState.isSelf} />
 
             <div className="mt-4 flex flex-wrap gap-6">
               <Stat value={stats.ratings} label="Rated" />

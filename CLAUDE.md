@@ -51,6 +51,14 @@ in plain language, and give them links and exact steps when they need to act.
   that day's row, so nothing runs on a timer. The database only accepts picks
   for today's matchup, and the split stays hidden until someone picks.
   Changing `VERSUS_START` or reordering pairs changes future days only.
+- Raised On (`src/components/RaisedOnPicker.tsx`, `src/lib/eras.ts`): decades,
+  scenes and five albums each, picked during signup or at
+  `/profile/raised-on`. `eras.ts` holds MusicBrainz ids and cover URLs for
+  albums already in the catalogue; add new ones to the catalogue first. The
+  chosen album becomes a "record avatar": `avatar_url` holds the path
+  `/records/{mbid}`, drawn as a picture disc by `src/app/records/[mbid]` at a
+  few fixed sizes (the `Avatar` component asks for the right one). Uploading a
+  photo replaces it.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
   rerun; `scripts/copy-covers.mjs` copies covers into storage.
 

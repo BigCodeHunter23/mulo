@@ -23,7 +23,7 @@ export default function WelcomeProfileForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <input type="hidden" name="next" value="/welcome?step=rate" />
+      <input type="hidden" name="next" value="/welcome?step=raised" />
 
       {state.error && <Notice tone="error">{state.error}</Notice>}
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { ImageResponse } from "next/og";
+import { siteUrl } from "@/lib/site";
 
 /** Brand colours for generated images, matching globals.css. */
 export const OG = {
@@ -113,7 +114,8 @@ export async function loadImage(
 ): Promise<string | null> {
   if (!url) return null;
 
-  let image = await fetchImage(url);
+  // Record avatars are stored as paths on this site.
+  let image = await fetchImage(url.startsWith("/") ? `${siteUrl()}${url}` : url);
 
   // The renderer can't reliably decode WebP. Wikimedia will hand over a PNG
   // copy instead; anything else in WebP is skipped rather than break the card.

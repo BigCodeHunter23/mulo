@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
+import { isRecordAvatar, RAISED_ON_PROMPT_COOKIE } from "@/lib/record-avatar";
 import FeedItem from "@/components/FeedItem";
 import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import DiscoverSections from "@/components/DiscoverSections";
+import RaisedOnPrompt from "@/components/RaisedOnPrompt";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export default async function Home() {
@@ -40,17 +43,29 @@ export default async function Home() {
   }
 
   const supabase = await createClient();
-  const [{ data: profile }, feed] = await Promise.all([
-    supabase.from("profiles").select("id").eq("id", user.id).maybeSingle(),
+  const [{ data: profile }, feed, store] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, avatar_url, raised_on_mbid")
+      .eq("id", user.id)
+      .maybeSingle(),
     getFollowingFeed(user.id),
+    cookies(),
   ]);
 
   // A new account hasn't picked a username yet, so nothing else would work.
   if (!profile) redirect("/welcome");
 
+  // Accounts from before Raised On get asked once, until they pick or hide it.
+  const prompt =
+    !profile.raised_on_mbid && store.get(RAISED_ON_PROMPT_COOKIE)?.value !== "hidden" ? (
+      <RaisedOnPrompt hasPhoto={!isRecordAvatar(profile.avatar_url)} />
+    ) : null;
+
   if (feed.length === 0) {
     return (
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-8 sm:px-6">
+        {prompt}
         <div className="mb-14">
           <SectionHeading>Your feed</SectionHeading>
           <EmptyState
@@ -66,6 +81,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
+      {prompt}
       {/* These stream in on their own, so the feed never waits for them. */}
       <Suspense fallback={<TodaysVersusPlaceholder className="mb-10" />}>
         <TodaysVersus className="mb-10" />
