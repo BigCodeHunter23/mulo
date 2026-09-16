@@ -6,11 +6,22 @@ import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 
 export type MixtapePick = {
   key: string;
+  /** The album, song or artist. */
+  mbid: string;
   title: string;
   subtitle: string | null;
   image: string | null;
   href: string;
   score: number;
+};
+
+export type RankOffKind = "album" | "song";
+
+/** Albums or songs sharing the month's top score, which can be ranked off. */
+export type Tie = {
+  contenders: MixtapePick[];
+  /** A rank-off already crowned one of them. */
+  settled: boolean;
 };
 
 export type Mixtape = {
@@ -25,11 +36,19 @@ export type Mixtape = {
   topAlbum: MixtapePick | null;
   topSong: MixtapePick | null;
   topArtist: (MixtapePick & { rated: number }) | null;
+  /** Set only when more than one album, or song, shares the top score. */
+  albumTie: Tie | null;
+  songTie: Tie | null;
+  /** Whether rank-off results can be saved yet. */
+  rankOffs: boolean;
   /** The best of the month, across all three, highest first. */
   highlights: MixtapePick[];
 };
 
 export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** More than this many tied is a long night; the earliest rated go through. */
+export const RANK_OFF_LIMIT = 8;
 
 export function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -72,6 +91,26 @@ function creditOf(release: ReleaseRef) {
 }
 
 /**
+ * The month's number one of a kind. A single top score just wins; a tie lists
+ * the contenders, and a saved rank-off decides between them.
+ */
+function crown(picks: MixtapePick[], saved: string | undefined) {
+  const first = picks[0];
+  if (!first) return { top: null, tie: null };
+
+  const contenders = picks
+    .filter((pick) => pick.score === first.score)
+    .slice(0, RANK_OFF_LIMIT);
+  if (contenders.length < 2) return { top: first, tie: null };
+
+  const winner = contenders.find((pick) => pick.mbid === saved);
+  return {
+    top: winner ?? first,
+    tie: { contenders, settled: Boolean(winner) },
+  };
+}
+
+/**
  * One month of somebody's ratings, laid out like a tape: what they scored
  * highest, and whose music they kept coming back to. Dates are when a rating
  * was first made, so changing a score later doesn't move it to another month.
@@ -84,8 +123,10 @@ async function load(
   const start = `${month}-01T00:00:00Z`;
   const end = `${shiftMonth(month, 1)}-01T00:00:00Z`;
   const highest = { ascending: false } as const;
+  // Equal scores keep the order they were rated in, so a tie is always the same tie.
+  const earliest = { ascending: true } as const;
 
-  const [albumResult, songResult, artistResult] = await Promise.all([
+  const [albumResult, songResult, artistResult, pickResult] = await Promise.all([
     supabase
       .from("ratings")
       .select(`score, ${RELEASE}`)
@@ -93,6 +134,7 @@ async function load(
       .gte("created_at", start)
       .lt("created_at", end)
       .order("score", highest)
+      .order("created_at", earliest)
       .limit(200),
     supabase
       .from("song_ratings")
@@ -101,6 +143,7 @@ async function load(
       .gte("created_at", start)
       .lt("created_at", end)
       .order("score", highest)
+      .order("created_at", earliest)
       .limit(500),
     supabase
       .from("artist_ratings")
@@ -110,14 +153,26 @@ async function load(
       .lt("created_at", end)
       .order("score", highest)
       .limit(200),
+    supabase
+      .from("mixtape_picks")
+      .select("kind, mbid")
+      .eq("user_id", userId)
+      .eq("month", month),
   ]);
 
   const albumRows = (albumResult.data ?? []) as unknown as AlbumRow[];
   const songRows = (songResult.data ?? []) as unknown as SongRow[];
   const artistRows = (artistResult.data ?? []) as unknown as ArtistRow[];
+  const saved = new Map(
+    ((pickResult.data ?? []) as { kind: RankOffKind; mbid: string }[]).map((row) => [
+      row.kind,
+      row.mbid,
+    ]),
+  );
 
   const albumPicks: MixtapePick[] = albumRows.map((row) => ({
     key: `album-${row.releases.mbid}`,
+    mbid: row.releases.mbid,
     title: row.releases.title,
     subtitle: creditOf(row.releases),
     image: coverSrc(row.releases.cover_art_url, 250),
@@ -127,6 +182,7 @@ async function load(
 
   const songPicks: MixtapePick[] = songRows.map((row) => ({
     key: `song-${row.songs.mbid}`,
+    mbid: row.songs.mbid,
     title: row.songs.title,
     subtitle: row.releases.title,
     image: coverSrc(row.releases.cover_art_url, 250),
@@ -136,12 +192,16 @@ async function load(
 
   const artistPicks: MixtapePick[] = artistRows.map((row) => ({
     key: `artist-${row.artists.mbid}`,
+    mbid: row.artists.mbid,
     title: row.artists.name,
     subtitle: null,
     image: artistPhotoSrc(row.artists.image_url, 300),
     href: `/artist/${row.artists.mbid}`,
     score: row.score,
   }));
+
+  const album = crown(albumPicks, saved.get("album"));
+  const song = crown(songPicks, saved.get("song"));
 
   // Whose music they rated most this month, albums and songs together.
   const tally = new Map<string, { artist: ArtistRef; rated: number }>();
@@ -160,6 +220,9 @@ async function load(
     ...artistRows.map((r) => r.score),
   ];
 
+  // The month's winners lead the tracklist among equal scores.
+  const crowned = new Set([album.top?.key, song.top?.key]);
+
   return {
     month,
     label: monthLabel(month),
@@ -170,12 +233,13 @@ async function load(
       scores.length > 0
         ? scores.reduce((sum, score) => sum + score, 0) / scores.length
         : null,
-    topAlbum: albumPicks[0] ?? null,
-    topSong: songPicks[0] ?? null,
+    topAlbum: album.top,
+    topSong: song.top,
     topArtist:
       busiest && busiest.rated > 1
         ? {
             key: `artist-${busiest.artist.mbid}`,
+            mbid: busiest.artist.mbid,
             title: busiest.artist.name,
             subtitle: null,
             image: artistPhotoSrc(busiest.artist.image_url, 300),
@@ -186,8 +250,15 @@ async function load(
             rated: busiest.rated,
           }
         : null,
+    albumTie: album.tie,
+    songTie: song.tie,
+    // Before the table exists, reading it fails, and there's nowhere to save a result.
+    rankOffs: !pickResult.error,
     highlights: [...albumPicks, ...songPicks, ...artistPicks]
-      .sort((a, b) => b.score - a.score)
+      .sort(
+        (a, b) =>
+          b.score - a.score || Number(crowned.has(b.key)) - Number(crowned.has(a.key)),
+      )
       .slice(0, 12),
   };
 }

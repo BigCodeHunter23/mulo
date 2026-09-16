@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfileByUsername } from "@/lib/social";
+import { getCurrentUser } from "@/lib/supabase/server";
 import {
   currentMonth,
   getMixtape,
@@ -9,10 +10,12 @@ import {
   MONTH_PATTERN,
   shiftMonth,
   type MixtapePick,
+  type Tie,
 } from "@/lib/mixtape";
 import Avatar from "@/components/Avatar";
 import ShareButton from "@/components/ShareButton";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+import RankOff from "./RankOff";
 
 export async function generateMetadata({
   params,
@@ -109,6 +112,45 @@ function Feature({
   );
 }
 
+/** A feature card that may be tied, with its rank-off underneath. */
+function Contested({
+  label,
+  kind,
+  pick,
+  tie,
+  month,
+  isOwner,
+}: {
+  label: string;
+  kind: "album" | "song";
+  pick: MixtapePick;
+  tie: Tie | null;
+  month: string;
+  isOwner: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Feature label={label} pick={pick} />
+      {tie && (
+        <RankOff
+          month={month}
+          kind={kind}
+          label={label}
+          score={pick.score}
+          contenders={tie.contenders.map(({ mbid, title, subtitle, image }) => ({
+            mbid,
+            title,
+            subtitle,
+            image,
+          }))}
+          settled={tie.settled}
+          isOwner={isOwner}
+        />
+      )}
+    </div>
+  );
+}
+
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col">
@@ -134,7 +176,8 @@ export default async function MixtapePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const tape = await getMixtape(profile.id, month);
+  const [tape, user] = await Promise.all([getMixtape(profile.id, month), getCurrentUser()]);
+  const isOwner = user?.id === profile.id;
   const name = profile.display_name || profile.username;
   const rated = tape.albums + tape.songs + tape.artists;
 
@@ -205,12 +248,26 @@ export default async function MixtapePage({
           </div>
 
           {(tape.topAlbum || tape.topSong || tape.topArtist) && (
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            <div className="mt-10 grid items-start gap-4 sm:grid-cols-3">
               {tape.topAlbum && (
-                <Feature label="Album of the month" pick={tape.topAlbum} />
+                <Contested
+                  label="Album of the month"
+                  kind="album"
+                  pick={tape.topAlbum}
+                  tie={tape.albumTie}
+                  month={month}
+                  isOwner={isOwner && tape.rankOffs}
+                />
               )}
               {tape.topSong && (
-                <Feature label="Track of the month" pick={tape.topSong} />
+                <Contested
+                  label="Track of the month"
+                  kind="song"
+                  pick={tape.topSong}
+                  tie={tape.songTie}
+                  month={month}
+                  isOwner={isOwner && tape.rankOffs}
+                />
               )}
               {tape.topArtist && (
                 <Feature
