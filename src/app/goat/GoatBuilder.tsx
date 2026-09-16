@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { saveTopPicks } from "./actions";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import ShareButton from "@/components/ShareButton";
 import { buttonClass, fieldClass } from "@/components/ui";
 
 type Kind = "artist" | "album";
@@ -398,6 +399,14 @@ export default function GoatBuilder({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
+        {items.length > 0 && (
+          <ShareButton
+            url={`/u/${username}`}
+            title="My GOAT on MULO"
+            text="My top ten, ranked."
+            label="Share your GOAT"
+          />
+        )}
         <Link
           href={`/u/${username}`}
           className="text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"

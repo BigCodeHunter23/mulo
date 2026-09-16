@@ -10,6 +10,7 @@ import {
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
 import { getBadges } from "@/lib/badges";
+import { getSound } from "@/lib/sound";
 import { getTasteMatch } from "@/lib/taste";
 import { getHighestRatedAlbums } from "@/lib/ratings";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -19,6 +20,7 @@ import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
+import ShareButton from "@/components/ShareButton";
 import TopPicks from "@/components/TopPicks";
 import { SkeletonRows } from "@/components/Skeleton";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
@@ -116,6 +118,7 @@ export default async function ProfilePage({
                   isSelf={followState.isSelf}
                   isFollowing={followState.isFollowing}
                 />
+                <ShareButton url={`/u/${profile.username}`} title={`${name} on MULO`} />
                 <ReportButton
                   profileId={profile.id}
                   signedIn={followState.signedIn}
@@ -131,6 +134,10 @@ export default async function ProfilePage({
             {profile.bio}
           </p>
         )}
+
+        <Suspense fallback={null}>
+          <ProfileSound userId={profile.id} isSelf={followState.isSelf} name={name} />
+        </Suspense>
 
         <Suspense fallback={null}>
           <ProfileBadges userId={profile.id} />
@@ -157,6 +164,12 @@ export default async function ProfilePage({
             >
               Your mixtape
             </ButtonLink>
+            <ShareButton
+              url={`/u/${profile.username}`}
+              title={`${name} on MULO`}
+              text="My GOAT, my ratings, my mixtape."
+              label="Share profile"
+            />
           </div>
         )}
       </header>
@@ -190,6 +203,37 @@ export default async function ProfilePage({
         />
       </Suspense>
     </main>
+  );
+}
+
+async function ProfileSound({
+  userId,
+  isSelf,
+  name,
+}: {
+  userId: string;
+  isSelf: boolean;
+  name: string;
+}) {
+  const sound = await getSound(userId);
+  if (sound.length === 0) return null;
+
+  return (
+    <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-4 w-4 text-accent"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+      >
+        <path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2" />
+      </svg>
+      <span className="text-text-muted">{isSelf ? "Your sound" : `${name}'s sound`}</span>
+      <span className="text-text">{sound.join(" · ")}</span>
+    </p>
   );
 }
 

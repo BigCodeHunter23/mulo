@@ -11,6 +11,7 @@ import {
   type MixtapePick,
 } from "@/lib/mixtape";
 import Avatar from "@/components/Avatar";
+import ShareButton from "@/components/ShareButton";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -153,6 +154,15 @@ export default async function MixtapePage({
         <span className="text-xs uppercase tracking-[0.15em] text-text-muted">
           Mixtape
         </span>
+        {rated > 0 && (
+          <div className="ml-auto">
+            <ShareButton
+              url={path(month)}
+              title={`${name}'s ${tape.label} mixtape`}
+              text={`${name}'s ${tape.label} on MULO.`}
+            />
+          </div>
+        )}
       </div>
 
       <div className="mt-5 flex items-center gap-4">
