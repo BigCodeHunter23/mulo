@@ -2,7 +2,7 @@ import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
 import { coverSrc } from "@/lib/cover-url";
 
-export type HotAlbum = {
+export type RotationAlbum = {
   mbid: string;
   title: string;
   artist: string | null;
@@ -12,7 +12,10 @@ export type HotAlbum = {
   average: number;
 };
 
-export type Hot = { label: "this week" | "this month"; albums: HotAlbum[] };
+export type HeavyRotation = {
+  label: "this week" | "this month";
+  albums: RotationAlbum[];
+};
 
 const WINDOWS = [
   { days: 7, label: "this week" },
@@ -41,7 +44,7 @@ type ReleaseRow = {
 };
 
 /**
- * What MULO is rating right now, from MULO's own activity rather than an
+ * What MULO has in heavy rotation, from MULO's own activity rather than an
  * outside chart. ListenBrainz's weekly chart was the obvious source, but its
  * user base is small enough for one fandom to fill it.
  *
@@ -50,7 +53,9 @@ type ReleaseRow = {
  * is used when there is enough going on, the month when there isn't, and
  * nothing at all when even the month is too quiet to rank.
  */
-export async function getHotOnMulo(limit = 10): Promise<Hot | null> {
+export async function getHeavyRotation(
+  limit = 10,
+): Promise<HeavyRotation | null> {
   const supabase = createPublicClient();
 
   for (const window of WINDOWS) {

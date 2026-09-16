@@ -1,8 +1,8 @@
 import { mostPlayedAlbums, popularArtists, topRatedOnMulo } from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
-import { getHotOnMulo } from "@/lib/trending";
+import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
-import HotOnMulo from "@/components/HotOnMulo";
+import HeavyRotation from "@/components/HeavyRotation";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
@@ -13,8 +13,8 @@ const ALBUM_GRID =
 
 /** The browsable parts of MULO, shared by the Discover page and the home page. */
 export default async function DiscoverSections() {
-  const [hot, topRated, mostPlayed, artists, recent, user] = await Promise.all([
-    getHotOnMulo(10),
+  const [rotation, topRated, mostPlayed, artists, recent, user] = await Promise.all([
+    getHeavyRotation(10),
     topRatedOnMulo(10),
     mostPlayedAlbums(15),
     popularArtists(10),
@@ -24,12 +24,18 @@ export default async function DiscoverSections() {
 
   return (
     <div className="flex flex-col gap-14">
-      {hot && <HotOnMulo hot={hot} />}
+      {rotation && <HeavyRotation rotation={rotation} />}
 
       {/* Only worth showing once enough albums have been rated to rank. */}
       {topRated.length >= 4 && (
         <section>
-          <SectionHeading>Top rated on MULO</SectionHeading>
+          <SectionHeading
+            action={
+              <span className="text-xs text-text-muted">Highest rated on MULO</span>
+            }
+          >
+            Undisputed
+          </SectionHeading>
           <ul className={ALBUM_GRID}>
             {topRated.map((album, i) => (
               <li key={album.mbid}>
@@ -56,7 +62,7 @@ export default async function DiscoverSections() {
               </span>
             }
           >
-            Most-played albums
+            Staples
           </SectionHeading>
           <ul className={ALBUM_GRID}>
             {mostPlayed.map((album, i) => (
@@ -77,7 +83,7 @@ export default async function DiscoverSections() {
 
       {artists.length > 0 && (
         <section>
-          <SectionHeading>Artists to explore</SectionHeading>
+          <SectionHeading>Dig Deeper</SectionHeading>
           <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-5">
             {artists.map((artist) => (
               <li key={artist.mbid}>
@@ -94,7 +100,7 @@ export default async function DiscoverSections() {
 
       {recent.length > 0 && (
         <section>
-          <SectionHeading>Just rated</SectionHeading>
+          <SectionHeading>Word on the Street</SectionHeading>
           <ul className="grid gap-3 md:grid-cols-2">
             {recent.map((item) => (
               <FeedItem key={item.key} item={item} signedIn={Boolean(user)} />

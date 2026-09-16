@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 
-export type RotationPick = {
+export type MixtapePick = {
   key: string;
   title: string;
   subtitle: string | null;
@@ -13,7 +13,7 @@ export type RotationPick = {
   score: number;
 };
 
-export type Rotation = {
+export type Mixtape = {
   /** "2026-09" */
   month: string;
   /** "September 2026" */
@@ -22,11 +22,11 @@ export type Rotation = {
   songs: number;
   artists: number;
   average: number | null;
-  topAlbum: RotationPick | null;
-  topSong: RotationPick | null;
-  topArtist: (RotationPick & { rated: number }) | null;
-  /** Their best of the month, across all three, highest first. */
-  highlights: RotationPick[];
+  topAlbum: MixtapePick | null;
+  topSong: MixtapePick | null;
+  topArtist: (MixtapePick & { rated: number }) | null;
+  /** The best of the month, across all three, highest first. */
+  highlights: MixtapePick[];
 };
 
 export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -72,15 +72,15 @@ function creditOf(release: ReleaseRef) {
 }
 
 /**
- * One month of somebody's ratings, in the order that makes a recap: what they
- * scored highest, and whose music they kept coming back to. Dates are the
- * moment a rating was first made, so changing a score later doesn't move it.
+ * One month of somebody's ratings, laid out like a tape: what they scored
+ * highest, and whose music they kept coming back to. Dates are when a rating
+ * was first made, so changing a score later doesn't move it to another month.
  */
 async function load(
   supabase: SupabaseClient,
   userId: string,
   month: string,
-): Promise<Rotation> {
+): Promise<Mixtape> {
   const start = `${month}-01T00:00:00Z`;
   const end = `${shiftMonth(month, 1)}-01T00:00:00Z`;
   const highest = { ascending: false } as const;
@@ -116,7 +116,7 @@ async function load(
   const songRows = (songResult.data ?? []) as unknown as SongRow[];
   const artistRows = (artistResult.data ?? []) as unknown as ArtistRow[];
 
-  const albumPicks: RotationPick[] = albumRows.map((row) => ({
+  const albumPicks: MixtapePick[] = albumRows.map((row) => ({
     key: `album-${row.releases.mbid}`,
     title: row.releases.title,
     subtitle: creditOf(row.releases),
@@ -125,7 +125,7 @@ async function load(
     score: row.score,
   }));
 
-  const songPicks: RotationPick[] = songRows.map((row) => ({
+  const songPicks: MixtapePick[] = songRows.map((row) => ({
     key: `song-${row.songs.mbid}`,
     title: row.songs.title,
     subtitle: row.releases.title,
@@ -134,7 +134,7 @@ async function load(
     score: row.score,
   }));
 
-  const artistPicks: RotationPick[] = artistRows.map((row) => ({
+  const artistPicks: MixtapePick[] = artistRows.map((row) => ({
     key: `artist-${row.artists.mbid}`,
     title: row.artists.name,
     subtitle: null,
@@ -192,11 +192,11 @@ async function load(
   };
 }
 
-export async function getRotation(userId: string, month: string) {
+export async function getMixtape(userId: string, month: string) {
   return load(await createClient(), userId, month);
 }
 
 /** The same month for the share picture, which runs without a session. */
-export async function getPublicRotation(userId: string, month: string) {
+export async function getPublicMixtape(userId: string, month: string) {
   return load(createPublicClient(), userId, month);
 }

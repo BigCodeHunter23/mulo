@@ -2,9 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingFeed } from "@/lib/feed";
-import { getHotOnMulo } from "@/lib/trending";
+import { getHeavyRotation } from "@/lib/trending";
 import FeedItem from "@/components/FeedItem";
-import HotOnMulo from "@/components/HotOnMulo";
+import HeavyRotation from "@/components/HeavyRotation";
 import DiscoverSections from "@/components/DiscoverSections";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -38,10 +38,10 @@ export default async function Home() {
   }
 
   const supabase = await createClient();
-  const [{ data: profile }, feed, hot] = await Promise.all([
+  const [{ data: profile }, feed, rotation] = await Promise.all([
     supabase.from("profiles").select("id").eq("id", user.id).maybeSingle(),
     getFollowingFeed(user.id),
-    getHotOnMulo(8),
+    getHeavyRotation(8),
   ]);
 
   // A new account hasn't picked a username yet, so nothing else would work.
@@ -65,7 +65,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      {hot && <HotOnMulo hot={hot} compact />}
+      {rotation && <HeavyRotation rotation={rotation} compact />}
 
       <SectionHeading
         action={

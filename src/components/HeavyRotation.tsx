@@ -1,17 +1,20 @@
 import Link from "next/link";
-import type { Hot } from "@/lib/trending";
+import type { HeavyRotation as Rotation } from "@/lib/trending";
 import { Star } from "@/components/StarScore";
 import { SectionHeading } from "@/components/ui";
 
-function Flame() {
+function Record() {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
       className="h-4 w-4 text-accent"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
     >
-      <path d="M12 2c.6 3.6-1.5 5.4-3 7.2C7.6 10.8 6.5 12.5 6.5 15a5.5 5.5 0 0 0 11 0c0-2.2-1-4-2.2-5.3-.2 1.6-1 2.6-2.3 3 .7-3.4-.2-7.6-1-10.7z" />
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2.5" />
     </svg>
   );
 }
@@ -27,16 +30,18 @@ function Meta({ people, average }: { people: number; average: number }) {
 }
 
 /**
- * What MULO is rating right now. The full grid heads Discover; the compact
+ * What MULO has in heavy rotation. The full grid heads Discover; the compact
  * row sits above a busy feed without pushing it down the page.
  */
-export default function HotOnMulo({
-  hot,
+export default function HeavyRotation({
+  rotation,
   compact = false,
 }: {
-  hot: Hot;
+  rotation: Rotation;
   compact?: boolean;
 }) {
+  const when = rotation.label === "this week" ? "This week" : "This month";
+
   const heading = (
     <SectionHeading
       action={
@@ -48,13 +53,13 @@ export default function HotOnMulo({
             More →
           </Link>
         ) : (
-          <span className="text-xs text-text-muted">By people rating it {hot.label}</span>
+          <span className="text-xs text-text-muted">{when}</span>
         )
       }
     >
       <span className="flex items-center gap-2">
-        <Flame />
-        Hot on MULO {hot.label}
+        <Record />
+        Heavy Rotation
       </span>
     </SectionHeading>
   );
@@ -64,7 +69,7 @@ export default function HotOnMulo({
       <section className="mb-10">
         {heading}
         <ol className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
-          {hot.albums.map((album, i) => (
+          {rotation.albums.map((album, i) => (
             <li key={album.mbid} className="w-28 shrink-0 sm:w-32">
               <Link href={`/album/${album.mbid}`} className="group block">
                 <span className="artwork relative block aspect-square overflow-hidden rounded-lg transition-transform group-hover:scale-[1.03]">
@@ -99,7 +104,7 @@ export default function HotOnMulo({
     <section>
       {heading}
       <ol className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
-        {hot.albums.map((album, i) => (
+        {rotation.albums.map((album, i) => (
           <li key={album.mbid}>
             <Link href={`/album/${album.mbid}`} className="group block">
               <span className="artwork relative block aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03]">

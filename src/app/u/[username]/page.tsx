@@ -187,11 +187,11 @@ export default async function ProfilePage({
               My ratings
             </ButtonLink>
             <ButtonLink
-              href={`/u/${profile.username}/rotation`}
+              href={`/u/${profile.username}/mixtape`}
               variant="secondary"
               size="sm"
             >
-              This month
+              Your mixtape
             </ButtonLink>
           </div>
         )}
@@ -258,7 +258,7 @@ export default async function ProfilePage({
               ) : undefined
             }
           >
-            Highest rated
+            Top Shelf
           </SectionHeading>
           <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
             {highest.map((rating, i) => (
@@ -281,10 +281,10 @@ export default async function ProfilePage({
       <SectionHeading
         action={
           <Link
-            href={`/u/${profile.username}/rotation`}
+            href={`/u/${profile.username}/mixtape`}
             className="text-xs text-text-muted transition-colors hover:text-text"
           >
-            This month →
+            Mixtape →
           </Link>
         }
       >

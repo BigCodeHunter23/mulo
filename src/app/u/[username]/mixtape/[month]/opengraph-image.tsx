@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- the image renderer needs <img> */
 import { ImageResponse } from "next/og";
 import { createPublicClient } from "@/lib/supabase/public";
-import { getPublicRotation, monthLabel, MONTH_PATTERN } from "@/lib/rotation";
+import { getPublicMixtape, monthLabel, MONTH_PATTERN } from "@/lib/mixtape";
 import { brandCard, loadImage, OG, ogFonts, Wordmark } from "@/lib/og";
 
 export const alt = "A month of ratings on MULO";
@@ -12,7 +12,7 @@ const short = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 
 /**
- * The card for a shared rotation link. Every box says how it lays its children
+ * The card for a shared mixtape link. Every box says how it lays its children
  * out, including the ones holding only text: the image renderer insists.
  */
 export default async function Image({
@@ -33,8 +33,8 @@ export default async function Image({
 
   if (!profile || !MONTH_PATTERN.test(month)) return brandCard(fonts);
 
-  const rotation = await getPublicRotation(profile.id, month);
-  const picks = rotation.highlights.slice(0, 4);
+  const tape = await getPublicMixtape(profile.id, month);
+  const picks = tape.highlights.slice(0, 4);
 
   const [avatar, ...covers] = await Promise.all([
     loadImage(profile.avatar_url),
@@ -42,7 +42,7 @@ export default async function Image({
   ]);
 
   const name = String(profile.display_name || profile.username);
-  const rated = rotation.albums + rotation.songs + rotation.artists;
+  const rated = tape.albums + tape.songs + tape.artists;
 
   return new ImageResponse(
     (
@@ -88,7 +88,7 @@ export default async function Image({
                 letterSpacing: "0.15em",
               }}
             >
-              {`${name.toUpperCase()}'S ROTATION`}
+              {`${name.toUpperCase()}'S MIXTAPE`}
             </div>
             <div
               style={{
@@ -195,8 +195,8 @@ export default async function Image({
         >
           {rated > 0
             ? `${rated} rated${
-                rotation.average !== null
-                  ? ` · ${rotation.average.toFixed(1)} average`
+                tape.average !== null
+                  ? ` · ${tape.average.toFixed(1)} average`
                   : ""
               }`
             : "Rating music on MULO"}

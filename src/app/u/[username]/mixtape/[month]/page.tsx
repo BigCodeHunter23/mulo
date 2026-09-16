@@ -4,12 +4,12 @@ import { notFound } from "next/navigation";
 import { getProfileByUsername } from "@/lib/social";
 import {
   currentMonth,
-  getRotation,
+  getMixtape,
   monthLabel,
   MONTH_PATTERN,
   shiftMonth,
-  type RotationPick,
-} from "@/lib/rotation";
+  type MixtapePick,
+} from "@/lib/mixtape";
 import Avatar from "@/components/Avatar";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -19,14 +19,14 @@ export async function generateMetadata({
   params: Promise<{ username: string; month: string }>;
 }): Promise<Metadata> {
   const { username, month } = await params;
-  if (!MONTH_PATTERN.test(month)) return { title: "Rotation" };
+  if (!MONTH_PATTERN.test(month)) return { title: "Mixtape" };
 
   const profile = await getProfileByUsername(username);
-  if (!profile) return { title: "Rotation" };
+  if (!profile) return { title: "Mixtape" };
 
   const name = profile.display_name || profile.username;
-  const title = `${name}'s rotation — ${monthLabel(month)}`;
-  const description = `What ${name} rated in ${monthLabel(month)}, on MULO.`;
+  const title = `${name}'s mixtape — ${monthLabel(month)}`;
+  const description = `${name}'s ${monthLabel(month)} mixtape on MULO: the albums, songs and artists they rated.`;
 
   return {
     title,
@@ -40,7 +40,7 @@ function Art({
   round,
   size,
 }: {
-  pick: RotationPick;
+  pick: MixtapePick;
   round: boolean;
   size: string;
 }) {
@@ -73,7 +73,7 @@ function Feature({
   detail,
 }: {
   label: string;
-  pick: RotationPick;
+  pick: MixtapePick;
   round?: boolean;
   detail?: string;
 }) {
@@ -122,7 +122,7 @@ function Stat({ value, label }: { value: string | number; label: string }) {
  * Each month has its own address, so a shared link always previews the month
  * it points at.
  */
-export default async function RotationPage({
+export default async function MixtapePage({
   params,
 }: {
   params: Promise<{ username: string; month: string }>;
@@ -133,13 +133,13 @@ export default async function RotationPage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const rotation = await getRotation(profile.id, month);
+  const tape = await getMixtape(profile.id, month);
   const name = profile.display_name || profile.username;
-  const rated = rotation.albums + rotation.songs + rotation.artists;
+  const rated = tape.albums + tape.songs + tape.artists;
 
   const previous = shiftMonth(month, -1);
   const next = shiftMonth(month, 1);
-  const path = (target: string) => `/u/${username}/rotation/${target}`;
+  const path = (target: string) => `/u/${username}/mixtape/${target}`;
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-8 sm:px-6">
@@ -151,23 +151,23 @@ export default async function RotationPage({
           </span>
         </Link>
         <span className="text-xs uppercase tracking-[0.15em] text-text-muted">
-          Rotation
+          Mixtape
         </span>
       </div>
 
       <div className="mt-5 flex items-center gap-4">
         <Link
           href={path(previous)}
-          aria-label={`Rotation for ${monthLabel(previous)}`}
+          aria-label={`Mixtape for ${monthLabel(previous)}`}
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text"
         >
           ←
         </Link>
-        <h1 className="display text-3xl text-text sm:text-4xl">{rotation.label}</h1>
+        <h1 className="display text-3xl text-text sm:text-4xl">{tape.label}</h1>
         {next <= currentMonth() && (
           <Link
             href={path(next)}
-            aria-label={`Rotation for ${monthLabel(next)}`}
+            aria-label={`Mixtape for ${monthLabel(next)}`}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text"
           >
             →
@@ -178,46 +178,46 @@ export default async function RotationPage({
       {rated === 0 ? (
         <div className="mt-10">
           <EmptyState
-            title={`Nothing rated in ${rotation.label}`}
-            body={`${name} hasn't scored anything this month yet.`}
+            title="Blank tape"
+            body={`Nothing rated in ${tape.label} yet.`}
             action={<ButtonLink href={path(previous)}>See {monthLabel(previous)}</ButtonLink>}
           />
         </div>
       ) : (
         <>
           <div className="mt-7 flex flex-wrap gap-7">
-            <Stat value={rotation.albums} label="Albums" />
-            <Stat value={rotation.songs} label="Songs" />
-            <Stat value={rotation.artists} label="Artists" />
-            {rotation.average !== null && (
-              <Stat value={rotation.average.toFixed(1)} label="Avg score" />
+            <Stat value={tape.albums} label="Albums" />
+            <Stat value={tape.songs} label="Songs" />
+            <Stat value={tape.artists} label="Artists" />
+            {tape.average !== null && (
+              <Stat value={tape.average.toFixed(1)} label="Avg score" />
             )}
           </div>
 
-          {(rotation.topAlbum || rotation.topSong || rotation.topArtist) && (
+          {(tape.topAlbum || tape.topSong || tape.topArtist) && (
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              {rotation.topAlbum && (
-                <Feature label="Album of the month" pick={rotation.topAlbum} />
+              {tape.topAlbum && (
+                <Feature label="Album of the month" pick={tape.topAlbum} />
               )}
-              {rotation.topSong && (
-                <Feature label="Song of the month" pick={rotation.topSong} />
+              {tape.topSong && (
+                <Feature label="Track of the month" pick={tape.topSong} />
               )}
-              {rotation.topArtist && (
+              {tape.topArtist && (
                 <Feature
                   label="On repeat"
-                  pick={rotation.topArtist}
+                  pick={tape.topArtist}
                   round
-                  detail={`${rotation.topArtist.rated} ratings this month`}
+                  detail={`${tape.topArtist.rated} ratings this month`}
                 />
               )}
             </div>
           )}
 
-          {rotation.highlights.length > 0 && (
+          {tape.highlights.length > 0 && (
             <section className="mt-14">
-              <SectionHeading>The month in full</SectionHeading>
+              <SectionHeading>Full tracklist</SectionHeading>
               <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
-                {rotation.highlights.map((pick) => (
+                {tape.highlights.map((pick) => (
                   <li key={pick.key}>
                     <Link href={pick.href} className="group block">
                       <Art
