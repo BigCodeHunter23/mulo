@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
@@ -38,10 +39,9 @@ export default async function Home() {
   }
 
   const supabase = await createClient();
-  const [{ data: profile }, feed, rotation] = await Promise.all([
+  const [{ data: profile }, feed] = await Promise.all([
     supabase.from("profiles").select("id").eq("id", user.id).maybeSingle(),
     getFollowingFeed(user.id),
-    getHeavyRotation(8),
   ]);
 
   // A new account hasn't picked a username yet, so nothing else would work.
@@ -65,7 +65,10 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      {rotation && <HeavyRotation rotation={rotation} compact />}
+      {/* Streams in on its own, so the feed never waits for it. */}
+      <Suspense fallback={null}>
+        <HomeRotation />
+      </Suspense>
 
       <SectionHeading
         action={
@@ -86,4 +89,9 @@ export default async function Home() {
       </ul>
     </main>
   );
+}
+
+async function HomeRotation() {
+  const rotation = await getHeavyRotation(8);
+  return rotation ? <HeavyRotation rotation={rotation} compact /> : null;
 }

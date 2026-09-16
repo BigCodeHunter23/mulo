@@ -20,20 +20,34 @@ function throttle<T>(fn: () => Promise<T>): Promise<T> {
 /** Thrown when MusicBrainz has no such artist or release. */
 export class MbNotFoundError extends Error {}
 
-async function mbFetch<T>(path: string, attempt = 1): Promise<T> {
+type FetchOptions = {
+  /** Retries when MusicBrainz says it's busy. Patient work can wait; search can't. */
+  retries?: number;
+  /** Give up on one request after this long. */
+  timeoutMs?: number;
+};
+
+async function mbFetch<T>(
+  path: string,
+  options: FetchOptions = {},
+  attempt = 1,
+): Promise<T> {
+  const { retries = 4, timeoutMs } = options;
+
   const response = await throttle(() =>
     fetch(`${API}${path}`, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       // We cache in Postgres ourselves; don't let Next.js cache responses
       // (a cached 503 would otherwise stick around).
       cache: "no-store",
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     }),
   );
 
   // 503 means MusicBrainz is busy or rate-limiting. Back off and retry.
-  if (response.status === 503 && attempt <= 4) {
+  if (response.status === 503 && attempt <= retries) {
     await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
-    return mbFetch<T>(path, attempt + 1);
+    return mbFetch<T>(path, options, attempt + 1);
   }
 
   // 404 = no such MBID; 400 = malformed MBID. Both arrive from a URL the
@@ -104,9 +118,33 @@ export function creditText(credit: MbCredit[] = []): string | null {
   );
 }
 
+/**
+ * Search is somebody waiting at a text box, so it gets one quick try. From
+ * Vercel's shared servers MusicBrainz often answers "busy", and retrying with
+ * back-off held the search page open for 25 seconds.
+ */
+const SEARCH: FetchOptions = { retries: 0, timeoutMs: 4000 };
+const SEARCH_DEADLINE_MS = 5000;
+
+/** Also counts time spent queued behind other MusicBrainz requests. */
+function withDeadline<T>(work: Promise<T>): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("MusicBrainz took too long")),
+        SEARCH_DEADLINE_MS,
+      ),
+    ),
+  ]);
+}
+
 export async function searchArtists(query: string): Promise<MbArtist[]> {
-  const data = await mbFetch<{ artists: MbArtist[] }>(
-    `/artist?query=${encodeURIComponent(query)}&limit=20&fmt=json`,
+  const data = await withDeadline(
+    mbFetch<{ artists: MbArtist[] }>(
+      `/artist?query=${encodeURIComponent(query)}&limit=20&fmt=json`,
+      SEARCH,
+    ),
   );
   return (data.artists ?? []).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
@@ -154,8 +192,11 @@ export async function searchReleaseGroups(
   const escaped = escapeLucene(query);
   const lucene = `(artist:(${escaped}) OR releasegroup:(${escaped})) AND primarytype:Album`;
 
-  const data = await mbFetch<{ "release-groups": MbReleaseGroup[] }>(
-    `/release-group?query=${encodeURIComponent(lucene)}&limit=100&fmt=json`,
+  const data = await withDeadline(
+    mbFetch<{ "release-groups": MbReleaseGroup[] }>(
+      `/release-group?query=${encodeURIComponent(lucene)}&limit=100&fmt=json`,
+      SEARCH,
+    ),
   );
 
   return (data["release-groups"] ?? [])

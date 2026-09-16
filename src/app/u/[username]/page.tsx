@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import {
   getFollowState,
   getProfileByUsername,
@@ -19,6 +20,7 @@ import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
 import TopPicks from "@/components/TopPicks";
+import { SkeletonRows } from "@/components/Skeleton";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -58,6 +60,11 @@ function Stat({ value, label }: { value: string | number; label: string }) {
   );
 }
 
+/**
+ * A profile waits only for what its header shows. The GOAT list, badges, taste
+ * match, top shelf and ratings each stream in underneath as they're ready, so
+ * the slowest of them never holds up the page.
+ */
 export default async function ProfilePage({
   params,
 }: {
@@ -68,35 +75,21 @@ export default async function ProfilePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [stats, followState, ratings, topArtists, topAlbums, badges, highest] =
-    await Promise.all([
-      getProfileStats(profile.id),
-      getFollowState(profile.id),
-      getUserFeed(profile.id),
-      getTopPicks(profile.id, "artist"),
-      getTopPicks(profile.id, "album"),
-      getBadges(profile.id),
-      getHighestRatedAlbums(profile.id, 12),
-    ]);
-  const taste = await getTasteMatch(profile.id);
+  const [stats, followState] = await Promise.all([
+    getProfileStats(profile.id),
+    getFollowState(profile.id),
+  ]);
 
   const name = profile.display_name || profile.username;
-  const hasPicks = topArtists.length > 0 || topAlbums.length > 0;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <header className="mb-10">
         <div className="flex items-start gap-5">
-          <Avatar
-            url={profile.avatar_url}
-            name={profile.display_name || profile.username}
-            size="xl"
-          />
+          <Avatar url={profile.avatar_url} name={name} size="xl" />
 
           <div className="min-w-0 flex-1">
-            <h1 className="display text-2xl text-text sm:text-3xl">
-              {profile.display_name || profile.username}
-            </h1>
+            <h1 className="display text-2xl text-text sm:text-3xl">{name}</h1>
             <p className="text-sm text-text-muted">@{profile.username}</p>
 
             <div className="mt-4 flex flex-wrap gap-6">
@@ -104,10 +97,7 @@ export default async function ProfilePage({
               <Stat value={stats.followers} label="Followers" />
               <Stat value={stats.following} label="Following" />
               {stats.averageScore !== null && (
-                <Stat
-                  value={stats.averageScore.toFixed(1)}
-                  label="Avg score"
-                />
+                <Stat value={stats.averageScore.toFixed(1)} label="Avg score" />
               )}
             </div>
           </div>
@@ -142,40 +132,14 @@ export default async function ProfilePage({
           </p>
         )}
 
-        {badges.length > 0 && (
-          <div className="mt-5">
-            <Badges badges={badges} />
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <ProfileBadges userId={profile.id} />
+        </Suspense>
 
-        {taste && (
-          <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
-            <p className="flex items-baseline gap-2">
-              <span className="display text-xl text-accent">{taste.percent}%</span>
-              <span className="text-sm text-text-secondary">
-                taste match · {taste.shared} in common
-              </span>
-            </p>
-            {taste.clash && (
-              <p className="mt-1.5 text-xs text-text-muted">
-                You disagree most on{" "}
-                <Link
-                  href={taste.clash.href}
-                  className="text-text underline-offset-4 transition-colors hover:text-accent hover:underline"
-                >
-                  {taste.clash.title}
-                </Link>
-                {" — you "}
-                <span className="font-semibold text-score-you">
-                  {taste.clash.yours}
-                </span>
-                {", them "}
-                <span className="font-semibold text-score-friends">
-                  {taste.clash.theirs}
-                </span>
-              </p>
-            )}
-          </div>
+        {!followState.isSelf && (
+          <Suspense fallback={null}>
+            <ProfileTaste userId={profile.id} />
+          </Suspense>
         )}
 
         {followState.isSelf && (
@@ -197,86 +161,13 @@ export default async function ProfilePage({
         )}
       </header>
 
-      {hasPicks && (
-        <section className="mb-14">
-          <SectionHeading
-            action={
-              followState.isSelf ? (
-                <Link
-                  href="/goat"
-                  className="text-xs text-text-muted transition-colors hover:text-text"
-                >
-                  Edit
-                </Link>
-              ) : undefined
-            }
-          >
-            {followState.isSelf ? "Your GOAT" : `${name}'s GOAT`}
-          </SectionHeading>
+      <Suspense fallback={null}>
+        <ProfileGoat userId={profile.id} name={name} isSelf={followState.isSelf} />
+      </Suspense>
 
-          {topArtists.length > 0 && (
-            <>
-              <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
-                Artists
-              </p>
-              <TopPicks picks={topArtists} kind="artist" />
-            </>
-          )}
-
-          {topAlbums.length > 0 && (
-            <div className={topArtists.length > 0 ? "mt-8" : ""}>
-              <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
-                Albums
-              </p>
-              <TopPicks picks={topAlbums} kind="album" />
-            </div>
-          )}
-        </section>
-      )}
-
-      {!hasPicks && followState.isSelf && (
-        <div className="mb-14">
-          <EmptyState
-            title="Select your GOAT"
-            body="Pick your top ten artists and albums and rank them. Number one wears the crown, on your profile and in the preview when you send someone your link."
-            action={<ButtonLink href="/goat">Pick your top ten</ButtonLink>}
-          />
-        </div>
-      )}
-
-      {highest.length >= 4 && (
-        <section className="mb-14">
-          <SectionHeading
-            action={
-              followState.isSelf ? (
-                <Link
-                  href="/ratings"
-                  className="text-xs text-text-muted transition-colors hover:text-text"
-                >
-                  All by score →
-                </Link>
-              ) : undefined
-            }
-          >
-            Top Shelf
-          </SectionHeading>
-          <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
-            {highest.map((rating, i) => (
-              <li key={rating.release.mbid}>
-                <AlbumCard
-                  mbid={rating.release.mbid}
-                  title={rating.release.title}
-                  artist={rating.release.artist?.name ?? null}
-                  coverUrl={rating.release.cover_art_url}
-                  score={rating.score}
-                  scoreKind="you"
-                  eager={i < 6}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <Suspense fallback={null}>
+        <ProfileTopShelf userId={profile.id} isSelf={followState.isSelf} />
+      </Suspense>
 
       <SectionHeading
         action={
@@ -291,33 +182,206 @@ export default async function ProfilePage({
         Ratings
       </SectionHeading>
 
-      {ratings.length === 0 ? (
-        <EmptyState
-          title="Nothing rated yet"
-          body={
-            followState.isSelf
-              ? "Find an artist, album or song and give it a score out of 10."
-              : undefined
-          }
-          action={
-            followState.isSelf ? (
-              <ButtonLink href="/search">Search music</ButtonLink>
-            ) : undefined
-          }
+      <Suspense fallback={<SkeletonRows count={3} />}>
+        <ProfileRatings
+          userId={profile.id}
+          signedIn={followState.signedIn}
+          isSelf={followState.isSelf}
         />
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {ratings.map((item) => (
-            <FeedItem
-              key={item.key}
-              item={item}
-              showAuthor={false}
-              signedIn={followState.signedIn}
-              readOnly={followState.isSelf}
-            />
-          ))}
-        </ul>
-      )}
+      </Suspense>
     </main>
+  );
+}
+
+async function ProfileBadges({ userId }: { userId: string }) {
+  const badges = await getBadges(userId);
+  if (badges.length === 0) return null;
+
+  return (
+    <div className="mt-5">
+      <Badges badges={badges} />
+    </div>
+  );
+}
+
+async function ProfileTaste({ userId }: { userId: string }) {
+  const taste = await getTasteMatch(userId);
+  if (!taste) return null;
+
+  return (
+    <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
+      <p className="flex items-baseline gap-2">
+        <span className="display text-xl text-accent">{taste.percent}%</span>
+        <span className="text-sm text-text-secondary">
+          taste match · {taste.shared} in common
+        </span>
+      </p>
+      {taste.clash && (
+        <p className="mt-1.5 text-xs text-text-muted">
+          You disagree most on{" "}
+          <Link
+            href={taste.clash.href}
+            className="text-text underline-offset-4 transition-colors hover:text-accent hover:underline"
+          >
+            {taste.clash.title}
+          </Link>
+          {" — you "}
+          <span className="font-semibold text-score-you">{taste.clash.yours}</span>
+          {", them "}
+          <span className="font-semibold text-score-friends">{taste.clash.theirs}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+async function ProfileGoat({
+  userId,
+  name,
+  isSelf,
+}: {
+  userId: string;
+  name: string;
+  isSelf: boolean;
+}) {
+  const [topArtists, topAlbums] = await Promise.all([
+    getTopPicks(userId, "artist"),
+    getTopPicks(userId, "album"),
+  ]);
+
+  if (topArtists.length === 0 && topAlbums.length === 0) {
+    return isSelf ? (
+      <div className="mb-14">
+        <EmptyState
+          title="Select your GOAT"
+          body="Pick your top ten artists and albums and rank them. Number one wears the crown, on your profile and in the preview when you send someone your link."
+          action={<ButtonLink href="/goat">Pick your top ten</ButtonLink>}
+        />
+      </div>
+    ) : null;
+  }
+
+  return (
+    <section className="mb-14">
+      <SectionHeading
+        action={
+          isSelf ? (
+            <Link
+              href="/goat"
+              className="text-xs text-text-muted transition-colors hover:text-text"
+            >
+              Edit
+            </Link>
+          ) : undefined
+        }
+      >
+        {isSelf ? "Your GOAT" : `${name}'s GOAT`}
+      </SectionHeading>
+
+      {topArtists.length > 0 && (
+        <>
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
+            Artists
+          </p>
+          <TopPicks picks={topArtists} kind="artist" />
+        </>
+      )}
+
+      {topAlbums.length > 0 && (
+        <div className={topArtists.length > 0 ? "mt-8" : ""}>
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
+            Albums
+          </p>
+          <TopPicks picks={topAlbums} kind="album" />
+        </div>
+      )}
+    </section>
+  );
+}
+
+async function ProfileTopShelf({
+  userId,
+  isSelf,
+}: {
+  userId: string;
+  isSelf: boolean;
+}) {
+  const highest = await getHighestRatedAlbums(userId, 12);
+  if (highest.length < 4) return null;
+
+  return (
+    <section className="mb-14">
+      <SectionHeading
+        action={
+          isSelf ? (
+            <Link
+              href="/ratings"
+              className="text-xs text-text-muted transition-colors hover:text-text"
+            >
+              All by score →
+            </Link>
+          ) : undefined
+        }
+      >
+        Top Shelf
+      </SectionHeading>
+      <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
+        {highest.map((rating, i) => (
+          <li key={rating.release.mbid}>
+            <AlbumCard
+              mbid={rating.release.mbid}
+              title={rating.release.title}
+              artist={rating.release.artist?.name ?? null}
+              coverUrl={rating.release.cover_art_url}
+              score={rating.score}
+              scoreKind="you"
+              eager={i < 6}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+async function ProfileRatings({
+  userId,
+  signedIn,
+  isSelf,
+}: {
+  userId: string;
+  signedIn: boolean;
+  isSelf: boolean;
+}) {
+  const ratings = await getUserFeed(userId);
+
+  if (ratings.length === 0) {
+    return (
+      <EmptyState
+        title="Nothing rated yet"
+        body={
+          isSelf
+            ? "Find an artist, album or song and give it a score out of 10."
+            : undefined
+        }
+        action={
+          isSelf ? <ButtonLink href="/search">Search music</ButtonLink> : undefined
+        }
+      />
+    );
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {ratings.map((item) => (
+        <FeedItem
+          key={item.key}
+          item={item}
+          showAuthor={false}
+          signedIn={signedIn}
+          readOnly={isSelf}
+        />
+      ))}
+    </ul>
   );
 }
