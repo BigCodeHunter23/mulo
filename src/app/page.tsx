@@ -6,6 +6,7 @@ import { getFollowingFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import FeedItem from "@/components/FeedItem";
 import HeavyRotation from "@/components/HeavyRotation";
+import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import DiscoverSections from "@/components/DiscoverSections";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -65,7 +66,10 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      {/* Streams in on its own, so the feed never waits for it. */}
+      {/* These stream in on their own, so the feed never waits for them. */}
+      <Suspense fallback={<TodaysVersusPlaceholder className="mb-10" />}>
+        <TodaysVersus className="mb-10" />
+      </Suspense>
       <Suspense fallback={null}>
         <HomeRotation />
       </Suspense>

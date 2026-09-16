@@ -43,7 +43,14 @@ in plain language, and give them links and exact steps when they need to act.
   `admin/reports` (the moderation inbox, open only to emails in the
   `ADMIN_EMAILS` environment variable).
 - Notifications, like feeds, are read from existing tables (follows,
-  reactions) rather than stored; when someone last looked lives in a cookie.
+  reactions, Versus picks) rather than stored; when someone last looked lives
+  in a cookie.
+- Daily Versus (`src/app/versus`, `src/lib/versus.ts`): one matchup a day on
+  Sydney time, taken in order from the hand-picked lineup in
+  `src/lib/versus-pairs.ts`, which loops. The first visit of a day creates
+  that day's row, so nothing runs on a timer. The database only accepts picks
+  for today's matchup, and the split stays hidden until someone picks.
+  Changing `VERSUS_START` or reordering pairs changes future days only.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
   rerun; `scripts/copy-covers.mjs` copies covers into storage.
 
@@ -54,6 +61,8 @@ in plain language, and give them links and exact steps when they need to act.
   `top_artists` and `top_albums` are separate tables.
 - Share images (`next/og`) need `display: flex` on every element with more
   than one child, text-only boxes included, and can't take React fragments.
+  They can't read WebP either; `loadImage` swaps Wikimedia WebP photos for a
+  PNG copy (Commons only makes thumbnails at set widths, such as 250 and 500).
 - Server actions refuse bodies over 1MB, so avatars are cropped in the browser
   to a 512px JPEG before upload.
 - MusicBrainz often rate-limits Vercel's shared addresses. Anything a person is

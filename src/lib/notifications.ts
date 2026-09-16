@@ -1,10 +1,18 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getLatestVersusAt,
+  getRecentResults,
+  getTodaysMatchup,
+  hasPickedToday,
+  sydneyMidnight,
+} from "@/lib/versus";
+import type { VersusMatchup, VersusResult } from "@/lib/versus-shared";
 
 /** When somebody last opened their notifications, kept per browser. */
 export const SEEN_COOKIE = "mulo_notifications_seen";
 
-type Person = {
+export type Person = {
   id: string;
   username: string;
   display_name: string | null;
@@ -21,7 +29,11 @@ export type Notification =
       /** 1 for a love, -1 for a nah. */
       value: 1 | -1;
       subject: { title: string; href: string };
-    };
+    }
+  /** Today's Daily Versus is up and they haven't picked yet. */
+  | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
+  /** A Versus they picked in has closed. */
+  | { kind: "versus-result"; key: string; at: string; result: VersusResult };
 
 type ReactionRow = {
   id: number;
@@ -35,9 +47,9 @@ type ReactionRow = {
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
 
 /**
- * What's happened to somebody lately: new followers, and loves and nahs on
- * their ratings. Worked out from those tables on request, like the feed, so
- * there's nothing extra to store or keep in step.
+ * What's happened to somebody lately: new followers, loves and nahs on their
+ * ratings, and the Daily Versus. Worked out from those tables on request, like
+ * the feed, so there's nothing extra to store or keep in step.
  */
 export async function getNotifications(
   userId: string,
@@ -46,7 +58,14 @@ export async function getNotifications(
   const supabase = await createClient();
   const newest = { ascending: false } as const;
 
-  const [follows, albumReactions, artistReactions] = await Promise.all([
+  const [
+    follows,
+    albumReactions,
+    artistReactions,
+    pickedToday,
+    today,
+    results,
+  ] = await Promise.all([
     supabase
       .from("follows")
       .select("follower_id, created_at")
@@ -69,6 +88,9 @@ export async function getNotifications(
       .neq("user_id", userId)
       .order("created_at", newest)
       .limit(limit),
+    hasPickedToday(userId),
+    getTodaysMatchup(),
+    getRecentResults(userId),
   ]);
 
   // Follows point at accounts rather than profiles, so their names come separately.
@@ -126,6 +148,24 @@ export async function getNotifications(
           : [];
       },
     ),
+    ...(today && !pickedToday
+      ? [
+          {
+            kind: "versus-live",
+            key: `versus-live-${today.day}`,
+            at: sydneyMidnight(today.day).toISOString(),
+            matchup: today,
+          } satisfies Notification,
+        ]
+      : []),
+    ...results.map(
+      (result): Notification => ({
+        kind: "versus-result",
+        key: `versus-result-${result.matchup.day}`,
+        at: result.at,
+        result,
+      }),
+    ),
   ];
 
   return notifications
@@ -138,7 +178,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
   const supabase = await createClient();
   const newest = { ascending: false } as const;
 
-  const [follow, albumReaction, artistReaction] = await Promise.all([
+  const [follow, albumReaction, artistReaction, versus] = await Promise.all([
     supabase
       .from("follows")
       .select("created_at")
@@ -159,11 +199,13 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
       .neq("user_id", userId)
       .order("created_at", newest)
       .limit(1),
+    getLatestVersusAt(userId),
   ]);
 
   const times = [follow.data, albumReaction.data, artistReaction.data]
     .flatMap((rows) => (rows ?? []) as { created_at: string }[])
     .map((row) => row.created_at)
+    .concat(versus ? [versus] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));
 
   return times[0] ?? null;

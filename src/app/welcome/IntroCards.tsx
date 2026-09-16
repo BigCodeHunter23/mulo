@@ -96,7 +96,7 @@ const CARDS = [
   },
   {
     title: "Settle the debate",
-    body: "Which album is actually the best? Every rating you make counts towards the answer.",
+    body: "Which album is actually the best? Every rating counts towards the answer, and there's a new Versus to pick every day.",
     art: <DebateArt />,
   },
 ];

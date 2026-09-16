@@ -148,9 +148,34 @@ select {
   animation: goat-glow 2.2s ease-in-out 0.5s 2;
 }
 
+/* Daily Versus: once the split is revealed, each side grows in from its end. */
+@keyframes versus-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.versus-bar-left,
+.versus-bar-right {
+  animation: versus-grow 0.7s ease-out both;
+}
+
+.versus-bar-left {
+  transform-origin: left;
+}
+
+.versus-bar-right {
+  transform-origin: right;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .goat-reveal,
-  .goat-crown {
+  .goat-crown,
+  .versus-bar-left,
+  .versus-bar-right {
     animation: none;
   }
 }

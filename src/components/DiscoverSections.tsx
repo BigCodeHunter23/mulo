@@ -4,6 +4,7 @@ import { getGlobalFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
 import HeavyRotation from "@/components/HeavyRotation";
+import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
@@ -23,6 +24,9 @@ const ARTIST_GRID = "grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-5";
 export default function DiscoverSections() {
   return (
     <div className="flex flex-col gap-14">
+      <Suspense fallback={<TodaysVersusPlaceholder />}>
+        <TodaysVersus />
+      </Suspense>
       <Suspense fallback={null}>
         <Rotation />
       </Suspense>

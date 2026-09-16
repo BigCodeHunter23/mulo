@@ -69,6 +69,41 @@ export async function ogFonts(): Promise<OgFont[] | undefined> {
   return fonts.length > 0 ? fonts : undefined;
 }
 
+type Fetched = { type: string; data: ArrayBuffer; url: string };
+
+async function fetchImage(url: string): Promise<Fetched | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(6000),
+    });
+    const type = response.headers.get("content-type") ?? "";
+    if (!response.ok || !type.startsWith("image/")) return null;
+
+    return { type, data: await response.arrayBuffer(), url: response.url };
+  } catch {
+    return null;
+  }
+}
+
+const COMMONS_FILE =
+  /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+)/;
+
+/**
+ * PNG copies of a Wikimedia Commons file, largest first. Commons only makes
+ * thumbnails at set widths, and never wider than the original.
+ */
+function commonsPngCopies(url: string) {
+  const match = url.match(COMMONS_FILE);
+  if (!match) return [];
+
+  const [, a, ab, file] = match;
+  return [500, 250].map(
+    (width) =>
+      `https://upload.wikimedia.org/wikipedia/commons/thumb/${a}/${ab}/${file}/${width}px-${file}.png`,
+  );
+}
+
 /**
  * Fetches an image and inlines it, so one slow or missing picture degrades to
  * a placeholder instead of failing the whole preview.
@@ -78,23 +113,24 @@ export async function loadImage(
 ): Promise<string | null> {
   if (!url) return null;
 
-  try {
-    const response = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(6000),
-    });
-    const type = response.headers.get("content-type") ?? "";
+  let image = await fetchImage(url);
 
-    // The renderer can't reliably decode WebP, so skip it rather than break.
-    if (!response.ok || !type.startsWith("image/") || type.includes("webp")) {
-      return null;
+  // The renderer can't reliably decode WebP. Wikimedia will hand over a PNG
+  // copy instead; anything else in WebP is skipped rather than break the card.
+  if (image?.type.includes("webp")) {
+    const copies = commonsPngCopies(image.url);
+    image = null;
+    for (const copy of copies) {
+      const png = await fetchImage(copy);
+      if (png && !png.type.includes("webp")) {
+        image = png;
+        break;
+      }
     }
-
-    const base64 = Buffer.from(await response.arrayBuffer()).toString("base64");
-    return `data:${type};base64,${base64}`;
-  } catch {
-    return null;
   }
+
+  if (!image) return null;
+  return `data:${image.type};base64,${Buffer.from(image.data).toString("base64")}`;
 }
 
 export function Star({ size, color }: { size: number; color: string }) {

@@ -37,6 +37,10 @@ export default async function Header() {
           <Link href="/people" className={navLink}>
             People
           </Link>
+          <Link href="/versus" className={`${navLink} hidden sm:inline`}>
+            Versus
+          </Link>
+          {/* The rest appear as the screen has room; Log out is also on Edit profile. */}
           {user && (
             <>
               <Link
@@ -45,10 +49,10 @@ export default async function Header() {
               >
                 My profile
               </Link>
-              <Link href="/goat" className={`${navLink} hidden sm:inline`}>
+              <Link href="/goat" className={`${navLink} hidden md:inline`}>
                 Your GOAT
               </Link>
-              <Link href="/ratings" className={`${navLink} hidden sm:inline`}>
+              <Link href="/ratings" className={`${navLink} hidden lg:inline`}>
                 My ratings
               </Link>
             </>
@@ -58,8 +62,8 @@ export default async function Header() {
         <div className="ml-auto flex items-center gap-3">
           {user ? (
             <>
-              <form action={logout}>
-                <button type="submit" className={`${navLink} hidden sm:inline`}>
+              <form action={logout} className="hidden lg:block">
+                <button type="submit" className={navLink}>
                   Log out
                 </button>
               </form>
