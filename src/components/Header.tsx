@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
 import Avatar from "@/components/Avatar";
+import NotificationBell from "@/components/NotificationBell";
 import { buttonClass } from "@/components/ui";
 
 export default async function Header() {
@@ -62,6 +63,7 @@ export default async function Header() {
                   Log out
                 </button>
               </form>
+              <NotificationBell />
               <Link
                 href={profile?.username ? `/u/${profile.username}` : "/welcome"}
                 className="transition-opacity hover:opacity-80"
