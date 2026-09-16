@@ -1,17 +1,21 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
+import Reactions from "@/components/Reactions";
 import type { Review } from "@/lib/reviews";
+import { NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
 
 /** Written reviews with their scores, on album and artist pages. */
 export default function ReviewList({
   reviews,
   kind,
   signedIn,
+  reactions,
 }: {
   reviews: Review[];
   kind: "album" | "artist";
   signedIn: boolean;
+  reactions: Record<number, ReactionSummary>;
 }) {
   return (
     <ul className="flex flex-col gap-3">
@@ -47,7 +51,13 @@ export default function ReviewList({
             </p>
           )}
 
-          <div className="mt-3">
+          <div className="mt-3.5 flex items-center justify-between gap-3">
+            <Reactions
+              kind={kind}
+              ratingId={review.id}
+              summary={reactions[review.id] ?? NO_REACTIONS}
+              signedIn={signedIn}
+            />
             <ReportButton
               {...(kind === "album"
                 ? { ratingId: review.id }

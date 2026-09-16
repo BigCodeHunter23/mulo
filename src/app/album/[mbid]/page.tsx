@@ -9,6 +9,7 @@ import {
 } from "@/lib/catalog";
 import { getOwnRating, getScores, getSongScores } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
+import { getReactions } from "@/lib/reactions";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
@@ -80,6 +81,10 @@ export default async function AlbumPage({
     getReviews("album", mbid),
   ]);
 
+  const reactions = await getReactions(
+    "album",
+    reviews.map((review) => review.id),
+  );
   const year = release.release_date?.slice(0, 4);
 
   return (
@@ -188,7 +193,12 @@ export default async function AlbumPage({
                 No written reviews yet. Be the first.
               </p>
             ) : (
-              <ReviewList reviews={reviews} kind="album" signedIn={signedIn} />
+              <ReviewList
+                reviews={reviews}
+                kind="album"
+                signedIn={signedIn}
+                reactions={reactions}
+              />
             )}
           </section>
         </div>

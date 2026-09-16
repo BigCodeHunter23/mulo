@@ -8,6 +8,7 @@ import {
   getTopSongs,
 } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
+import { getReactions } from "@/lib/reactions";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
@@ -66,7 +67,13 @@ export default async function ArtistPage({
     getReviews("artist", mbid),
     getTopSongs(mbid),
   ]);
-  const albumScores = await getScoresForReleases(albums.map((a) => a.mbid));
+  const [albumScores, reactions] = await Promise.all([
+    getScoresForReleases(albums.map((a) => a.mbid)),
+    getReactions(
+      "artist",
+      reviews.map((review) => review.id),
+    ),
+  ]);
 
   // A "top songs" list isn't worth a section until a few songs have scores.
   const showTopSongs = topSongs.length >= 3;
@@ -149,7 +156,12 @@ export default async function ArtistPage({
             {reviews.length > 0 && (
               <section>
                 <SectionHeading>Reviews</SectionHeading>
-                <ReviewList reviews={reviews} kind="artist" signedIn={signedIn} />
+                <ReviewList
+                  reviews={reviews}
+                  kind="artist"
+                  signedIn={signedIn}
+                  reactions={reactions}
+                />
               </section>
             )}
           </div>
