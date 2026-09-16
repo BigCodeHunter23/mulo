@@ -358,3 +358,41 @@ export async function getOwnRatingCounts(): Promise<Record<RatingKind, number>> 
   });
   return counts;
 }
+
+/**
+ * Somebody's best-scored albums, for the shelf at the top of their profile.
+ * A wall of covers says more about someone's taste than a list of dates.
+ */
+export async function getHighestRatedAlbums(
+  userId: string,
+  limit = 12,
+): Promise<AlbumRating[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("ratings")
+    .select(
+      `score, review, created_at,
+       releases!inner ( mbid, title, cover_art_url, release_date, artists ( mbid, name ) )`,
+    )
+    .eq("user_id", userId)
+    .gte("score", 8)
+    .order("score", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  type Row = Omit<AlbumRating, "release"> & {
+    releases: Omit<AlbumRating["release"], "artist"> & { artists: ArtistRef | null };
+  };
+
+  return ((data ?? []) as unknown as Row[]).map(({ releases, ...row }) => ({
+    ...row,
+    release: {
+      mbid: releases.mbid,
+      title: releases.title,
+      cover_art_url: releases.cover_art_url,
+      release_date: releases.release_date,
+      artist: releases.artists,
+    },
+  }));
+}

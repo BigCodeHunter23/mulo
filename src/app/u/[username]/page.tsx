@@ -8,7 +8,11 @@ import {
 } from "@/lib/social";
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
+import { getBadges } from "@/lib/badges";
+import { getHighestRatedAlbums } from "@/lib/ratings";
 import { createPublicClient } from "@/lib/supabase/public";
+import AlbumCard from "@/components/AlbumCard";
+import Badges from "@/components/Badges";
 import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
@@ -63,13 +67,16 @@ export default async function ProfilePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [stats, followState, ratings, topArtists, topAlbums] = await Promise.all([
-    getProfileStats(profile.id),
-    getFollowState(profile.id),
-    getUserFeed(profile.id),
-    getTopPicks(profile.id, "artist"),
-    getTopPicks(profile.id, "album"),
-  ]);
+  const [stats, followState, ratings, topArtists, topAlbums, badges, highest] =
+    await Promise.all([
+      getProfileStats(profile.id),
+      getFollowState(profile.id),
+      getUserFeed(profile.id),
+      getTopPicks(profile.id, "artist"),
+      getTopPicks(profile.id, "album"),
+      getBadges(profile.id),
+      getHighestRatedAlbums(profile.id, 12),
+    ]);
 
   const name = profile.display_name || profile.username;
   const hasPicks = topArtists.length > 0 || topAlbums.length > 0;
@@ -132,6 +139,23 @@ export default async function ProfilePage({
             {profile.bio}
           </p>
         )}
+
+        {badges.length > 0 && (
+          <div className="mt-5">
+            <Badges badges={badges} />
+          </div>
+        )}
+
+        {followState.isSelf && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <ButtonLink href="/goat" variant="secondary" size="sm">
+              Your GOAT
+            </ButtonLink>
+            <ButtonLink href="/ratings" variant="secondary" size="sm">
+              My ratings
+            </ButtonLink>
+          </div>
+        )}
       </header>
 
       {hasPicks && (
@@ -179,6 +203,40 @@ export default async function ProfilePage({
             action={<ButtonLink href="/goat">Pick your top ten</ButtonLink>}
           />
         </div>
+      )}
+
+      {highest.length >= 4 && (
+        <section className="mb-14">
+          <SectionHeading
+            action={
+              followState.isSelf ? (
+                <Link
+                  href="/ratings"
+                  className="text-xs text-text-muted transition-colors hover:text-text"
+                >
+                  All by score →
+                </Link>
+              ) : undefined
+            }
+          >
+            Highest rated
+          </SectionHeading>
+          <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
+            {highest.map((rating, i) => (
+              <li key={rating.release.mbid}>
+                <AlbumCard
+                  mbid={rating.release.mbid}
+                  title={rating.release.title}
+                  artist={rating.release.artist?.name ?? null}
+                  coverUrl={rating.release.cover_art_url}
+                  score={rating.score}
+                  scoreKind="you"
+                  eager={i < 6}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <SectionHeading>Ratings</SectionHeading>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { coverSrc } from "@/lib/cover-url";
-import { Score } from "@/components/StarScore";
+import { Score, type ScoreKind } from "@/components/StarScore";
 
 /** Cover, title and a line of detail, for album grids across the site. */
 export default function AlbumCard({
@@ -10,6 +10,7 @@ export default function AlbumCard({
   year,
   coverUrl,
   score,
+  scoreKind = "overall",
   eager = false,
 }: {
   mbid: string;
@@ -17,8 +18,10 @@ export default function AlbumCard({
   artist?: string | null;
   year?: string | null;
   coverUrl: string | null;
-  /** Pass a value (or null for unrated) to show the overall score. */
+  /** Pass a value (or null for unrated) to show a score. */
   score?: number | null;
+  /** Whose score it is: the crowd's by default, or one person's. */
+  scoreKind?: ScoreKind;
   /** For the first row of a page, so it isn't held back by lazy loading. */
   eager?: boolean;
 }) {
@@ -44,7 +47,7 @@ export default function AlbumCard({
       <div className="mt-0.5 flex items-center justify-between gap-2">
         <span className="truncate text-xs text-text-muted">{detail}</span>
         {score !== undefined && (
-          <Score kind="overall" value={score} size="sm" showLabel={false} />
+          <Score kind={scoreKind} value={score} size="sm" showLabel={false} />
         )}
       </div>
     </Link>

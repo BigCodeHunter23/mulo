@@ -7,7 +7,9 @@ import {
   getOwnArtistRatings,
   getOwnRatingCounts,
   getOwnSongRatings,
-  type Sort,
+  type AlbumRating,
+  type ArtistRating,
+  type SongRating,
 } from "@/lib/ratings";
 import type { RatingKind } from "@/lib/rating-kinds";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
@@ -15,34 +17,38 @@ import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export const metadata: Metadata = { title: "My ratings" };
 
-const TABS: { kind: RatingKind; param: string; label: string; empty: string }[] = [
+const TABS: {
+  kind: RatingKind;
+  param: string;
+  label: string;
+  noun: string;
+  empty: string;
+}[] = [
   {
     kind: "album",
     param: "albums",
     label: "Albums",
+    noun: "albums",
     empty: "Open any album and tap a score out of 10.",
   },
   {
     kind: "artist",
     param: "artists",
     label: "Artists",
+    noun: "artists",
     empty: "Open an artist's page and give them a score out of 10.",
   },
   {
     kind: "song",
     param: "songs",
     label: "Songs",
+    noun: "songs",
     empty: "Open an album and tap any song in its tracklist to rate it.",
   },
 ];
 
-const SORTS: { key: Sort; label: string }[] = [
-  { key: "recent", label: "Recent" },
-  { key: "highest", label: "Highest" },
-  { key: "lowest", label: "Lowest" },
-];
-
-const href = (param: string, sort: Sort) => `/ratings?type=${param}&sort=${sort}`;
+/** How many of a score to show before the band gets a "see all" link. */
+const PER_BAND = 8;
 
 const CARD =
   "group flex gap-4 rounded-xl border border-border bg-surface p-3.5 transition-colors hover:border-border-strong";
@@ -56,14 +62,25 @@ function YourScore({ score }: { score: number }) {
   );
 }
 
+/** Ratings grouped by score, best first: the 10s, then the 9s, and so on. */
+function byScore<T extends { score: number }>(items: T[]): [number, T[]][] {
+  const bands = new Map<number, T[]>();
+  for (const item of items) {
+    bands.set(item.score, [...(bands.get(item.score) ?? []), item]);
+  }
+  return [...bands.entries()].sort((a, b) => b[0] - a[0]);
+}
+
 export default async function MyRatingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; sort?: string }>;
+  searchParams: Promise<{ type?: string; view?: string; score?: string }>;
 }) {
-  const { type, sort } = await searchParams;
+  const { type, view, score } = await searchParams;
   const tab = TABS.find((t) => t.param === type) ?? TABS[0];
-  const active = SORTS.find((s) => s.key === sort)?.key ?? "recent";
+  const recent = view === "recent";
+  const band = Number(score);
+  const openBand = Number.isInteger(band) && band >= 1 && band <= 10 ? band : null;
 
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -71,25 +88,53 @@ export default async function MyRatingsPage({
   const counts = await getOwnRatingCounts();
   const total = counts.album + counts.artist + counts.song;
 
+  // Grouping by score reads best highest-first; "recent" keeps its own order.
+  const sort = recent ? "recent" : "highest";
+  const [albums, artists, songs] = await Promise.all([
+    tab.kind === "album" ? getOwnAlbumRatings(sort) : [],
+    tab.kind === "artist" ? getOwnArtistRatings(sort) : [],
+    tab.kind === "song" ? getOwnSongRatings(sort) : [],
+  ]);
+
+  const href = (param: string, options: { view?: string; score?: number } = {}) => {
+    const search = new URLSearchParams({ type: param });
+    if (options.view) search.set("view", options.view);
+    if (options.score) search.set("score", String(options.score));
+    return `/ratings?${search}`;
+  };
+
+  function items(list: (AlbumRating | ArtistRating | SongRating)[]) {
+    if (tab.kind === "album") return <AlbumItems ratings={list as AlbumRating[]} />;
+    if (tab.kind === "artist") return <ArtistItems ratings={list as ArtistRating[]} />;
+    return <SongItems ratings={list as SongRating[]} />;
+  }
+
+  const all: (AlbumRating | ArtistRating | SongRating)[] =
+    tab.kind === "album" ? albums : tab.kind === "artist" ? artists : songs;
+  const shown = openBand ? all.filter((r) => r.score === openBand) : all;
+
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <SectionHeading
         action={
           counts[tab.kind] > 1 ? (
             <div className="flex gap-1">
-              {SORTS.map((s) => (
-                <Link
-                  key={s.key}
-                  href={href(tab.param, s.key)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active === s.key
-                      ? "bg-surface-raised text-text"
-                      : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  {s.label}
-                </Link>
-              ))}
+              <Link
+                href={href(tab.param)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  !recent ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
+                }`}
+              >
+                By score
+              </Link>
+              <Link
+                href={href(tab.param, { view: "recent" })}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  recent ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
+                }`}
+              >
+                Recent
+              </Link>
             </div>
           ) : undefined
         }
@@ -109,14 +154,16 @@ export default async function MyRatingsPage({
           return (
             <Link
               key={t.param}
-              href={href(t.param, active)}
+              href={href(t.param, { view: recent ? "recent" : undefined })}
               aria-current={current ? "page" : undefined}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
                 current ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
               }`}
             >
               {t.label}
-              <span className="text-xs tabular-nums text-text-muted">{counts[t.kind]}</span>
+              <span className="text-xs tabular-nums text-text-muted">
+                {counts[t.kind]}
+              </span>
             </Link>
           );
         })}
@@ -124,24 +171,60 @@ export default async function MyRatingsPage({
 
       {counts[tab.kind] === 0 ? (
         <EmptyState
-          title={`No ${tab.label.toLowerCase()} rated yet`}
+          title={`No ${tab.noun} rated yet`}
           body={tab.empty}
           action={<ButtonLink href="/discover">Find something to rate</ButtonLink>}
         />
-      ) : tab.kind === "album" ? (
-        <AlbumRatings sort={active} />
-      ) : tab.kind === "artist" ? (
-        <ArtistRatings sort={active} />
+      ) : openBand ? (
+        <>
+          <div className="mb-5 flex items-baseline gap-3">
+            <span className="display text-3xl tabular-nums text-score-you">
+              {openBand}
+            </span>
+            <span className="text-sm text-text-muted">
+              {shown.length} {tab.noun}
+            </span>
+            <Link
+              href={href(tab.param)}
+              className="ml-auto text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
+            >
+              ← All scores
+            </Link>
+          </div>
+          {items(shown)}
+        </>
+      ) : recent ? (
+        items(all)
       ) : (
-        <SongRatings sort={active} />
+        <div className="flex flex-col gap-10">
+          {byScore(all).map(([score, list]) => (
+            <section key={score}>
+              <div className="mb-4 flex items-baseline gap-3">
+                <span className="display text-2xl tabular-nums text-score-you">
+                  {score}
+                </span>
+                <span className="text-sm text-text-muted">
+                  {list.length} {tab.noun}
+                </span>
+                {list.length > PER_BAND && (
+                  <Link
+                    href={href(tab.param, { score })}
+                    className="ml-auto text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
+                  >
+                    See all {list.length} →
+                  </Link>
+                )}
+              </div>
+              {items(list.slice(0, PER_BAND))}
+            </section>
+          ))}
+        </div>
       )}
     </main>
   );
 }
 
-async function AlbumRatings({ sort }: { sort: Sort }) {
-  const ratings = await getOwnAlbumRatings(sort);
-
+function AlbumItems({ ratings }: { ratings: AlbumRating[] }) {
   return (
     <ol className="grid gap-3 sm:grid-cols-2">
       {ratings.map((rating) => {
@@ -197,9 +280,7 @@ async function AlbumRatings({ sort }: { sort: Sort }) {
   );
 }
 
-async function ArtistRatings({ sort }: { sort: Sort }) {
-  const ratings = await getOwnArtistRatings(sort);
-
+function ArtistItems({ ratings }: { ratings: ArtistRating[] }) {
   return (
     <ol className="grid gap-3 sm:grid-cols-2">
       {ratings.map((rating) => {
@@ -250,9 +331,7 @@ async function ArtistRatings({ sort }: { sort: Sort }) {
   );
 }
 
-async function SongRatings({ sort }: { sort: Sort }) {
-  const ratings = await getOwnSongRatings(sort);
-
+function SongItems({ ratings }: { ratings: SongRating[] }) {
   return (
     <ol className="overflow-hidden rounded-xl border border-border">
       {ratings.map((rating, i) => {

@@ -38,6 +38,12 @@ export default async function Header() {
           </Link>
           {user && (
             <>
+              <Link
+                href={profile?.username ? `/u/${profile.username}` : "/welcome"}
+                className={`${navLink} hidden sm:inline`}
+              >
+                My profile
+              </Link>
               <Link href="/goat" className={`${navLink} hidden sm:inline`}>
                 Your GOAT
               </Link>
