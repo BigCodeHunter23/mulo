@@ -6,6 +6,7 @@ import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import FollowButton from "@/components/FollowButton";
+import InviteButton from "@/components/InviteButton";
 import Avatar from "@/components/Avatar";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import WelcomeProfileForm from "./WelcomeProfileForm";
@@ -171,7 +172,8 @@ async function FollowStep({ userId }: { userId: string }) {
         <div className="mt-8">
           <EmptyState
             title="You're one of the first here"
-            body="Invite some friends, then follow them from the People page."
+            body="Invite some friends. You'll follow each other as soon as they join."
+            action={<InviteButton variant="primary" />}
           />
         </div>
       ) : (

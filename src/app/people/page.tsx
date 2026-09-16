@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import FollowButton from "@/components/FollowButton";
+import InviteButton from "@/components/InviteButton";
 import Avatar from "@/components/Avatar";
 import { EmptyState, SectionHeading } from "@/components/ui";
 
@@ -20,7 +21,9 @@ export default async function PeoplePage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      <SectionHeading>People on MULO</SectionHeading>
+      <SectionHeading action={user ? <InviteButton /> : undefined}>
+        People on MULO
+      </SectionHeading>
 
       {profiles.length === 0 ? (
         <EmptyState title="Nobody has set up a profile yet." />

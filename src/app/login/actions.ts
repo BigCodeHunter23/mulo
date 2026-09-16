@@ -1,7 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { connectInvite, INVITE_COOKIE } from "@/lib/invites";
 
 export type AuthState = { error?: string; message?: string };
 
@@ -66,6 +68,14 @@ export async function signup(
   // When email confirmation is switched off, Supabase signs the user straight
   // in and returns a session. Otherwise they need to click the emailed link.
   if (data.session) {
+    // Arrived through somebody's invite link: follow each other straight away.
+    const store = await cookies();
+    const invite = store.get(INVITE_COOKIE)?.value;
+    if (invite && data.user) {
+      await connectInvite(data.user.id, invite);
+      store.delete(INVITE_COOKIE);
+    }
+
     redirect("/welcome?intro=1");
   }
 

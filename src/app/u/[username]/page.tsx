@@ -20,6 +20,7 @@ import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
+import InviteButton from "@/components/InviteButton";
 import ShareButton from "@/components/ShareButton";
 import TopPicks from "@/components/TopPicks";
 import { SkeletonRows } from "@/components/Skeleton";
@@ -170,6 +171,7 @@ export default async function ProfilePage({
               text="My GOAT, my ratings, my mixtape."
               label="Share profile"
             />
+            <InviteButton />
           </div>
         )}
       </header>

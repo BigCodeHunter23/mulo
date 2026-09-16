@@ -26,8 +26,12 @@ function SubmitButton({ mode }: { mode: "login" | "signup" }) {
   );
 }
 
-export default function AuthForm() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+export default function AuthForm({
+  initialMode = "login",
+}: {
+  initialMode?: "login" | "signup";
+}) {
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const action = mode === "login" ? login : signup;
   const [state, formAction] = useActionState<AuthState, FormData>(action, {});
 
