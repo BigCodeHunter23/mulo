@@ -186,6 +186,13 @@ export default async function ProfilePage({
             <ButtonLink href="/ratings" variant="secondary" size="sm">
               My ratings
             </ButtonLink>
+            <ButtonLink
+              href={`/u/${profile.username}/rotation`}
+              variant="secondary"
+              size="sm"
+            >
+              This month
+            </ButtonLink>
           </div>
         )}
       </header>
@@ -271,7 +278,18 @@ export default async function ProfilePage({
         </section>
       )}
 
-      <SectionHeading>Ratings</SectionHeading>
+      <SectionHeading
+        action={
+          <Link
+            href={`/u/${profile.username}/rotation`}
+            className="text-xs text-text-muted transition-colors hover:text-text"
+          >
+            This month →
+          </Link>
+        }
+      >
+        Ratings
+      </SectionHeading>
 
       {ratings.length === 0 ? (
         <EmptyState
