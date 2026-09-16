@@ -9,6 +9,7 @@ import {
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
 import { getBadges } from "@/lib/badges";
+import { getTasteMatch } from "@/lib/taste";
 import { getHighestRatedAlbums } from "@/lib/ratings";
 import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
@@ -77,6 +78,7 @@ export default async function ProfilePage({
       getBadges(profile.id),
       getHighestRatedAlbums(profile.id, 12),
     ]);
+  const taste = await getTasteMatch(profile.id);
 
   const name = profile.display_name || profile.username;
   const hasPicks = topArtists.length > 0 || topAlbums.length > 0;
@@ -143,6 +145,36 @@ export default async function ProfilePage({
         {badges.length > 0 && (
           <div className="mt-5">
             <Badges badges={badges} />
+          </div>
+        )}
+
+        {taste && (
+          <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
+            <p className="flex items-baseline gap-2">
+              <span className="display text-xl text-accent">{taste.percent}%</span>
+              <span className="text-sm text-text-secondary">
+                taste match · {taste.shared} in common
+              </span>
+            </p>
+            {taste.clash && (
+              <p className="mt-1.5 text-xs text-text-muted">
+                You disagree most on{" "}
+                <Link
+                  href={taste.clash.href}
+                  className="text-text underline-offset-4 transition-colors hover:text-accent hover:underline"
+                >
+                  {taste.clash.title}
+                </Link>
+                {" — you "}
+                <span className="font-semibold text-score-you">
+                  {taste.clash.yours}
+                </span>
+                {", them "}
+                <span className="font-semibold text-score-friends">
+                  {taste.clash.theirs}
+                </span>
+              </p>
+            )}
           </div>
         )}
 
