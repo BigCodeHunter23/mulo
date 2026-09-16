@@ -76,7 +76,7 @@ export default async function Home() {
       </SectionHeading>
       <ul className="flex flex-col gap-3">
         {feed.map((item) => (
-          <FeedItem key={item.key} item={item} />
+          <FeedItem key={item.key} item={item} signedIn />
         ))}
       </ul>
     </main>

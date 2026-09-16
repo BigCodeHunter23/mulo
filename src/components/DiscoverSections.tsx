@@ -1,5 +1,6 @@
 import { mostPlayedAlbums, popularArtists, topRatedOnMulo } from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
+import { getCurrentUser } from "@/lib/supabase/server";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
@@ -10,11 +11,12 @@ const ALBUM_GRID =
 
 /** The browsable parts of MULO, shared by the Discover page and the home page. */
 export default async function DiscoverSections() {
-  const [topRated, mostPlayed, artists, recent] = await Promise.all([
+  const [topRated, mostPlayed, artists, recent, user] = await Promise.all([
     topRatedOnMulo(10),
     mostPlayedAlbums(15),
     popularArtists(10),
     getGlobalFeed(6),
+    getCurrentUser(),
   ]);
 
   return (
@@ -90,7 +92,7 @@ export default async function DiscoverSections() {
           <SectionHeading>Just rated</SectionHeading>
           <ul className="grid gap-3 md:grid-cols-2">
             {recent.map((item) => (
-              <FeedItem key={item.key} item={item} />
+              <FeedItem key={item.key} item={item} signedIn={Boolean(user)} />
             ))}
           </ul>
         </section>

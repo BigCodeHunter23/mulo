@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
+import { getReactions, NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
 
 type Author = { username: string; display_name: string | null; avatar_url: string | null };
 
@@ -15,6 +16,9 @@ export type FeedItem =
   | {
       kind: "album";
       key: string;
+      /** The rating itself, which is what a love or a nah attaches to. */
+      ratingId: number;
+      reaction: ReactionSummary;
       created_at: string;
       author: Author;
       score: number;
@@ -24,6 +28,8 @@ export type FeedItem =
   | {
       kind: "artist";
       key: string;
+      ratingId: number;
+      reaction: ReactionSummary;
       created_at: string;
       author: Author;
       score: number;
@@ -159,6 +165,8 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
       (row): FeedItem => ({
         kind: "album",
         key: `album-${row.id}`,
+        ratingId: row.id,
+        reaction: NO_REACTIONS,
         created_at: row.created_at,
         author: row.profiles,
         score: row.score,
@@ -170,6 +178,8 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
       (row): FeedItem => ({
         kind: "artist",
         key: `artist-${row.id}`,
+        ratingId: row.id,
+        reaction: NO_REACTIONS,
         created_at: row.created_at,
         author: row.profiles,
         score: row.score,
@@ -180,9 +190,31 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
     ...groupSongs((songResult.data ?? []) as unknown as SongRow[]),
   ];
 
-  return items
+  const visible = items
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     .slice(0, limit);
+
+  // Loves and nahs, for the items that made the cut.
+  const [albumReactions, artistReactions] = await Promise.all([
+    getReactions(
+      "album",
+      visible.flatMap((item) => (item.kind === "album" ? [item.ratingId] : [])),
+    ),
+    getReactions(
+      "artist",
+      visible.flatMap((item) => (item.kind === "artist" ? [item.ratingId] : [])),
+    ),
+  ]);
+
+  return visible.map((item) => {
+    if (item.kind === "album") {
+      return { ...item, reaction: albumReactions[item.ratingId] ?? NO_REACTIONS };
+    }
+    if (item.kind === "artist") {
+      return { ...item, reaction: artistReactions[item.ratingId] ?? NO_REACTIONS };
+    }
+    return item;
+  });
 }
 
 /** Ratings from the people a user follows. */

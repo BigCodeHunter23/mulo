@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
+import Reactions from "@/components/Reactions";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import type { FeedItem as Item } from "@/lib/feed";
 
@@ -189,11 +190,22 @@ function SongDetails({ item }: { item: Of<"songs"> }) {
 export default function FeedItem({
   item,
   showAuthor = true,
+  signedIn = false,
+  readOnly = false,
 }: {
   item: Item;
   showAuthor?: boolean;
+  signedIn?: boolean;
+  /** On your own ratings: the counts, with nothing to press. */
+  readOnly?: boolean;
 }) {
   const ago = timeAgo(item.created_at);
+
+  // A grouped song item is many ratings at once, so there is nothing single
+  // to love or disagree with.
+  const reactable = item.kind !== "songs";
+  const hasReactions =
+    reactable && (item.reaction.love > 0 || item.reaction.dislike > 0);
 
   return (
     <li className="group rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong">
@@ -242,6 +254,18 @@ export default function FeedItem({
           )}
         </div>
       </div>
+
+      {reactable && (!readOnly || hasReactions) && (
+        <div className="mt-3.5">
+          <Reactions
+            kind={item.kind}
+            ratingId={item.ratingId}
+            summary={item.reaction}
+            signedIn={signedIn}
+            readOnly={readOnly}
+          />
+        </div>
+      )}
     </li>
   );
 }

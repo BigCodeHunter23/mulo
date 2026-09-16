@@ -290,7 +290,13 @@ export default async function ProfilePage({
       ) : (
         <ul className="flex flex-col gap-3">
           {ratings.map((item) => (
-            <FeedItem key={item.key} item={item} showAuthor={false} />
+            <FeedItem
+              key={item.key}
+              item={item}
+              showAuthor={false}
+              signedIn={followState.signedIn}
+              readOnly={followState.isSelf}
+            />
           ))}
         </ul>
       )}

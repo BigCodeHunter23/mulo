@@ -49,11 +49,14 @@ export default function Reactions({
   ratingId,
   summary,
   signedIn,
+  readOnly = false,
 }: {
   kind: Kind;
   ratingId: number;
   summary: Summary;
   signedIn: boolean;
+  /** For your own ratings: the counts, with nothing to press. */
+  readOnly?: boolean;
 }) {
   const [state, setState] = useState(summary);
   const [, startTransition] = useTransition();
@@ -76,6 +79,26 @@ export default function Reactions({
 
   const base =
     "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs tabular-nums transition-colors";
+
+  if (readOnly) {
+    if (state.love === 0 && state.dislike === 0) return null;
+    return (
+      <div className="flex items-center gap-3 text-xs tabular-nums text-text-muted">
+        {state.love > 0 && (
+          <span className="flex items-center gap-1.5">
+            <Heart filled />
+            {state.love}
+          </span>
+        )}
+        {state.dislike > 0 && (
+          <span className="flex items-center gap-1.5">
+            <ThumbDown filled />
+            {state.dislike}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (!signedIn) {
     return (
