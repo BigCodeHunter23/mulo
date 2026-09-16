@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getFollowState,
@@ -6,11 +7,13 @@ import {
   getProfileStats,
 } from "@/lib/social";
 import { getUserFeed } from "@/lib/feed";
+import { getTopPicks } from "@/lib/top-picks";
 import { createPublicClient } from "@/lib/supabase/public";
 import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
+import TopPicks from "@/components/TopPicks";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -60,11 +63,16 @@ export default async function ProfilePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [stats, followState, ratings] = await Promise.all([
+  const [stats, followState, ratings, topArtists, topAlbums] = await Promise.all([
     getProfileStats(profile.id),
     getFollowState(profile.id),
     getUserFeed(profile.id),
+    getTopPicks(profile.id, "artist"),
+    getTopPicks(profile.id, "album"),
   ]);
+
+  const name = profile.display_name || profile.username;
+  const hasPicks = topArtists.length > 0 || topAlbums.length > 0;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
@@ -125,6 +133,53 @@ export default async function ProfilePage({
           </p>
         )}
       </header>
+
+      {hasPicks && (
+        <section className="mb-14">
+          <SectionHeading
+            action={
+              followState.isSelf ? (
+                <Link
+                  href="/goat"
+                  className="text-xs text-text-muted transition-colors hover:text-text"
+                >
+                  Edit
+                </Link>
+              ) : undefined
+            }
+          >
+            {followState.isSelf ? "Your GOAT" : `${name}'s GOAT`}
+          </SectionHeading>
+
+          {topArtists.length > 0 && (
+            <>
+              <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
+                Artists
+              </p>
+              <TopPicks picks={topArtists} kind="artist" />
+            </>
+          )}
+
+          {topAlbums.length > 0 && (
+            <div className={topArtists.length > 0 ? "mt-8" : ""}>
+              <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
+                Albums
+              </p>
+              <TopPicks picks={topAlbums} kind="album" />
+            </div>
+          )}
+        </section>
+      )}
+
+      {!hasPicks && followState.isSelf && (
+        <div className="mb-14">
+          <EmptyState
+            title="Select your GOAT"
+            body="Pick your top ten artists and albums and rank them. Number one wears the crown, on your profile and in the preview when you send someone your link."
+            action={<ButtonLink href="/goat">Pick your top ten</ButtonLink>}
+          />
+        </div>
+      )}
 
       <SectionHeading>Ratings</SectionHeading>
 

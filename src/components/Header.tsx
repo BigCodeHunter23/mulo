@@ -37,9 +37,14 @@ export default async function Header() {
             People
           </Link>
           {user && (
-            <Link href="/ratings" className={`${navLink} hidden sm:inline`}>
-              My ratings
-            </Link>
+            <>
+              <Link href="/goat" className={`${navLink} hidden sm:inline`}>
+                Your GOAT
+              </Link>
+              <Link href="/ratings" className={`${navLink} hidden sm:inline`}>
+                My ratings
+              </Link>
+            </>
           )}
         </nav>
 
