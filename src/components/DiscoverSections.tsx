@@ -1,6 +1,8 @@
 import { mostPlayedAlbums, popularArtists, topRatedOnMulo } from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
+import { getHotOnMulo } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
+import HotOnMulo from "@/components/HotOnMulo";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
@@ -11,7 +13,8 @@ const ALBUM_GRID =
 
 /** The browsable parts of MULO, shared by the Discover page and the home page. */
 export default async function DiscoverSections() {
-  const [topRated, mostPlayed, artists, recent, user] = await Promise.all([
+  const [hot, topRated, mostPlayed, artists, recent, user] = await Promise.all([
+    getHotOnMulo(10),
     topRatedOnMulo(10),
     mostPlayedAlbums(15),
     popularArtists(10),
@@ -21,6 +24,8 @@ export default async function DiscoverSections() {
 
   return (
     <div className="flex flex-col gap-14">
+      {hot && <HotOnMulo hot={hot} />}
+
       {/* Only worth showing once enough albums have been rated to rank. */}
       {topRated.length >= 4 && (
         <section>
