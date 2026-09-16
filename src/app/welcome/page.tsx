@@ -10,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import WelcomeProfileForm from "./WelcomeProfileForm";
 import QuickRateGrid from "./QuickRateGrid";
+import IntroCards from "./IntroCards";
 
 export const metadata: Metadata = { title: "Welcome" };
 
@@ -30,7 +31,7 @@ const LABELS: Record<Step, string> = {
 export default async function WelcomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string }>;
+  searchParams: Promise<{ step?: string; intro?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -42,7 +43,7 @@ export default async function WelcomePage({
     .eq("id", user.id)
     .maybeSingle();
 
-  const { step: requested } = await searchParams;
+  const { step: requested, intro } = await searchParams;
   // Ratings and follows hang off a profile, so a username always comes first.
   const step: Step = !profile
     ? "profile"
@@ -52,6 +53,8 @@ export default async function WelcomePage({
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-20 pt-10 sm:px-6">
+      {/* Only ever set by signing up, so existing accounts never see it. */}
+      {intro === "1" && <IntroCards />}
       <Progress step={step} />
       {step === "profile" && <ProfileStep />}
       {step === "rate" && <RateStep userId={user.id} />}
