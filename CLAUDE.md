@@ -38,8 +38,12 @@ in plain language, and give them links and exact steps when they need to act.
   `reviews.ts`, `reactions.ts`, `badges.ts`, `taste.ts`, `top-picks.ts` (GOAT),
   `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`.
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),
-  `goat`, `ratings`, `discover`, `search`, `welcome` (onboarding), `profile`
-  (settings).
+  `goat`, `ratings`, `discover`, `search`, `welcome` (onboarding, with intro
+  cards after signup), `profile` (settings), `notifications`, and
+  `admin/reports` (the moderation inbox, open only to emails in the
+  `ADMIN_EMAILS` environment variable).
+- Notifications, like feeds, are read from existing tables (follows,
+  reactions) rather than stored; when someone last looked lives in a cookie.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
   rerun; `scripts/copy-covers.mjs` copies covers into storage.
 
