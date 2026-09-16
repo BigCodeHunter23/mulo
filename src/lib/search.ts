@@ -15,7 +15,33 @@ export type SearchAlbum = {
   year: string | null;
 };
 
-export type SearchResults = { artists: SearchArtist[]; albums: SearchAlbum[] };
+export type SearchSong = {
+  mbid: string;
+  title: string;
+  album: string;
+  albumMbid: string;
+  artist: string | null;
+  cover_art_url: string | null;
+};
+
+export type SearchResults = {
+  artists: SearchArtist[];
+  albums: SearchAlbum[];
+  songs: SearchSong[];
+};
+
+type SongRow = {
+  title: string;
+  song_mbid: string;
+  releases: {
+    mbid: string;
+    title: string;
+    artist_credit: string | null;
+    cover_art_url: string | null;
+    popularity: number | null;
+    artists: { name: string } | { name: string }[] | null;
+  };
+};
 
 type ArtistRow = SearchArtist & {
   search_names: string | null;
@@ -75,12 +101,12 @@ export async function searchCatalog(
   limit = 8,
 ): Promise<SearchResults> {
   const query = rawQuery.trim().slice(0, 80);
-  if (query.length < 2) return { artists: [], albums: [] };
+  if (query.length < 2) return { artists: [], albums: [], songs: [] };
 
   const supabase = createPublicClient();
   const like = pattern(query);
 
-  const [artistResult, albumResult] = await Promise.all([
+  const [artistResult, albumResult, songResult] = await Promise.all([
     supabase
       .from("artists")
       .select("mbid, name, image_url, search_names, popularity")
@@ -93,6 +119,16 @@ export async function searchCatalog(
       .or(`title.ilike.${like},artist_credit.ilike.${like}`)
       .order("popularity", { ascending: false, nullsFirst: false })
       .limit(60),
+    // Songs are found through the tracklists they sit on, which carry the
+    // album and its cover.
+    supabase
+      .from("tracks")
+      .select(
+        "title, song_mbid, releases!inner ( mbid, title, artist_credit, cover_art_url, popularity, artists ( name ) )",
+      )
+      .ilike("title", `*${query.replace(/[*%_]/g, " ")}*`)
+      .not("song_mbid", "is", null)
+      .limit(80),
   ]);
 
   const artists = ((artistResult.data ?? []) as ArtistRow[])
@@ -143,7 +179,37 @@ export async function searchCatalog(
     }))
     .sort((a, b) => a.rank - b.rank || (b.row.popularity ?? 0) - (a.row.popularity ?? 0));
 
+  // A song can sit on more than one album; keep its best-known one.
+  const bestSongs = new Map<string, { row: SongRow; rank: number }>();
+  for (const row of (songResult.data ?? []) as unknown as SongRow[]) {
+    const rank = matchRank(row.title, query);
+    const current = bestSongs.get(row.song_mbid);
+    const morePopular =
+      (row.releases.popularity ?? 0) > (current?.row.releases.popularity ?? 0);
+    if (!current || rank < current.rank || (rank === current.rank && morePopular)) {
+      bestSongs.set(row.song_mbid, { row, rank });
+    }
+  }
+  const songs = [...bestSongs.values()].sort(
+    (a, b) =>
+      a.rank - b.rank ||
+      (b.row.releases.popularity ?? 0) - (a.row.releases.popularity ?? 0),
+  );
+
   return {
+    songs: songs.slice(0, limit).map(({ row }) => {
+      const joined = Array.isArray(row.releases.artists)
+        ? row.releases.artists[0]
+        : row.releases.artists;
+      return {
+        mbid: row.song_mbid,
+        title: row.title,
+        album: row.releases.title,
+        albumMbid: row.releases.mbid,
+        artist: row.releases.artist_credit ?? joined?.name ?? null,
+        cover_art_url: row.releases.cover_art_url || null,
+      };
+    }),
     artists: artists.slice(0, limit).map(({ row }) => ({
       mbid: row.mbid,
       name: row.name,

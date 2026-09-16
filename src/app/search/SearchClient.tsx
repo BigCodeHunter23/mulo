@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { SearchResults } from "@/lib/search";
+import { coverSrc } from "@/lib/cover-url";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import { fieldClass, SectionHeading } from "@/components/ui";
 
-const EMPTY: SearchResults = { artists: [], albums: [] };
+const EMPTY: SearchResults = { artists: [], albums: [], songs: [] };
 
 /**
  * Searches MULO's catalogue as you type. Pressing Enter also runs the slower
@@ -77,7 +79,11 @@ export default function SearchClient({
 
   const q = query.trim();
   const nothing =
-    q.length >= 2 && !loading && results.artists.length === 0 && results.albums.length === 0;
+    q.length >= 2 &&
+    !loading &&
+    results.artists.length === 0 &&
+    results.albums.length === 0 &&
+    results.songs.length === 0;
 
   return (
     <div>
@@ -99,8 +105,8 @@ export default function SearchClient({
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
           autoComplete="off"
-          placeholder="Search artists and albums"
-          aria-label="Search artists and albums"
+          placeholder="Search artists, albums and songs"
+          aria-label="Search artists, albums and songs"
           className={`${fieldClass} h-12 pl-11 pr-24 text-base`}
         />
         {loading && (
@@ -112,7 +118,7 @@ export default function SearchClient({
 
       {q.length < 2 && (
         <p className="text-sm text-text-secondary">
-          Start typing the name of an artist or an album.
+          Start typing an artist, an album or a song.
         </p>
       )}
 
@@ -151,6 +157,50 @@ export default function SearchClient({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {results.songs.length > 0 && (
+        <section className="mb-12">
+          <SectionHeading>Songs</SectionHeading>
+          <ol className="overflow-hidden rounded-xl border border-border">
+            {results.songs.map((song, i) => {
+              const cover = coverSrc(song.cover_art_url, 250);
+
+              return (
+                <li key={song.mbid} className={i % 2 ? "bg-surface/40" : ""}>
+                  <Link
+                    href={`/album/${song.albumMbid}`}
+                    className="group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-surface-hover"
+                  >
+                    <span className="artwork h-11 w-11 shrink-0 overflow-hidden rounded-md">
+                      {cover && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={cover}
+                          alt=""
+                          loading={i < 4 ? "eager" : "lazy"}
+                          className="h-full w-full object-cover"
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-text transition-colors group-hover:text-accent">
+                        {song.title}
+                      </span>
+                      <span className="block truncate text-xs text-text-muted">
+                        {song.album}
+                        {song.artist && ` · ${song.artist}`}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs text-text-muted transition-colors group-hover:text-text">
+                      Rate it →
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
         </section>
       )}
 
