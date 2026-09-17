@@ -93,13 +93,13 @@ function lineupPair(left: string, right: string) {
 }
 
 type ArtistRow = { mbid: string; name: string; image_url: string | null };
-type MatchupRow = { id: number; day: string; left: ArtistRow; right: ArtistRow };
+export type MatchupRow = { id: number; day: string; left: ArtistRow; right: ArtistRow };
 
 // A matchup points at two artists, so each join names the link it follows.
-const MATCHUP_SELECT =
+export const MATCHUP_SELECT =
   "id, day, left:artists!versus_matchups_left_artist_mbid_fkey ( mbid, name, image_url ), right:artists!versus_matchups_right_artist_mbid_fkey ( mbid, name, image_url )";
 
-function toMatchup(row: MatchupRow): VersusMatchup {
+export function toMatchup(row: MatchupRow): VersusMatchup {
   const pair = lineupPair(row.left.mbid, row.right.mbid);
   const side = (artist: ArtistRow, name?: string) => ({
     mbid: artist.mbid,

@@ -3,6 +3,8 @@ import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import type { FeedItem as Item } from "@/lib/feed";
+import { SIDES } from "@/lib/versus-shared";
+import { buttonClass } from "@/components/ui";
 
 type Of<K extends Item["kind"]> = Extract<Item, { kind: K }>;
 
@@ -187,6 +189,68 @@ function SongDetails({ item }: { item: Of<"songs"> }) {
   );
 }
 
+/** Both artists side by side; once it can be seen, the one they picked in full colour. */
+function PickArt({ item }: { item: Of<"pick"> }) {
+  const { matchup, pick, revealed } = item;
+
+  return (
+    <Link
+      href={`/versus/${matchup.day}`}
+      aria-label={matchup.title}
+      className="artwork relative flex h-20 w-20 shrink-0 overflow-hidden rounded-lg transition-transform group-hover:scale-[1.02]"
+    >
+      {SIDES.map((side) => {
+        const src = artistPhotoSrc(matchup[side].image, 200);
+        const faded = revealed && side !== pick;
+        return (
+          <span key={side} className="relative block h-full w-1/2 overflow-hidden bg-surface-raised">
+            {src && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt=""
+                loading="lazy"
+                className={`h-full w-full object-cover object-top ${faded ? "opacity-30 grayscale" : ""}`}
+              />
+            )}
+          </span>
+        );
+      })}
+      <span className="absolute left-1/2 top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border-strong bg-bg text-[9px] font-extrabold text-accent">
+        {revealed ? "VS" : "?"}
+      </span>
+    </Link>
+  );
+}
+
+function PickDetails({ item }: { item: Of<"pick"> }) {
+  const { matchup, pick, revealed } = item;
+
+  return (
+    <>
+      <p className={EYEBROW}>Daily Versus</p>
+      <Link href={`/versus/${matchup.day}`} className={TITLE}>
+        {matchup.title}
+      </Link>
+      <p className="truncate text-sm text-text-secondary">
+        {matchup.left.name} vs {matchup.right.name}
+      </p>
+      {revealed ? (
+        <p className="mt-2 text-sm text-text-secondary">
+          Picked <span className="display-sm text-accent">{matchup[pick].name}</span>
+        </p>
+      ) : (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-sm text-text-secondary">Picked a side.</span>
+          <Link href="/versus" className={buttonClass({ size: "sm" })}>
+            Pick yours to see
+          </Link>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function FeedItem({
   item,
   showAuthor = true,
@@ -202,8 +266,8 @@ export default function FeedItem({
   const ago = timeAgo(item.created_at);
 
   // A grouped song item is many ratings at once, so there is nothing single
-  // to love or disagree with.
-  const reactable = item.kind !== "songs";
+  // to love or disagree with; a pick you can't see yet can't be judged.
+  const reactable = item.kind !== "songs" && (item.kind !== "pick" || item.revealed);
   const hasReactions =
     reactable && (item.reaction.love > 0 || item.reaction.dislike > 0);
 
@@ -222,12 +286,16 @@ export default function FeedItem({
           >
             {item.author.display_name || item.author.username}
           </Link>
-          <span className="text-xs text-text-muted">rated · {ago}</span>
+          <span className="text-xs text-text-muted">
+            {item.kind === "pick" ? "picked" : "rated"} · {ago}
+          </span>
         </div>
       )}
 
       <div className="flex gap-4">
-        {item.kind === "artist" ? (
+        {item.kind === "pick" ? (
+          <PickArt item={item} />
+        ) : item.kind === "artist" ? (
           <Artwork
             href={`/artist/${item.artist.mbid}`}
             src={artistPhotoSrc(item.artist.image_url, 300)}
@@ -246,6 +314,7 @@ export default function FeedItem({
           {item.kind === "album" && <AlbumDetails item={item} />}
           {item.kind === "artist" && <ArtistDetails item={item} />}
           {item.kind === "songs" && <SongDetails item={item} />}
+          {item.kind === "pick" && <PickDetails item={item} />}
 
           {!showAuthor && (
             <p className="mt-2 text-xs text-text-muted">

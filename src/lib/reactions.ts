@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
-export type ReactionKind = "album" | "artist" | "take";
+export type ReactionKind = "album" | "artist" | "take" | "pick";
 
 export type ReactionSummary = {
   love: number;
@@ -10,11 +10,12 @@ export type ReactionSummary = {
   mine: 1 | -1 | null;
 };
 
-/** Which column points at which kind of rating, or at a Versus take. */
+/** Which column points at which kind of rating, or at a Versus take or pick. */
 export const REACTION_COLUMNS = {
   album: "rating_id",
   artist: "artist_rating_id",
   take: "versus_take_id",
+  pick: "versus_vote_id",
 } as const satisfies Record<ReactionKind, string>;
 
 export const NO_REACTIONS: ReactionSummary = { love: 0, dislike: 0, mine: null };

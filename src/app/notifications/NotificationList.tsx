@@ -81,8 +81,12 @@ function Text({ item }: { item: Notification }) {
     case "reaction":
       return (
         <p>
-          <Name person={item.person} />{" "}
-          {item.value === 1 ? "loved" : "said nah to"} your rating of{" "}
+          <Name person={item.person} /> {item.value === 1 ? "loved" : "said nah to"}{" "}
+          {item.on === "rating"
+            ? "your rating of "
+            : item.on === "pick"
+              ? `your pick of ${item.picked} in `
+              : "your take on "}
           <Link href={item.subject.href} className={strong}>
             {item.subject.title}
           </Link>

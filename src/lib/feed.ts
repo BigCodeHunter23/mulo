@@ -2,6 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { getReactions, NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
+import { MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
+import type { VersusMatchup, VersusSideKey } from "@/lib/versus-shared";
 
 type Author = { username: string; display_name: string | null; avatar_url: string | null };
 
@@ -44,6 +46,19 @@ export type FeedItem =
       release: FeedAlbum;
       /** Newest first. */
       songs: { title: string; score: number }[];
+    }
+  | {
+      kind: "pick";
+      key: string;
+      /** The pick itself, which is what a love or a nah attaches to. */
+      ratingId: number;
+      reaction: ReactionSummary;
+      created_at: string;
+      author: Author;
+      matchup: VersusMatchup;
+      pick: VersusSideKey;
+      /** Hidden until the viewer has picked too, or the matchup has closed. */
+      revealed: boolean;
     };
 
 type ReleaseRow = {
@@ -69,6 +84,14 @@ type ArtistRow = {
   created_at: string;
   profiles: Author;
   artists: { mbid: string; name: string; image_url: string | null };
+};
+
+type PickRow = {
+  id: number;
+  pick: VersusSideKey;
+  created_at: string;
+  profiles: Author;
+  versus_matchups: MatchupRow;
 };
 
 type SongRow = {
@@ -123,9 +146,14 @@ function groupSongs(rows: SongRow[]): FeedItem[] {
 /**
  * Recent album, artist and song ratings, newest first, from the given people
  * or from everyone. Plain queries, not a fan-out table: at this scale that
- * would be needless machinery.
+ * would be needless machinery. Given a viewer, their friends' Daily Versus
+ * picks come in too.
  */
-async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedItem[]> {
+async function loadFeed(
+  userIds: string[] | null,
+  limit: number,
+  viewerId: string | null = null,
+): Promise<FeedItem[]> {
   const supabase = await createClient();
   const newest = { ascending: false } as const;
 
@@ -154,10 +182,22 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
     songs.in("user_id", userIds);
   }
 
-  const [albumResult, artistResult, songResult] = await Promise.all([
+  // Before picks can take reactions they have no id, and this reads nothing.
+  const picks =
+    viewerId && userIds
+      ? supabase
+          .from("versus_votes")
+          .select(`id, pick, created_at, ${AUTHOR}, versus_matchups!inner ( ${MATCHUP_SELECT} )`)
+          .in("user_id", userIds)
+          .order("created_at", newest)
+          .limit(limit)
+      : Promise.resolve({ data: null });
+
+  const [albumResult, artistResult, songResult, pickResult] = await Promise.all([
     albums,
     artists,
     songs,
+    picks,
   ]);
 
   const items: FeedItem[] = [
@@ -188,14 +228,31 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
       }),
     ),
     ...groupSongs((songResult.data ?? []) as unknown as SongRow[]),
+    ...((pickResult.data ?? []) as unknown as PickRow[]).map(
+      (row): FeedItem => ({
+        kind: "pick",
+        key: `pick-${row.id}`,
+        ratingId: row.id,
+        reaction: NO_REACTIONS,
+        created_at: row.created_at,
+        author: row.profiles,
+        matchup: toMatchup(row.versus_matchups),
+        pick: row.pick,
+        revealed: false,
+      }),
+    ),
   ];
 
   const visible = items
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     .slice(0, limit);
 
-  // Loves and nahs, for the items that made the cut.
-  const [albumReactions, artistReactions] = await Promise.all([
+  const pickItems = visible.flatMap((item) => (item.kind === "pick" ? [item] : []));
+  const pickMatchups = [...new Set(pickItems.map((item) => item.matchup.id))];
+
+  // Loves and nahs, for the items that made the cut, and which matchups the
+  // viewer has picked in themselves.
+  const [albumReactions, artistReactions, pickReactions, viewerPicks] = await Promise.all([
     getReactions(
       "album",
       visible.flatMap((item) => (item.kind === "album" ? [item.ratingId] : [])),
@@ -204,7 +261,23 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
       "artist",
       visible.flatMap((item) => (item.kind === "artist" ? [item.ratingId] : [])),
     ),
+    getReactions(
+      "pick",
+      pickItems.map((item) => item.ratingId),
+    ),
+    viewerId && pickMatchups.length > 0
+      ? supabase
+          .from("versus_votes")
+          .select("matchup_id")
+          .eq("user_id", viewerId)
+          .in("matchup_id", pickMatchups)
+      : Promise.resolve({ data: [] }),
   ]);
+
+  const pickedIn = new Set(
+    ((viewerPicks.data ?? []) as { matchup_id: number }[]).map((row) => row.matchup_id),
+  );
+  const today = sydneyDay();
 
   return visible.map((item) => {
     if (item.kind === "album") {
@@ -212,6 +285,13 @@ async function loadFeed(userIds: string[] | null, limit: number): Promise<FeedIt
     }
     if (item.kind === "artist") {
       return { ...item, reaction: artistReactions[item.ratingId] ?? NO_REACTIONS };
+    }
+    if (item.kind === "pick") {
+      return {
+        ...item,
+        reaction: pickReactions[item.ratingId] ?? NO_REACTIONS,
+        revealed: item.matchup.day < today || pickedIn.has(item.matchup.id),
+      };
     }
     return item;
   });
@@ -224,7 +304,7 @@ export async function getFollowingFeed(
 ): Promise<FeedItem[]> {
   const followingIds = await getFollowingIds(userId);
   if (followingIds.length === 0) return [];
-  return loadFeed(followingIds, limit);
+  return loadFeed(followingIds, limit, userId);
 }
 
 /** Recent activity across everyone, so a new account has something to read. */

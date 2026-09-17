@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setReaction } from "@/app/reactions/actions";
 
-type Kind = "album" | "artist" | "take";
+type Kind = "album" | "artist" | "take" | "pick";
+
+const NOUN: Record<Kind, string> = {
+  album: "review",
+  artist: "review",
+  take: "take",
+  pick: "pick",
+};
 
 type Summary = { love: number; dislike: number; mine: 1 | -1 | null };
 
@@ -118,7 +125,7 @@ export default function Reactions({
         type="button"
         onClick={() => pick(1)}
         aria-pressed={state.mine === 1}
-        aria-label={kind === "take" ? "Love this take" : "Love this review"}
+        aria-label={`Love this ${NOUN[kind]}`}
         className={`${base} ${
           state.mine === 1
             ? "border-score-you/40 bg-score-you/10 text-score-you"
@@ -133,7 +140,7 @@ export default function Reactions({
         type="button"
         onClick={() => pick(-1)}
         aria-pressed={state.mine === -1}
-        aria-label={kind === "take" ? "Disagree with this take" : "Disagree with this review"}
+        aria-label={`Disagree with this ${NOUN[kind]}`}
         className={`${base} ${
           state.mine === -1
             ? "border-score-friends/40 bg-score-friends/10 text-score-friends"
