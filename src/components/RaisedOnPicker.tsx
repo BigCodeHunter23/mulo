@@ -10,6 +10,7 @@ import { eraForYear, findScene, shortEraLabel } from "@/lib/raised-on-shared";
 import type { SearchAlbum } from "@/lib/search";
 import RecordDisc from "@/components/RecordDisc";
 import { buttonClass, fieldClass } from "@/components/ui";
+import Portal from "@/components/Portal";
 
 export type RaisedOnPick = {
   mbid: string;
@@ -504,73 +505,75 @@ export default function RaisedOnPicker({
       {body}
 
       {pick && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Raised on ${pick.title}`}
-          onClick={closeSheet}
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-6"
-        >
+        <Portal>
           <div
-            onClick={(event) => event.stopPropagation()}
-            className="sheet-up w-full max-w-md rounded-t-3xl border border-border bg-bg px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-7 sm:rounded-3xl sm:pb-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Raised on ${pick.title}`}
+            onClick={closeSheet}
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-6"
           >
-            <div className="flex flex-col items-center text-center">
-              <div className={`relative ${saved ? "record-land" : ""}`}>
-                {saved && <span className="record-ring absolute inset-0 rounded-full" />}
-                <RecordDisc cover={pick.cover} className="h-44 w-44" spinning />
-              </div>
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="sheet-up w-full max-w-md rounded-t-3xl border border-border bg-bg px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-7 sm:rounded-3xl sm:pb-6"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className={`relative ${saved ? "record-land" : ""}`}>
+                  {saved && <span className="record-ring absolute inset-0 rounded-full" />}
+                  <RecordDisc cover={pick.cover} className="h-44 w-44" spinning />
+                </div>
 
-              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-                {saved ? "Locked in" : "Raised on"}
-              </p>
-              <h2 className="display mt-1 text-2xl text-text">{pick.title}</h2>
-              {detail && <p className="mt-1 text-sm text-text-secondary">{detail}</p>}
+                <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                  {saved ? "Locked in" : "Raised on"}
+                </p>
+                <h2 className="display mt-1 text-2xl text-text">{pick.title}</h2>
+                {detail && <p className="mt-1 text-sm text-text-secondary">{detail}</p>}
 
-              {hasPhoto ? (
-                <label className="mt-4 flex items-center gap-2 text-sm text-text-secondary">
-                  <input
-                    type="checkbox"
-                    checked={useAsPicture}
-                    onChange={(event) => setUseAsPicture(event.target.checked)}
+                {hasPhoto ? (
+                  <label className="mt-4 flex items-center gap-2 text-sm text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={useAsPicture}
+                      onChange={(event) => setUseAsPicture(event.target.checked)}
+                      disabled={pending || saved}
+                      className="h-4 w-4 accent-[#f2803f]"
+                    />
+                    Use it as my picture instead of my photo
+                  </label>
+                ) : (
+                  <p className="mt-3 text-xs text-text-muted">
+                    It&rsquo;ll be your picture until you add a photo.
+                  </p>
+                )}
+
+                {error && (
+                  <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
+                    {error}
+                  </p>
+                )}
+
+                <div className="mt-6 grid w-full grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={closeSheet}
                     disabled={pending || saved}
-                    className="h-4 w-4 accent-[#f2803f]"
-                  />
-                  Use it as my picture instead of my photo
-                </label>
-              ) : (
-                <p className="mt-3 text-xs text-text-muted">
-                  It&rsquo;ll be your picture until you add a photo.
-                </p>
-              )}
-
-              {error && (
-                <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
-                  {error}
-                </p>
-              )}
-
-              <div className="mt-6 grid w-full grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={closeSheet}
-                  disabled={pending || saved}
-                  className={`${buttonClass({ variant: "secondary" })} h-12`}
-                >
-                  Pick another
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={pending || saved}
-                  className={`${buttonClass()} h-12`}
-                >
-                  {saved ? "Saved" : pending ? "Saving…" : "That's the one"}
-                </button>
+                    className={`${buttonClass({ variant: "secondary" })} h-12`}
+                  >
+                    Pick another
+                  </button>
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={pending || saved}
+                    className={`${buttonClass()} h-12`}
+                  >
+                    {saved ? "Saved" : pending ? "Saving…" : "That's the one"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </>
   );

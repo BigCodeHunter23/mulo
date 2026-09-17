@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Star } from "@/components/StarScore";
 import { buttonClass } from "@/components/ui";
+import Portal from "@/components/Portal";
 
 function ScoresArt() {
   const scores = [
@@ -153,75 +154,77 @@ export default function IntroCards() {
   const card = CARDS[index];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="intro-title"
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-bg/80 p-4 backdrop-blur-sm sm:items-center"
-    >
+    <Portal>
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
-        onPointerDown={(event) => {
-          swipeFrom.current = event.clientX;
-        }}
-        onPointerUp={(event) => {
-          const from = swipeFrom.current;
-          swipeFrom.current = null;
-          if (from === null) return;
-          const distance = event.clientX - from;
-          if (distance < -50) setIndex((i) => Math.min(CARDS.length - 1, i + 1));
-          if (distance > 50) setIndex((i) => Math.max(0, i - 1));
-        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="intro-title"
+        className="fixed inset-0 z-[60] flex items-end justify-center bg-bg/80 p-4 backdrop-blur-sm sm:items-center"
       >
-        <div key={`art-${index}`} className="goat-reveal flex h-48 items-center justify-center bg-surface-raised">
-          {card.art}
-        </div>
+        <div
+          className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+          onPointerDown={(event) => {
+            swipeFrom.current = event.clientX;
+          }}
+          onPointerUp={(event) => {
+            const from = swipeFrom.current;
+            swipeFrom.current = null;
+            if (from === null) return;
+            const distance = event.clientX - from;
+            if (distance < -50) setIndex((i) => Math.min(CARDS.length - 1, i + 1));
+            if (distance > 50) setIndex((i) => Math.max(0, i - 1));
+          }}
+        >
+          <div key={`art-${index}`} className="goat-reveal flex h-48 items-center justify-center bg-surface-raised">
+            {card.art}
+          </div>
 
-        <div key={`text-${index}`} className="goat-reveal p-6">
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-text-muted">
-            {index + 1} of {CARDS.length}
-          </p>
-          <h2 id="intro-title" className="display mt-2 text-2xl text-text">
-            {card.title}
-          </h2>
-          <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-text-secondary">
-            {card.body}
-          </p>
+          <div key={`text-${index}`} className="goat-reveal p-6">
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-text-muted">
+              {index + 1} of {CARDS.length}
+            </p>
+            <h2 id="intro-title" className="display mt-2 text-2xl text-text">
+              {card.title}
+            </h2>
+            <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-text-secondary">
+              {card.body}
+            </p>
 
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <div className="flex gap-1.5" aria-hidden="true">
-              {CARDS.map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === index ? "w-5 bg-accent" : "w-1.5 bg-border-strong"
-                  }`}
-                />
-              ))}
-            </div>
+            <div className="mt-6 flex items-center justify-between gap-4">
+              <div className="flex gap-1.5" aria-hidden="true">
+                {CARDS.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === index ? "w-5 bg-accent" : "w-1.5 bg-border-strong"
+                    }`}
+                  />
+                ))}
+              </div>
 
-            <div className="flex items-center gap-4">
-              {!last && (
+              <div className="flex items-center gap-4">
+                {!last && (
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="text-xs text-text-muted transition-colors hover:text-text"
+                  >
+                    Skip
+                  </button>
+                )}
                 <button
+                  ref={primary}
                   type="button"
-                  onClick={close}
-                  className="text-xs text-text-muted transition-colors hover:text-text"
+                  onClick={() => (last ? close() : setIndex(index + 1))}
+                  className={buttonClass({ size: "sm" })}
                 >
-                  Skip
+                  {last ? "Let's go" : "Next"}
                 </button>
-              )}
-              <button
-                ref={primary}
-                type="button"
-                onClick={() => (last ? close() : setIndex(index + 1))}
-                className={buttonClass({ size: "sm" })}
-              >
-                {last ? "Let's go" : "Next"}
-              </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }

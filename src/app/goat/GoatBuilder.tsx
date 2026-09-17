@@ -7,6 +7,7 @@ import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { Crown, Sparks } from "@/components/Celebrate";
 import ShareButton from "@/components/ShareButton";
 import { buttonClass, fieldClass } from "@/components/ui";
+import Portal from "@/components/Portal";
 
 type Kind = "artist" | "album";
 
@@ -340,71 +341,73 @@ export default function GoatBuilder({
   return (
     <div>
       {crowned && crowned.length > 0 && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Your GOAT: ${crowned[0].title}`}
-          onClick={() => setCrowned(null)}
-          className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/85 p-6 backdrop-blur-sm"
-        >
+        <Portal>
           <div
-            onClick={(event) => event.stopPropagation()}
-            className="flex w-full max-w-sm flex-col items-center text-center"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Your GOAT: ${crowned[0].title}`}
+            onClick={() => setCrowned(null)}
+            className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/85 p-6 backdrop-blur-sm"
           >
-            <p className="step-in text-xs font-semibold uppercase tracking-[0.22em] text-score-overall">
-              {kind === "artist" ? "Your GOAT artist" : "Your GOAT album"}
-            </p>
-
-            <div className="relative mt-10">
-              <Sparks />
-              <span className="crown-drop absolute -top-10 left-1/2 z-20 -ml-7 block">
-                <Crown className="h-14 w-14" />
-              </span>
-              <span
-                className={`winner-rise goat-crown block ${round ? "rounded-full" : "rounded-lg"}`}
-              >
-                <Art item={crowned[0]} round={round} size="h-44 w-44 sm:h-52 sm:w-52" />
-              </span>
-            </div>
-
-            <p className="winner-rise display mt-6 text-3xl text-text" style={{ animationDelay: "0.25s" }}>
-              {crowned[0].title}
-            </p>
-            {crowned[0].subtitle && (
-              <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.3s" }}>
-                {crowned[0].subtitle}
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="flex w-full max-w-sm flex-col items-center text-center"
+            >
+              <p className="step-in text-xs font-semibold uppercase tracking-[0.22em] text-score-overall">
+                {kind === "artist" ? "Your GOAT artist" : "Your GOAT album"}
               </p>
-            )}
 
-            {crowned.length > 1 && (
-              <ol className="mt-7 flex items-start justify-center gap-4">
-                {crowned.slice(1, 3).map((item, i) => (
-                  <li
-                    key={item.mbid}
-                    className="deal-in flex w-24 flex-col items-center gap-1.5"
-                    style={{ "--delay": `${0.7 + i * 0.12}s` } as React.CSSProperties}
-                  >
-                    <Art item={item} round={round} size="h-16 w-16" />
-                    <span className="text-xs font-bold tabular-nums text-text-muted">{i + 2}</span>
-                    <span className="line-clamp-1 text-xs text-text-secondary">{item.title}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
+              <div className="relative mt-10">
+                <Sparks />
+                <span className="crown-drop absolute -top-10 left-1/2 z-20 -ml-7 block">
+                  <Crown className="h-14 w-14" />
+                </span>
+                <span
+                  className={`winner-rise goat-crown block ${round ? "rounded-full" : "rounded-lg"}`}
+                >
+                  <Art item={crowned[0]} round={round} size="h-44 w-44 sm:h-52 sm:w-52" />
+                </span>
+              </div>
 
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <ShareButton
-                url={`/u/${username}`}
-                title="My GOAT on MULO"
-                text={`My number one: ${crowned[0].title}.`}
-                label="Share it"
-              />
-              <button type="button" onClick={() => setCrowned(null)} className={buttonClass({ size: "sm" })}>
-                Done
-              </button>
+              <p className="winner-rise display mt-6 text-3xl text-text" style={{ animationDelay: "0.25s" }}>
+                {crowned[0].title}
+              </p>
+              {crowned[0].subtitle && (
+                <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.3s" }}>
+                  {crowned[0].subtitle}
+                </p>
+              )}
+
+              {crowned.length > 1 && (
+                <ol className="mt-7 flex items-start justify-center gap-4">
+                  {crowned.slice(1, 3).map((item, i) => (
+                    <li
+                      key={item.mbid}
+                      className="deal-in flex w-24 flex-col items-center gap-1.5"
+                      style={{ "--delay": `${0.7 + i * 0.12}s` } as React.CSSProperties}
+                    >
+                      <Art item={item} round={round} size="h-16 w-16" />
+                      <span className="text-xs font-bold tabular-nums text-text-muted">{i + 2}</span>
+                      <span className="line-clamp-1 text-xs text-text-secondary">{item.title}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <ShareButton
+                  url={`/u/${username}`}
+                  title="My GOAT on MULO"
+                  text={`My number one: ${crowned[0].title}.`}
+                  label="Share it"
+                />
+                <button type="button" onClick={() => setCrowned(null)} className={buttonClass({ size: "sm" })}>
+                  Done
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
