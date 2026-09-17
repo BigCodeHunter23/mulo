@@ -21,7 +21,7 @@ export default function ArtistCard({
       href={`/artist/${mbid}`}
       className="group flex flex-col items-center gap-2.5 text-center"
     >
-      <div className="artwork aspect-square w-full overflow-hidden rounded-full transition-transform duration-200 group-hover:scale-[1.03]">
+      <div className="artwork aspect-square w-full overflow-hidden rounded-full transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

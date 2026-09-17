@@ -30,7 +30,7 @@ export default function AlbumCard({
 
   return (
     <Link href={`/album/${mbid}`} className="group block">
-      <div className="artwork aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03]">
+      <div className="artwork aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
         {src && (
           // eslint-disable-next-line @next/next/no-img-element
           <img

@@ -9,7 +9,7 @@ export function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** A header link that shows where you are. */
+/** A header link that shows where you are, underlined in the accent colour. */
 export default function NavLink({
   href,
   children,
@@ -25,11 +25,17 @@ export default function NavLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`text-sm transition-colors ${
-        active ? "text-text" : "text-text-secondary hover:text-text"
+      className={`relative py-4 text-sm transition-colors ${
+        active ? "font-medium text-text" : "text-text-secondary hover:text-text"
       } ${className}`}
     >
       {children}
+      {active && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-accent"
+        />
+      )}
     </Link>
   );
 }
