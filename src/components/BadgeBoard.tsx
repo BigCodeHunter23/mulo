@@ -1,22 +1,25 @@
 import type { BadgeBoard, BoardBadge, BoardLadder } from "@/lib/badges";
-import { Star } from "@/components/StarScore";
+import BadgeIcon from "@/components/BadgeIcon";
 import { SectionHeading } from "@/components/ui";
 
-function Medal({ earned }: { earned: boolean }) {
+/**
+ * The badge itself: its own glyph in a gold ring once earned, the same glyph
+ * dimmed behind a dashed ring while it isn't. Showing the locked shape is the
+ * point — a board of outlines waiting to be filled in reads as a collection,
+ * where a grid of question marks read as a wall. What it took to earn stays
+ * hidden either way, which was always the part worth keeping back.
+ */
+function Medal({ earned, slug }: { earned: boolean; slug: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${
         earned
-          ? "border-score-overall/40 bg-score-overall/15"
-          : "border-dashed border-border bg-surface-raised/60"
+          ? "border-score-overall/50 bg-score-overall/15 text-score-overall"
+          : "border-dashed border-border bg-surface-raised/50 text-text-muted/70"
       }`}
     >
-      {earned ? (
-        <Star className="h-4 w-4 text-score-overall" />
-      ) : (
-        <span className="text-sm font-semibold text-text-muted">?</span>
-      )}
+      <BadgeIcon slug={slug} className="h-5 w-5" />
     </span>
   );
 }
@@ -30,7 +33,7 @@ function Tile({ badge }: { badge: BoardBadge }) {
           : "border-border bg-surface/40"
       }`}
     >
-      <Medal earned={badge.earned} />
+      <Medal earned={badge.earned} slug={badge.slug} />
       <span className="min-w-0">
         <span
           className={`display-sm block text-sm ${
@@ -50,8 +53,11 @@ function Tile({ badge }: { badge: BoardBadge }) {
 function Ladder({ ladder }: { ladder: BoardLadder }) {
   return (
     <li className="rounded-xl border border-border bg-surface/40 p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="display-sm text-sm text-text">{ladder.name}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2.5">
+          <Medal earned={ladder.tiers.some((tier) => tier.earned)} slug={ladder.id} />
+          <span className="display-sm text-sm text-text">{ladder.name}</span>
+        </span>
         <span className="text-xs tabular-nums text-text-muted">
           {ladder.rated} rated
         </span>

@@ -52,6 +52,7 @@ export default async function Header() {
           <nav className="hidden items-center gap-5 sm:flex">
             <NavLink href="/">Home</NavLink>
             <NavLink href="/discover">Discover</NavLink>
+            <NavLink href="/charts">Charts</NavLink>
             <NavLink href="/search">Search</NavLink>
             <NavLink href="/people">People</NavLink>
             <NavLink href="/versus">Versus</NavLink>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import {
   artistsToExplore,
@@ -124,7 +125,18 @@ async function TopRated() {
 
   return (
     <section>
-      <SectionHeading>Top rated on MULO</SectionHeading>
+      <SectionHeading
+        action={
+          <Link
+            href="/charts"
+            className="text-xs font-medium text-text-secondary transition-colors hover:text-accent"
+          >
+            The Charts →
+          </Link>
+        }
+      >
+        Top rated on MULO
+      </SectionHeading>
       <ul className={ALBUM_GRID}>
         {topRated.map((album, i) => (
           <li key={album.mbid} className={ALBUM_ITEM}>

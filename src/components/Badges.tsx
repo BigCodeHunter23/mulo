@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Badge } from "@/lib/badge-catalog";
-import { Star } from "@/components/StarScore";
+import BadgeIcon from "@/components/BadgeIcon";
 
 /** Past this many the row turns into a wall, so the rest live on the board. */
 const SHOWN = 8;
@@ -21,7 +21,7 @@ export default function Badges({ badges, href }: { badges: Badge[]; href: string
           title={badge.description}
           className="flex items-center gap-1.5 rounded-full border border-score-overall/30 bg-score-overall/10 px-3 py-1 text-xs font-medium text-[#f3d98a]"
         >
-          <Star className="h-3 w-3 text-score-overall" />
+          <BadgeIcon slug={badge.slug} className="h-3.5 w-3.5 text-score-overall" />
           {badge.name}
           <span className="sr-only">: {badge.description}</span>
         </li>
