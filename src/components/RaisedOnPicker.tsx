@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { saveRaisedOn } from "@/app/raised-on/actions";
 import { coverSrc } from "@/lib/cover-url";
-import { ERAS, type EraAlbum } from "@/lib/eras";
+import { ERAS, type Era, type EraAlbum } from "@/lib/eras";
 import { eraForYear, findScene, shortEraLabel } from "@/lib/raised-on-shared";
-import { recordAvatarPath } from "@/lib/record-avatar";
 import type { SearchAlbum } from "@/lib/search";
+import RecordDisc from "@/components/RecordDisc";
 import { buttonClass, fieldClass } from "@/components/ui";
 
 export type RaisedOnPick = {
@@ -20,13 +20,7 @@ export type RaisedOnPick = {
   scene: string | null;
 };
 
-function Check() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3}>
-      <path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+type Changes = Record<string, string | null>;
 
 function Cover({ url, className }: { url: string | null; className: string }) {
   const src = coverSrc(url, 250);
@@ -38,13 +32,91 @@ function Cover({ url, className }: { url: string | null; className: string }) {
   );
 }
 
-function AlbumSearch({
-  chosen,
-  onPick,
+function BackButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="-ml-2 flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-text-secondary transition-colors hover:bg-surface-raised hover:text-text"
+    >
+      <span aria-hidden="true" className="text-lg leading-none">
+        ‹
+      </span>
+      {label}
+    </button>
+  );
+}
+
+/** Where an album sits in the lineup, preferring the scene being looked at. */
+function lineupPick(mbid: string, eraId: string | null, sceneId: string | null) {
+  let match: RaisedOnPick | null = null;
+  for (const era of ERAS) {
+    for (const scene of era.scenes) {
+      const album = scene.albums.find((candidate) => candidate.mbid === mbid);
+      if (!album) continue;
+      const pick = {
+        mbid,
+        title: album.title,
+        artist: album.artist,
+        cover: album.cover,
+        era: era.id,
+        scene: scene.id,
+      };
+      if (era.id === eraId && scene.id === sceneId) return pick;
+      match ??= pick;
+    }
+  }
+  return match;
+}
+
+function DecadeTile({
+  era,
+  mine,
+  onClick,
 }: {
-  chosen: string | null;
-  onPick: (album: SearchAlbum) => void;
+  era: Era;
+  mine: boolean;
+  onClick: () => void;
 }) {
+  const covers = era.scenes.slice(0, 3).map((scene) => scene.albums[0]);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative flex min-h-36 flex-col justify-between gap-4 overflow-hidden rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-raised active:scale-[0.98]"
+    >
+      <span className="flex items-start justify-between gap-2">
+        <span className="flex">
+          {covers.map((album, i) => (
+            <Cover
+              key={album.mbid}
+              url={album.cover}
+              className={`h-11 w-11 rounded-md shadow-lg ring-2 ring-surface ${i > 0 ? "-ml-4" : ""} ${
+                i === 0 ? "-rotate-6" : i === 2 ? "rotate-6" : ""
+              }`}
+            />
+          ))}
+        </span>
+        {mine && (
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
+            Yours
+          </span>
+        )}
+      </span>
+      <span>
+        <span className="display block text-3xl text-text transition-colors group-hover:text-accent">
+          {shortEraLabel(era.id)}
+        </span>
+        <span className="mt-1 line-clamp-2 block text-xs leading-snug text-text-muted">
+          {era.blurb}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function AlbumSearch({ onPick }: { onPick: (album: SearchAlbum) => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchAlbum[]>([]);
   const [loading, setLoading] = useState(false);
@@ -86,24 +158,19 @@ function AlbumSearch({
         }}
         placeholder="Search for an album"
         autoFocus
-        className={fieldClass}
+        className={`${fieldClass} h-12 text-base`}
       />
       {loading && <p className="mt-3 text-xs text-text-muted">Searching…</p>}
       {results.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1.5">
+        <ul className="mt-3 flex flex-col gap-2">
           {results.map((album) => (
             <li key={album.mbid}>
               <button
                 type="button"
                 onClick={() => onPick(album)}
-                aria-pressed={chosen === album.mbid}
-                className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors ${
-                  chosen === album.mbid
-                    ? "border-accent bg-accent/5"
-                    : "border-border bg-surface hover:bg-surface-raised"
-                }`}
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-2.5 text-left transition-colors hover:bg-surface-raised active:scale-[0.99]"
               >
-                <Cover url={album.cover_art_url} className="h-11 w-11 shrink-0 rounded" />
+                <Cover url={album.cover_art_url} className="h-14 w-14 shrink-0 rounded-md" />
                 <span className="min-w-0 flex-1">
                   <span className="display-sm block truncate text-sm text-text">{album.title}</span>
                   <span className="block truncate text-xs text-text-muted">
@@ -120,70 +187,120 @@ function AlbumSearch({
 }
 
 /**
- * Raised On: tap a decade on the timeline, one of the scenes that defined it,
- * then the record you grew up on. Nothing locks in until you save, so you can
- * wander between decades as much as you like. Your pick stays in the bar at
- * the bottom while you look around.
+ * Raised On, one screen at a time: a decade, one of the scenes that defined
+ * it, then the record. Each step is its own place in the browser's history,
+ * so the back button or a swipe goes back a step, and any decade is a tap
+ * away. Picking a record opens a sheet to confirm it; saving drops the needle
+ * and heads to wherever comes next.
  */
 export default function RaisedOnPicker({
   initial,
   hasPhoto,
   mode,
+  doneHref,
 }: {
   initial: RaisedOnPick | null;
   hasPhoto: boolean;
   mode: "welcome" | "settings";
+  /** Where to go once it's saved. */
+  doneHref: string;
 }) {
   const router = useRouter();
-  const [eraId, setEraId] = useState<string | null>(initial?.era ?? null);
-  const [sceneId, setSceneId] = useState<string | null>(initial?.scene ?? null);
-  const [pick, setPick] = useState<RaisedOnPick | null>(initial);
-  const [searching, setSearching] = useState(false);
+  const params = useSearchParams();
+  const [found, setFound] = useState<Record<string, RaisedOnPick>>({});
   const [useAsPicture, setUseAsPicture] = useState(!hasPhoto);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  // How many steps this page has added to history, so Back can undo them.
+  const pushed = useRef(0);
 
-  const scenesRef = useRef<HTMLDivElement>(null);
-  const albumsRef = useRef<HTMLDivElement>(null);
+  const eraId = params.get("era");
+  const sceneId = params.get("scene");
+  const finding = params.get("find") === "1";
+  const pickId = params.get("pick");
 
   const era = ERAS.find((candidate) => candidate.id === eraId) ?? null;
   const scene = era?.scenes.find((candidate) => candidate.id === sceneId) ?? null;
-  const unchanged = pick !== null && initial !== null && pick.mbid === initial.mbid;
 
-  function reveal(ref: React.RefObject<HTMLDivElement | null>) {
-    requestAnimationFrame(() =>
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
+  const pick = pickId
+    ? (found[pickId] ??
+      lineupPick(pickId, eraId, sceneId) ??
+      (initial?.mbid === pickId ? initial : null))
+    : null;
+
+  useEffect(() => {
+    const popped = () => {
+      pushed.current = Math.max(0, pushed.current - 1);
+    };
+    window.addEventListener("popstate", popped);
+    return () => window.removeEventListener("popstate", popped);
+  }, []);
+
+  // The confirm sheet closes on Escape, and the page behind it holds still.
+  useEffect(() => {
+    if (!pick) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (pushed.current > 0) {
+        window.history.back();
+      } else {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("pick");
+        window.history.replaceState(null, "", url);
+      }
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", close);
+    };
+  }, [pick]);
+
+  function go(changes: Changes, how: "push" | "replace" = "push", scrollTop = true) {
+    const url = new URL(window.location.href);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) url.searchParams.delete(key);
+      else url.searchParams.set(key, value);
+    }
+    if (how === "push") {
+      pushed.current += 1;
+      window.history.pushState(null, "", url);
+    } else {
+      window.history.replaceState(null, "", url);
+    }
+    if (scrollTop) window.scrollTo({ top: 0 });
   }
 
-  function chooseEra(id: string) {
-    setEraId(id);
-    setSceneId(null);
-    setSearching(false);
-    reveal(scenesRef);
+  /** Back a step: through history when this page put it there. */
+  function back(fallback: Changes) {
+    if (pushed.current > 0) window.history.back();
+    else go(fallback, "replace");
   }
 
-  function chooseScene(id: string) {
-    setSceneId(id);
-    reveal(albumsRef);
+  function closeSheet() {
+    if (!pending && !saved) back({ pick: null });
   }
 
-  function choose(next: RaisedOnPick) {
-    setPick(next);
-    setSaved(false);
+  function open(next: RaisedOnPick) {
     setError(null);
+    setSaved(false);
+    go({ pick: next.mbid }, "push", false);
   }
 
-  function chooseAlbum(album: EraAlbum) {
-    choose({
+  function chooseSearched(album: SearchAlbum) {
+    const next: RaisedOnPick = {
       mbid: album.mbid,
       title: album.title,
       artist: album.artist,
-      cover: album.cover,
-      era: eraId,
-      scene: sceneId,
-    });
+      cover: album.cover_art_url,
+      era: eraForYear(album.year ? Number(album.year) : null),
+      scene: null,
+    };
+    setFound((current) => ({ ...current, [album.mbid]: next }));
+    open(next);
   }
 
   function save() {
@@ -201,267 +318,260 @@ export default function RaisedOnPicker({
         setError(result.error);
         return;
       }
-      if (mode === "welcome") {
-        router.push("/welcome?step=rate");
-      } else {
-        setSaved(true);
-        router.refresh();
-      }
+      setSaved(true);
+      // Long enough to see the record land.
+      setTimeout(() => router.push(doneHref), 1100);
     });
   }
 
-  const pickPlace = pick ? findScene(pick.era, pick.scene) : null;
-  const pickDetail = pick
-    ? [pick.artist, pickPlace?.scene?.name ?? pickPlace?.era?.label].filter(Boolean).join(" · ")
+  const place = pick ? findScene(pick.era, pick.scene) : null;
+  const detail = pick
+    ? [pick.artist, place?.scene?.name ?? place?.era?.label].filter(Boolean).join(" · ")
     : "";
 
-  return (
-    <div>
-      {/* The timeline stays pinned under the header, so another decade is always one tap away. */}
-      <div className="sticky top-14 z-10 -mx-4 overflow-x-auto border-b border-border/60 bg-bg/90 px-4 pb-3 pt-3 backdrop-blur-xl sm:mx-0 sm:rounded-b-xl sm:px-2">
-        <ol className="relative flex min-w-max sm:min-w-0">
-          <span
-            aria-hidden="true"
-            className="absolute left-9 right-9 top-[13px] h-px bg-border-strong"
-          />
-          {ERAS.map((candidate) => {
-            const active = candidate.id === eraId;
-            const holdsPick = pick?.era === candidate.id;
+  let body: React.ReactNode;
 
-            return (
-              <li key={candidate.id} className="relative flex w-[4.5rem] justify-center sm:flex-1">
-                <button
-                  type="button"
-                  onClick={() => chooseEra(candidate.id)}
-                  aria-pressed={active}
-                  aria-label={candidate.label}
-                  className="group flex flex-col items-center gap-2 px-1"
-                >
-                  <span
-                    className={`relative flex h-7 w-7 items-center justify-center rounded-full border-2 transition ${
-                      active
-                        ? "scale-110 border-accent bg-accent"
-                        : "border-border-strong bg-bg group-hover:border-accent/70"
-                    }`}
-                  >
-                    {holdsPick && (
-                      <span
-                        className={`h-2 w-2 rounded-full ${active ? "bg-[#0b0b0e]" : "bg-accent"}`}
-                      />
-                    )}
-                  </span>
-                  <span
-                    className={`display-sm text-sm transition-colors sm:text-base ${
-                      active ? "text-accent" : "text-text-secondary group-hover:text-text"
-                    }`}
-                  >
-                    {shortEraLabel(candidate.id)}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      {!era && (
-        <p className="mt-4 text-sm text-text-muted">
-          Tap a decade to start. Any decade counts: it&rsquo;s about the music you grew
-          up with, not the year you were born.
+  if (finding) {
+    body = (
+      <div key="search" className="step-in">
+        <BackButton label="Back" onClick={() => back({ find: null })} />
+        <h1 className="display mt-2 text-3xl text-text">Search any album</h1>
+        <p className="mt-1.5 text-sm text-text-secondary">
+          Whatever raised you, if it&rsquo;s on MusicBrainz, it&rsquo;s here.
         </p>
-      )}
-
-      {era && (
-        <div ref={scenesRef} className="mt-6 scroll-mt-40">
-          <p className="text-sm text-text-secondary">
-            <span className="display-sm text-text">{era.label}.</span> {era.blurb}.
-          </p>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {era.scenes.map((candidate) => {
-              const active = candidate.id === sceneId;
-              return (
-                <li key={candidate.id}>
-                  <button
-                    type="button"
-                    onClick={() => chooseScene(candidate.id)}
-                    aria-pressed={active}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
-                      active
-                        ? "border-accent bg-accent/5"
-                        : "border-border bg-surface hover:border-border-strong hover:bg-surface-raised"
-                    }`}
-                  >
-                    <span className="flex shrink-0 -space-x-4">
-                      {candidate.albums.slice(0, 3).map((album) => (
-                        <Cover
-                          key={album.mbid}
-                          url={album.cover}
-                          className="h-10 w-10 rounded-md ring-2 ring-surface"
-                        />
-                      ))}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="display-sm block truncate text-sm text-text">
-                        {candidate.name}
-                      </span>
-                      <span className="block truncate text-xs text-text-muted">
-                        {candidate.artists.join(", ")}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="mt-6">
+          <AlbumSearch onPick={chooseSearched} />
         </div>
-      )}
-
-      {scene && (
-        <div ref={albumsRef} className="mt-8 scroll-mt-40">
-          <p className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            {scene.name}: pick the record
-          </p>
-          <ul className="mt-3 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-5">
-            {scene.albums.map((album) => {
-              const chosen = pick?.mbid === album.mbid;
-              return (
-                <li key={album.mbid}>
-                  <button
-                    type="button"
-                    onClick={() => chooseAlbum(album)}
-                    aria-pressed={chosen}
-                    className="group block w-full text-left"
-                  >
-                    <span
-                      className={`artwork relative block aspect-square overflow-hidden rounded-lg ring-2 transition ${
-                        chosen ? "ring-accent" : "ring-transparent group-hover:ring-border-strong"
-                      }`}
-                    >
-                      <Cover url={album.cover} className="h-full w-full" />
-                      {chosen && (
-                        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[#0b0b0e]">
-                          <Check />
-                        </span>
-                      )}
-                    </span>
-                    <span className="display-sm mt-2 block truncate text-xs text-text">
-                      {album.title}
-                    </span>
-                    <span className="block truncate text-[11px] text-text-muted">
-                      {album.artist} · {album.year}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      <div className="mt-8">
-        {searching ? (
-          <AlbumSearch
-            chosen={pick?.mbid ?? null}
-            onPick={(album) => {
-              const year = album.year ? Number(album.year) : null;
-              choose({
-                mbid: album.mbid,
-                title: album.title,
-                artist: album.artist,
-                cover: album.cover_art_url,
-                era: eraForYear(year),
-                scene: null,
-              });
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setSearching(true)}
-            className="text-sm text-text-secondary underline-offset-4 transition-colors hover:text-text hover:underline"
-          >
-            Not in the list? Search for any album
-          </button>
-        )}
       </div>
+    );
+  } else if (era && scene) {
+    body = (
+      <div key={`records-${scene.id}`} className="step-in">
+        <BackButton label={era.label} onClick={() => back({ scene: null })} />
+        <h1 className="display mt-2 text-3xl text-text">{scene.name}</h1>
+        <p className="mt-1.5 text-sm text-text-muted">{scene.artists.join(", ")}</p>
 
-      {mode === "welcome" && !pick && (
-        <div className="mt-10 flex justify-end">
-          <Link
-            href="/welcome?step=rate"
-            className="text-sm text-text-muted transition-colors hover:text-text"
-          >
-            Skip for now
-          </Link>
-        </div>
-      )}
-
-      {/* Your pick, kept in view while you look around. */}
-      {pick && (
-        <div className="sticky bottom-0 z-20 -mx-4 mt-10 border-t border-border bg-bg/90 px-4 py-3 backdrop-blur-xl sm:bottom-4 sm:mx-0 sm:rounded-2xl sm:border sm:px-4">
-          <div className="flex items-center gap-3">
-            <span
-              className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-full bg-surface-raised bg-cover bg-center"
-              style={{
-                backgroundImage: pick.cover ? `url("${coverSrc(pick.cover, 250)}")` : undefined,
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                key={pick.mbid}
-                src={`${recordAvatarPath(pick.mbid)}?s=128`}
-                alt=""
-                className="record-spin h-full w-full"
-              />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-text-secondary">
-                Raised on <span className="display-sm text-text">{pick.title}</span>
-              </p>
-              {pickDetail && <p className="truncate text-xs text-text-muted">{pickDetail}</p>}
-            </div>
-            {mode === "welcome" ? (
-              <button type="button" onClick={save} disabled={pending} className={buttonClass()}>
-                {pending ? "Saving…" : "That's the one"}
-              </button>
-            ) : (
+        <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
+          {scene.albums.map((album: EraAlbum) => (
+            <li key={album.mbid}>
               <button
                 type="button"
-                onClick={save}
-                disabled={pending || saved || (unchanged && !(hasPhoto && useAsPicture))}
-                className={buttonClass()}
+                onClick={() => open(lineupPick(album.mbid, era.id, scene.id)!)}
+                className="group block w-full text-left active:scale-[0.97]"
               >
-                {pending ? "Saving…" : saved ? "Saved" : "Save"}
+                <span className="artwork relative block aspect-square overflow-hidden rounded-xl ring-2 ring-transparent transition group-hover:ring-accent/60">
+                  <Cover url={album.cover} className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]" />
+                  {initial?.mbid === album.mbid && (
+                    <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-[#0b0b0e]">
+                      Your record
+                    </span>
+                  )}
+                </span>
+                <span className="display-sm mt-2.5 block truncate text-sm text-text">
+                  {album.title}
+                </span>
+                <span className="block truncate text-xs text-text-muted">
+                  {album.artist} · {album.year}
+                </span>
               </button>
-            )}
-          </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  } else if (era) {
+    body = (
+      <div key={`scenes-${era.id}`} className="step-in">
+        <BackButton label="Decades" onClick={() => back({ era: null })} />
 
-          {hasPhoto && (
-            <label className="mt-2.5 flex items-center gap-2 text-xs text-text-secondary">
-              <input
-                type="checkbox"
-                checked={useAsPicture}
-                onChange={(event) => {
-                  setUseAsPicture(event.target.checked);
-                  setSaved(false);
-                }}
-                className="h-4 w-4 accent-[#f2803f]"
+        {/* Hop straight to another decade without going back. */}
+        <div className="-mx-4 mt-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max gap-2">
+            {ERAS.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => go({ era: candidate.id }, "replace")}
+                aria-pressed={candidate.id === era.id}
+                className={`h-9 rounded-full border px-3.5 text-sm font-semibold transition-colors ${
+                  candidate.id === era.id
+                    ? "border-accent bg-accent text-[#0b0b0e]"
+                    : "border-border bg-surface text-text-secondary hover:text-text"
+                }`}
+              >
+                {shortEraLabel(candidate.id)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <h1 className="display mt-6 text-3xl text-text">{era.label}</h1>
+        <p className="mt-1.5 text-sm text-text-secondary">{era.blurb}.</p>
+
+        <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
+          {era.scenes.map((candidate) => (
+            <li key={candidate.id}>
+              <button
+                type="button"
+                onClick={() => go({ scene: candidate.id })}
+                className="flex w-full items-center gap-3.5 rounded-xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-border-strong hover:bg-surface-raised active:scale-[0.99]"
+              >
+                <span className="flex shrink-0">
+                  {candidate.albums.slice(0, 3).map((album, i) => (
+                    <Cover
+                      key={album.mbid}
+                      url={album.cover}
+                      className={`h-12 w-12 rounded-md ring-2 ring-surface ${i > 0 ? "-ml-5" : ""}`}
+                    />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="display-sm block truncate text-[15px] text-text">
+                    {candidate.name}
+                  </span>
+                  <span className="block truncate text-xs text-text-muted">
+                    {candidate.artists.join(", ")}
+                  </span>
+                </span>
+                <span aria-hidden="true" className="text-lg text-text-muted">
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  } else {
+    body = (
+      <div key="decades" className="step-in">
+        <h1 className="display text-3xl text-text sm:text-4xl">What were you raised on?</h1>
+        <p className="mt-2 max-w-xl text-sm text-text-secondary">
+          Pick a decade, a scene, then the record that made you. Any decade counts.
+          {mode === "welcome" || !hasPhoto
+            ? " It becomes your profile picture, pressed onto vinyl, until you add a photo."
+            : " It shows on your profile."}
+        </p>
+
+        {initial && (
+          <div className="mt-6 flex items-center gap-4 rounded-2xl border border-border bg-surface p-4">
+            <RecordDisc cover={initial.cover} className="h-16 w-16" />
+            <div className="min-w-0">
+              <p className="text-xs text-text-muted">Right now you were raised on</p>
+              <p className="display-sm truncate text-base text-text">{initial.title}</p>
+              {initial.artist && (
+                <p className="truncate text-xs text-text-muted">{initial.artist}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {ERAS.map((candidate) => (
+            <li key={candidate.id}>
+              <DecadeTile
+                era={candidate}
+                mine={initial?.era === candidate.id}
+                onClick={() => go({ era: candidate.id })}
               />
-              Use the record as my picture instead of my photo
-            </label>
-          )}
-          {!hasPhoto && (
-            <p className="mt-2 text-xs text-text-muted">
-              It&rsquo;s your picture until you add a photo.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="mt-2 text-sm text-[#ffb4ae]">
-              {error}
-            </p>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => go({ find: "1" })}
+            className="text-sm text-text-secondary underline-offset-4 transition-colors hover:text-text hover:underline"
+          >
+            Not listed? Search any album
+          </button>
+          {mode === "welcome" && (
+            <Link
+              href="/welcome?step=rate"
+              className="text-sm text-text-muted transition-colors hover:text-text"
+            >
+              Skip for now
+            </Link>
           )}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {body}
+
+      {pick && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Raised on ${pick.title}`}
+          onClick={closeSheet}
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-6"
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="sheet-up w-full max-w-md rounded-t-3xl border border-border bg-bg px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-7 sm:rounded-3xl sm:pb-6"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className={`relative ${saved ? "record-land" : ""}`}>
+                {saved && <span className="record-ring absolute inset-0 rounded-full" />}
+                <RecordDisc cover={pick.cover} className="h-44 w-44" spinning />
+              </div>
+
+              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                {saved ? "Locked in" : "Raised on"}
+              </p>
+              <h2 className="display mt-1 text-2xl text-text">{pick.title}</h2>
+              {detail && <p className="mt-1 text-sm text-text-secondary">{detail}</p>}
+
+              {hasPhoto ? (
+                <label className="mt-4 flex items-center gap-2 text-sm text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={useAsPicture}
+                    onChange={(event) => setUseAsPicture(event.target.checked)}
+                    disabled={pending || saved}
+                    className="h-4 w-4 accent-[#f2803f]"
+                  />
+                  Use it as my picture instead of my photo
+                </label>
+              ) : (
+                <p className="mt-3 text-xs text-text-muted">
+                  It&rsquo;ll be your picture until you add a photo.
+                </p>
+              )}
+
+              {error && (
+                <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
+                  {error}
+                </p>
+              )}
+
+              <div className="mt-6 grid w-full grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={closeSheet}
+                  disabled={pending || saved}
+                  className={`${buttonClass({ variant: "secondary" })} h-12`}
+                >
+                  Pick another
+                </button>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={pending || saved}
+                  className={`${buttonClass()} h-12`}
+                >
+                  {saved ? "Saved" : pending ? "Saving…" : "That's the one"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }

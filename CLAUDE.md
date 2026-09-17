@@ -50,7 +50,11 @@ in plain language, and give them links and exact steps when they need to act.
   `src/lib/versus-pairs.ts`, which loops. The first visit of a day creates
   that day's row, so nothing runs on a timer. The database only accepts picks
   for today's matchup, and the split stays hidden until someone picks.
-  Changing `VERSUS_START` or reordering pairs changes future days only.
+  Changing `VERSUS_START` or reordering pairs changes future days only. Each
+  pair has a title ("King of New York") and a plain tagline. Takes
+  (`versus_takes`, migration 0012) are one short comment per person who
+  picked, with Love/Nah reactions and reports; they stay hidden until you pick,
+  and the whole section hides itself if the table doesn't exist yet.
 - Raised On (`src/components/RaisedOnPicker.tsx`, `src/lib/eras.ts`): decades,
   scenes and five albums each, picked during signup or at
   `/profile/raised-on`. `eras.ts` holds MusicBrainz ids and cover URLs for
@@ -58,7 +62,15 @@ in plain language, and give them links and exact steps when they need to act.
   chosen album becomes a "record avatar": `avatar_url` holds the path
   `/records/{mbid}`, drawn as a picture disc by `src/app/records/[mbid]` at a
   few fixed sizes (the `Avatar` component asks for the right one). Uploading a
-  photo replaces it.
+  photo replaces it. The picker keeps its step (decade, scene, record, the
+  confirm sheet) in the address bar through `history.pushState`, so a phone's
+  back swipe goes back one step.
+- Navigation: on phones the header is just the logo, People and the bell, and
+  `MobileNav` is a tab bar along the bottom (hidden during `/welcome`); the
+  layout leaves room for it. Wider screens use the header links.
+- Motion lives in `globals.css` (clash, crown drop, sparks, deal-in, count-up
+  and friends) and every animation is switched off under
+  `prefers-reduced-motion`. `Celebrate.tsx` has the crown and sparks.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
   rerun; `scripts/copy-covers.mjs` copies covers into storage.
 

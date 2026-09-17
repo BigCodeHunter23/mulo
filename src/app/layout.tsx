@@ -36,6 +36,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0b0b0e",
   colorScheme: "dark",
+  // Lets the tab bar sit clear of the home indicator on newer phones.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -47,6 +49,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-bg font-sans text-text">
         <Header />
         {children}
+        {/* Room for the phone tab bar, so it never covers the end of a page. */}
+        <div aria-hidden="true" className="h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0 sm:hidden" />
       </body>
     </html>
   );

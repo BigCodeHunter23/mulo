@@ -123,30 +123,23 @@ async function RaisedStep({ userId }: { userId: string }) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="display text-3xl text-text">What were you raised on?</h1>
-      <p className="mt-2 max-w-xl text-sm text-text-secondary">
-        Pick a decade, a scene, then the record that made you. Any decade
-        counts. It becomes your profile picture, pressed onto vinyl, until you
-        add a photo.
-      </p>
-      <div className="mt-8">
-        <RaisedOnPicker
-          mode="welcome"
-          hasPhoto={!isRecordAvatar(profile?.avatar_url)}
-          initial={
-            raisedOn
-              ? {
-                  mbid: raisedOn.album.mbid,
-                  title: raisedOn.album.title,
-                  artist: raisedOn.album.artist,
-                  cover: raisedOn.album.cover,
-                  era: raisedOn.era?.id ?? null,
-                  scene: raisedOn.scene?.id ?? null,
-                }
-              : null
-          }
-        />
-      </div>
+      <RaisedOnPicker
+        mode="welcome"
+        hasPhoto={!isRecordAvatar(profile?.avatar_url)}
+        doneHref="/welcome?step=rate"
+        initial={
+          raisedOn
+            ? {
+                mbid: raisedOn.album.mbid,
+                title: raisedOn.album.title,
+                artist: raisedOn.album.artist,
+                cover: raisedOn.album.cover,
+                era: raisedOn.era?.id ?? null,
+                scene: raisedOn.scene?.id ?? null,
+              }
+            : null
+        }
+      />
     </div>
   );
 }
