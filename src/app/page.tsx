@@ -3,16 +3,23 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { getFollowingFeed } from "@/lib/feed";
+import { getFollowingFeed, getGlobalFeed, type FeedItem as Item } from "@/lib/feed";
+import { getFollowingIds, listProfiles } from "@/lib/social";
 import { getHeavyRotation } from "@/lib/trending";
 import { isRecordAvatar, RAISED_ON_PROMPT_COOKIE } from "@/lib/record-avatar";
+import Avatar from "@/components/Avatar";
 import FeedItem from "@/components/FeedItem";
+import FollowButton from "@/components/FollowButton";
 import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
-import DiscoverSections from "@/components/DiscoverSections";
+import DiscoverSections, { NewReleases } from "@/components/DiscoverSections";
 import RaisedOnPrompt from "@/components/RaisedOnPrompt";
 import CoverWall from "@/components/CoverWall";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+
+/** How much of the feed to show before the first break, and between breaks. */
+const OPENING = 6;
+const MIDDLE = 8;
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -55,7 +62,7 @@ export default async function Home() {
   const [{ data: profile }, feed, store] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, avatar_url, raised_on_mbid")
+      .select("id, username, avatar_url, raised_on_mbid")
       .eq("id", user.id)
       .maybeSingle(),
     getFollowingFeed(user.id),
@@ -88,15 +95,18 @@ export default async function Home() {
     );
   }
 
+  // Friends first, then something to look at, then more friends. A wall of one
+  // thing gets scrolled past; breaking it up is what keeps people going down.
+  const opening = feed.slice(0, OPENING);
+  const middle = feed.slice(OPENING, OPENING + MIDDLE);
+  const rest = feed.slice(OPENING + MIDDLE);
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       {prompt}
       {/* These stream in on their own, so the feed never waits for them. */}
       <Suspense fallback={<TodaysVersusPlaceholder className="mb-10" />}>
         <TodaysVersus className="mb-10" />
-      </Suspense>
-      <Suspense fallback={null}>
-        <HomeRotation />
       </Suspense>
 
       <SectionHeading
@@ -111,16 +121,152 @@ export default async function Home() {
       >
         Your feed
       </SectionHeading>
-      <ul className="flex flex-col gap-3">
-        {feed.map((item) => (
-          <FeedItem key={item.key} item={item} signedIn />
-        ))}
-      </ul>
+      <Feed items={opening} />
+
+      <Suspense fallback={null}>
+        <div className="mt-12">
+          <HomeRotation />
+        </div>
+      </Suspense>
+
+      {middle.length > 0 && (
+        <div className="mt-12">
+          <Feed items={middle} />
+        </div>
+      )}
+
+      <Suspense fallback={null}>
+        <div className="mt-12">
+          <NewReleases />
+        </div>
+      </Suspense>
+
+      {rest.length > 0 && (
+        <div className="mt-12">
+          <Feed items={rest} />
+        </div>
+      )}
+
+      <Suspense fallback={null}>
+        <div className="mt-12">
+          <PeopleToFollow userId={user.id} />
+        </div>
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <div className="mt-12">
+          <AroundMulo seen={feed.map((item) => item.key)} me={profile.username} />
+        </div>
+      </Suspense>
     </main>
+  );
+}
+
+function Feed({ items }: { items: Item[] }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {items.map((item) => (
+        <FeedItem key={item.key} item={item} signedIn />
+      ))}
+    </ul>
   );
 }
 
 async function HomeRotation() {
   const rotation = await getHeavyRotation(8);
   return rotation ? <HeavyRotation rotation={rotation} compact /> : null;
+}
+
+/** Nobody to follow yet is the normal state early on, so this just hides. */
+async function PeopleToFollow({ userId }: { userId: string }) {
+  const [profiles, followingIds] = await Promise.all([
+    listProfiles(),
+    getFollowingIds(userId),
+  ]);
+
+  const following = new Set([...followingIds, userId]);
+  const suggestions = profiles.filter((p) => !following.has(p.id)).slice(0, 4);
+  if (suggestions.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHeading
+        action={
+          <Link
+            href="/people"
+            className="text-xs text-text-muted transition-colors hover:text-text"
+          >
+            Everyone →
+          </Link>
+        }
+      >
+        People to follow
+      </SectionHeading>
+      <ul className="flex flex-col gap-2">
+        {suggestions.map((profile) => (
+          <li
+            key={profile.id}
+            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-border-strong"
+          >
+            <Link href={`/u/${profile.username}`}>
+              <Avatar
+                url={profile.avatar_url}
+                name={profile.display_name || profile.username}
+                size="md"
+              />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/u/${profile.username}`}
+                className="block truncate font-medium text-text transition-colors hover:text-accent"
+              >
+                {profile.display_name || profile.username}
+              </Link>
+              <p className="truncate text-sm text-text-muted">@{profile.username}</p>
+            </div>
+            <FollowButton
+              targetId={profile.id}
+              username={profile.username}
+              signedIn
+              isSelf={false}
+              isFollowing={false}
+              size="small"
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * The bottom of the feed used to be the end of the page. This is what everyone
+ * else has been rating, minus anything already shown above.
+ */
+async function AroundMulo({ seen, me }: { seen: string[]; me: string }) {
+  const recent = await getGlobalFeed(24);
+  const already = new Set(seen);
+  const others = recent
+    .filter((item) => !already.has(item.key) && item.author.username !== me)
+    .slice(0, 4);
+
+  if (others.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHeading
+        action={
+          <Link
+            href="/discover"
+            className="text-xs text-text-muted transition-colors hover:text-text"
+          >
+            More →
+          </Link>
+        }
+      >
+        Around MULO
+      </SectionHeading>
+      <Feed items={others} />
+    </section>
+  );
 }

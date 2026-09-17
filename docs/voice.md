@@ -39,5 +39,12 @@ explaining, or reads like it's trying, it's the wrong name.
 ## Badges
 
 Day Ones, Crate Digger, A&R, Liner Notes, Certified, The Crew, Time Traveller,
-No Skips, Box Set. New badges follow the same rule: a name somebody into music
-would recognise, earned by range or depth rather than volume alone.
+No Skips, Box Set, First Spin, Track by Track, Discography, Century, Omnivore,
+Tough Crowd, GOAT Status, Ringside, Hot Take, Co-sign, The Whole Night. New
+badges follow the same rule: a name somebody into music would recognise,
+earned by range or depth rather than volume alone.
+
+Genres have ladders of four, and each rung is named from that genre's own
+world rather than a generic level: Head Nod, Cipher, Crate Scholar, Hip Hop
+Don; Blue Note, Late Set, Jazz Scholar, Jazz Legend. A badge nobody has yet
+shows its name and nothing else, so there is something left to find out.

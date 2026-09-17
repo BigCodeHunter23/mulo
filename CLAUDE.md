@@ -35,7 +35,8 @@ in plain language, and give them links and exact steps when they need to act.
 ## Where things are
 
 - `src/lib/`: `catalog.ts` (MusicBrainz caching), `ratings.ts`, `feed.ts`,
-  `reviews.ts`, `reactions.ts`, `badges.ts`, `taste.ts`, `top-picks.ts` (GOAT),
+  `reviews.ts`, `reactions.ts`, `badges.ts` + `badge-catalog.ts`, `taste.ts`,
+  `top-picks.ts` (GOAT),
   `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`.
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),
   `goat`, `ratings`, `discover`, `search`, `welcome` (onboarding, with intro
@@ -65,6 +66,23 @@ in plain language, and give them links and exact steps when they need to act.
   photo replaces it. The picker keeps its step (decade, scene, record, the
   confirm sheet) in the address bar through `history.pushState`, so a phone's
   back swipe goes back one step.
+- Badges (`src/lib/badge-catalog.ts` for the list, `src/lib/badges.ts` for who
+  has what): one-offs in five groups, plus twelve genre ladders of four rungs
+  each (10 / 25 / 50 / 100 albums rated in that genre). Nothing is stored:
+  every badge is worked out from ratings on each view, so it can never drift
+  from the truth. The board lives at `/u/{username}/badges`, with `/badges` as
+  a shortcut to your own; a locked badge shows its name and nothing else, on
+  purpose. Genre families match whole words against MusicBrainz genre tags, so
+  "rap" catches "pop rap" but not "trap".
+- Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool
+  once an hour, so the same ten famous names don't always lead; `newReleases`
+  is the last few months; `similarArtists` ranks by shared genres, weighted by
+  how central each genre is to the artist. `WhereNext` puts those at the foot
+  of every artist and album page so a page is never a dead end.
+- The home feed alternates rather than running as one long list: friends,
+  Heavy Rotation, more friends, new releases, the rest of the feed, people to
+  follow, then Around MULO (everyone else's recent ratings, minus anything
+  already shown above).
 - Navigation: on phones the header is just the logo, People and the bell, and
   `MobileNav` is a tab bar along the bottom (hidden during `/welcome`); the
   layout leaves room for it. Wider screens use the header links.
