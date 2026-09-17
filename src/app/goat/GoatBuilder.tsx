@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { saveTopPicks } from "./actions";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import { Crown, Sparks } from "@/components/Celebrate";
 import ShareButton from "@/components/ShareButton";
 import { buttonClass, fieldClass } from "@/components/ui";
 
@@ -129,10 +130,23 @@ export default function GoatBuilder({
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ranking, setRanking] = useState<Ranking | null>(null);
+  // Which side just won a matchup, while the tap plays out.
+  const [hit, setHit] = useState<boolean | null>(null);
+  // The finished order, shown off before going back to the list.
+  const [crowned, setCrowned] = useState<PickItem[] | null>(null);
   const [pending, startTransition] = useTransition();
 
   const round = kind === "artist";
   const noun = kind === "artist" ? "artists" : "albums";
+
+  useEffect(() => {
+    if (!crowned) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCrowned(null);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [crowned]);
 
   useEffect(() => {
     if (!saved) return;
@@ -229,14 +243,22 @@ export default function GoatBuilder({
   }
 
   function matchup(currentWins: boolean) {
-    if (!ranking) return;
-    const { next, order } = answer(ranking, currentWins);
-    if (order) {
-      setRanking(null);
-      commit(order);
-    } else {
-      setRanking(next);
-    }
+    if (!ranking || hit !== null) return;
+    setHit(currentWins);
+
+    // Let the winner flex before the next pair comes in.
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(() => {
+      setHit(null);
+      const { next, order } = answer(ranking, currentWins);
+      if (order) {
+        setRanking(null);
+        commit(order);
+        setCrowned(order);
+      } else {
+        setRanking(next);
+      }
+    }, calm ? 0 : 320);
   }
 
   if (ranking) {
@@ -274,10 +296,17 @@ export default function GoatBuilder({
             { item: rival, wins: false },
           ].map(({ item, wins }) => (
             <button
-              key={item.mbid}
+              key={`${item.mbid}-${ranking.done}`}
               type="button"
               onClick={() => matchup(wins)}
-              className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-surface p-4 text-center transition-all hover:border-accent active:scale-[0.98] sm:p-6"
+              disabled={hit !== null}
+              className={`step-in group flex flex-col items-center gap-3 rounded-xl border bg-surface p-4 text-center transition-colors hover:border-accent sm:p-6 ${
+                hit === null
+                  ? "border-border"
+                  : hit === wins
+                    ? "match-win border-accent shadow-[0_0_40px_-8px_rgba(242,128,63,0.6)]"
+                    : "match-lose border-border"
+              }`}
             >
               <Art item={item} round={round} size="h-28 w-28 sm:h-40 sm:w-40" />
               <span className="display-sm line-clamp-2 text-sm text-text transition-colors group-hover:text-accent sm:text-base">
@@ -310,6 +339,74 @@ export default function GoatBuilder({
 
   return (
     <div>
+      {crowned && crowned.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Your GOAT: ${crowned[0].title}`}
+          onClick={() => setCrowned(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/85 p-6 backdrop-blur-sm"
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            className="flex w-full max-w-sm flex-col items-center text-center"
+          >
+            <p className="step-in text-xs font-semibold uppercase tracking-[0.22em] text-score-overall">
+              {kind === "artist" ? "Your GOAT artist" : "Your GOAT album"}
+            </p>
+
+            <div className="relative mt-10">
+              <Sparks />
+              <span className="crown-drop absolute -top-10 left-1/2 z-20 -ml-7 block">
+                <Crown className="h-14 w-14" />
+              </span>
+              <span
+                className={`winner-rise goat-crown block ${round ? "rounded-full" : "rounded-lg"}`}
+              >
+                <Art item={crowned[0]} round={round} size="h-44 w-44 sm:h-52 sm:w-52" />
+              </span>
+            </div>
+
+            <p className="winner-rise display mt-6 text-3xl text-text" style={{ animationDelay: "0.25s" }}>
+              {crowned[0].title}
+            </p>
+            {crowned[0].subtitle && (
+              <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.3s" }}>
+                {crowned[0].subtitle}
+              </p>
+            )}
+
+            {crowned.length > 1 && (
+              <ol className="mt-7 flex items-start justify-center gap-4">
+                {crowned.slice(1, 3).map((item, i) => (
+                  <li
+                    key={item.mbid}
+                    className="deal-in flex w-24 flex-col items-center gap-1.5"
+                    style={{ "--delay": `${0.7 + i * 0.12}s` } as React.CSSProperties}
+                  >
+                    <Art item={item} round={round} size="h-16 w-16" />
+                    <span className="text-xs font-bold tabular-nums text-text-muted">{i + 2}</span>
+                    <span className="line-clamp-1 text-xs text-text-secondary">{item.title}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <ShareButton
+                url={`/u/${username}`}
+                title="My GOAT on MULO"
+                text={`My number one: ${crowned[0].title}.`}
+                label="Share it"
+              />
+              <button type="button" onClick={() => setCrowned(null)} className={buttonClass({ size: "sm" })}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="display-sm text-lg text-text">
           Your top {LIMIT}
@@ -350,7 +447,7 @@ export default function GoatBuilder({
             >
               <span
                 className={`w-6 shrink-0 text-center text-sm font-bold tabular-nums ${
-                  i === 0 ? "text-score-overall" : "text-text-muted"
+                  i === 0 ? "rank-pop text-score-overall" : "text-text-muted"
                 }`}
               >
                 {i + 1}

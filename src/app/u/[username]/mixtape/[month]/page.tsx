@@ -154,9 +154,37 @@ function Contested({
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col">
-      <span className="display-sm text-lg tabular-nums text-text">{value}</span>
+      <span className="display-sm text-lg tabular-nums text-text">
+        {typeof value === "number" ? (
+          <>
+            {/* Counts up from zero as the tape loads. */}
+            <span aria-hidden="true" className="count-up" style={{ "--count": value } as React.CSSProperties} />
+            <span className="sr-only">{value}</span>
+          </>
+        ) : (
+          value
+        )}
+      </span>
       <span className="text-xs uppercase tracking-wider text-text-muted">{label}</span>
     </div>
+  );
+}
+
+/** A little cassette with its reels turning, next to the word Mixtape. */
+function Cassette() {
+  return (
+    <svg viewBox="0 0 32 22" aria-hidden="true" className="h-4 w-6 text-accent" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="1.5" y="1.5" width="29" height="19" rx="3" />
+      <path d="M8 20.5l2.5-4.5h11l2.5 4.5" />
+      <g className="reel-spin">
+        <circle cx="10.5" cy="9" r="3" />
+        <path d="M10.5 6v6M7.5 9h6" strokeWidth={1.2} />
+      </g>
+      <g className="reel-spin">
+        <circle cx="21.5" cy="9" r="3" />
+        <path d="M21.5 6v6M18.5 9h6" strokeWidth={1.2} />
+      </g>
+    </svg>
   );
 }
 
@@ -194,7 +222,8 @@ export default async function MixtapePage({
             {name}
           </span>
         </Link>
-        <span className="text-xs uppercase tracking-[0.15em] text-text-muted">
+        <span className="flex items-center gap-1.5 text-xs uppercase tracking-[0.15em] text-text-muted">
+          <Cassette />
           Mixtape
         </span>
         {rated > 0 && (
@@ -250,6 +279,7 @@ export default async function MixtapePage({
           {(tape.topAlbum || tape.topSong || tape.topArtist) && (
             <div className="mt-10 grid items-start gap-4 sm:grid-cols-3">
               {tape.topAlbum && (
+                <div className="deal-in" style={{ "--delay": "0.1s" } as React.CSSProperties}>
                 <Contested
                   label="Album of the month"
                   kind="album"
@@ -258,8 +288,10 @@ export default async function MixtapePage({
                   month={month}
                   isOwner={isOwner && tape.rankOffs}
                 />
+                </div>
               )}
               {tape.topSong && (
+                <div className="deal-in" style={{ "--delay": "0.22s" } as React.CSSProperties}>
                 <Contested
                   label="Track of the month"
                   kind="song"
@@ -268,14 +300,17 @@ export default async function MixtapePage({
                   month={month}
                   isOwner={isOwner && tape.rankOffs}
                 />
+                </div>
               )}
               {tape.topArtist && (
-                <Feature
-                  label="On repeat"
-                  pick={tape.topArtist}
-                  round
-                  detail={`${tape.topArtist.rated} ratings this month`}
-                />
+                <div className="deal-in" style={{ "--delay": "0.34s" } as React.CSSProperties}>
+                  <Feature
+                    label="On repeat"
+                    pick={tape.topArtist}
+                    round
+                    detail={`${tape.topArtist.rated} ratings this month`}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -284,8 +319,12 @@ export default async function MixtapePage({
             <section className="mt-14">
               <SectionHeading>Full tracklist</SectionHeading>
               <ul className="grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-6">
-                {tape.highlights.map((pick) => (
-                  <li key={pick.key}>
+                {tape.highlights.map((pick, i) => (
+                  <li
+                    key={pick.key}
+                    className="deal-in"
+                    style={{ "--delay": `${0.45 + Math.min(i, 11) * 0.05}s` } as React.CSSProperties}
+                  >
                     <Link href={pick.href} className="group block">
                       <Art
                         pick={pick}

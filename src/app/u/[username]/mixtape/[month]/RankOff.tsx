@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { Crown, Sparks } from "@/components/Celebrate";
 import { buttonClass } from "@/components/ui";
 import { saveRankOff } from "../actions";
 
@@ -11,15 +12,6 @@ type Contender = {
   subtitle: string | null;
   image: string | null;
 };
-
-function Crown() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8 text-score-overall" fill="currentColor">
-      <path d="M3 8.5l4.2 3.3L12 5l4.8 6.8L21 8.5 19.4 18H4.6L3 8.5z" />
-      <rect x="4.6" y="19.2" width="14.8" height="1.8" rx="0.9" />
-    </svg>
-  );
-}
 
 function Art({ item, size }: { item: Contender; size: string }) {
   return (
@@ -64,6 +56,8 @@ export default function RankOff({
   const [champion, setChampion] = useState(0);
   const [challenger, setChallenger] = useState(1);
   const [winner, setWinner] = useState<Contender | null>(null);
+  // The one just picked, while the tap plays out.
+  const [hit, setHit] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -85,6 +79,7 @@ export default function RankOff({
   }, [open]);
 
   function start() {
+    setHit(null);
     setChampion(0);
     setChallenger(1);
     setWinner(null);
@@ -93,12 +88,19 @@ export default function RankOff({
   }
 
   function choose(index: number) {
-    if (challenger >= contenders.length - 1) {
-      setWinner(contenders[index]);
-      return;
-    }
-    setChampion(index);
-    setChallenger(challenger + 1);
+    if (hit !== null) return;
+    setHit(index);
+
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(() => {
+      setHit(null);
+      if (challenger >= contenders.length - 1) {
+        setWinner(contenders[index]);
+        return;
+      }
+      setChampion(index);
+      setChallenger(challenger + 1);
+    }, calm ? 0 : 320);
   }
 
   function crown() {
@@ -200,14 +202,26 @@ export default function RankOff({
             </div>
 
             {winner ? (
-              <div className="goat-reveal mt-7 flex flex-col items-center text-center">
-                <Crown />
-                <span className="goat-crown mt-2 block rounded-lg">
-                  <Art item={winner} size="h-40 w-40 sm:h-48 sm:w-48" />
-                </span>
-                <p className="display-sm mt-4 text-lg text-text">{winner.title}</p>
+              <div className="mt-10 flex flex-col items-center text-center">
+                <div className="relative">
+                  <Sparks />
+                  <span className="crown-drop absolute -top-9 left-1/2 z-20 -ml-6 block">
+                    <Crown className="h-12 w-12" />
+                  </span>
+                  <span className="winner-rise goat-crown block rounded-lg">
+                    <Art item={winner} size="h-40 w-40 sm:h-48 sm:w-48" />
+                  </span>
+                </div>
+                <p
+                  className="winner-rise display-sm mt-5 text-lg text-text"
+                  style={{ animationDelay: "0.2s" }}
+                >
+                  {winner.title}
+                </p>
                 {winner.subtitle && (
-                  <p className="text-sm text-text-muted">{winner.subtitle}</p>
+                  <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.25s" }}>
+                    {winner.subtitle}
+                  </p>
                 )}
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
                   <button
@@ -237,13 +251,22 @@ export default function RankOff({
               <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5">
                 {[champion, challenger].map((index) => {
                   const item = contenders[index];
+                  const flex = hit === index;
+                  const knocked = hit !== null && hit !== index;
                   const holding = index === champion && challenger > 1;
                   return (
                     <button
-                      key={item.mbid}
+                      key={`${item.mbid}-${challenger}`}
                       type="button"
                       onClick={() => choose(index)}
-                      className="group flex min-w-0 flex-col items-center gap-3 rounded-xl border border-border bg-surface p-4 text-center transition-all hover:border-accent active:scale-[0.98] sm:p-6"
+                      disabled={hit !== null}
+                      className={`step-in group flex min-w-0 flex-col items-center gap-3 rounded-xl border bg-surface p-4 text-center transition-colors hover:border-accent sm:p-6 ${
+                        flex
+                          ? "match-win border-accent shadow-[0_0_40px_-8px_rgba(242,128,63,0.6)]"
+                          : knocked
+                            ? "match-lose border-border"
+                            : "border-border"
+                      }`}
                     >
                       {challenger > 1 && (
                         <span
