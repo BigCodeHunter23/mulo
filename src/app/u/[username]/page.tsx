@@ -216,7 +216,7 @@ export default async function ProfilePage({
         </Suspense>
 
         <Suspense fallback={null}>
-          <ProfileBadges userId={profile.id} />
+          <ProfileBadges userId={profile.id} username={profile.username} />
         </Suspense>
 
         {!followState.isSelf && (
@@ -230,6 +230,13 @@ export default async function ProfilePage({
           <div className="rail -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [&>*]:shrink-0">
             <ButtonLink href="/goat" variant="secondary" size="sm">
               Your GOAT
+            </ButtonLink>
+            <ButtonLink
+              href={`/u/${profile.username}/badges`}
+              variant="secondary"
+              size="sm"
+            >
+              Your badges
             </ButtonLink>
             <ButtonLink href="/ratings" variant="secondary" size="sm">
               My ratings
@@ -309,13 +316,18 @@ async function ProfileSound({
   );
 }
 
-async function ProfileBadges({ userId }: { userId: string }) {
+async function ProfileBadges({
+  userId,
+  username,
+}: {
+  userId: string;
+  username: string;
+}) {
   const badges = await getBadges(userId);
-  if (badges.length === 0) return null;
 
   return (
     <div className="mt-5">
-      <Badges badges={badges} />
+      <Badges badges={badges} href={`/u/${username}/badges`} />
     </div>
   );
 }
