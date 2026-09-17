@@ -124,37 +124,37 @@ export default async function Home() {
       <Feed items={opening} />
 
       <Suspense fallback={null}>
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <HomeRotation />
         </div>
       </Suspense>
 
       {middle.length > 0 && (
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <Feed items={middle} />
         </div>
       )}
 
       <Suspense fallback={null}>
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <NewReleases />
         </div>
       </Suspense>
 
       {rest.length > 0 && (
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <Feed items={rest} />
         </div>
       )}
 
       <Suspense fallback={null}>
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <PeopleToFollow userId={user.id} />
         </div>
       </Suspense>
 
       <Suspense fallback={null}>
-        <div className="mt-12">
+        <div className="mt-12 empty:hidden">
           <AroundMulo seen={feed.map((item) => item.key)} me={profile.username} />
         </div>
       </Suspense>
