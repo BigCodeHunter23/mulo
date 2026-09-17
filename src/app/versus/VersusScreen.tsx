@@ -12,9 +12,11 @@ import VersusCard from "@/components/VersusCard";
 import VersusFaces from "@/components/VersusFaces";
 import ShareButton from "@/components/ShareButton";
 import { SectionHeading } from "@/components/ui";
+import Takes from "./Takes";
 
 export function versusMetadata(matchup: VersusMatchup): Metadata {
-  const title = `${matchup.left.name} vs ${matchup.right.name}`;
+  const pair = `${matchup.left.name} vs ${matchup.right.name}`;
+  const title = `${matchup.title}: ${pair}`;
   const description = `${matchup.tagline ? `${matchup.tagline}. ` : ""}Who you got? Pick a side in the Daily Versus on MULO.`;
   const image = `/versus/${matchup.day}/opengraph-image`;
 
@@ -48,10 +50,12 @@ async function Yesterday({ day }: { day: string }) {
         <VersusFaces matchup={matchup} winner={ahead} />
         <span className="min-w-0 flex-1">
           <span className="display-sm block truncate text-sm text-text transition-colors group-hover:text-accent">
-            {matchup.left.name} vs {matchup.right.name}
+            {matchup.title}
           </span>
           <span className="mt-0.5 block text-sm text-text-secondary">
-            {ahead ? `${matchup[ahead].name} took it with ${split[ahead]}%` : "Dead even"}
+            {ahead
+              ? `${matchup[ahead].name} took it with ${split[ahead]}%`
+              : `${matchup.left.name} and ${matchup.right.name}, dead even`}
             {` · ${split.total} ${split.total === 1 ? "pick" : "picks"}`}
           </span>
           {view.mine && (
@@ -94,10 +98,11 @@ export default async function VersusScreen({ matchup }: { matchup: VersusMatchup
             {view.closed ? dayLabel(matchup.day) : "Today"}
           </span>
         </p>
-        <h1 className="display mt-2 text-3xl text-text sm:text-5xl">
-          {left.name} <span className="text-text-muted">vs</span> {right.name}
-        </h1>
-        <p className="mt-2 text-sm text-text-secondary sm:text-base">{subline}</p>
+        <h1 className="display mt-2 text-4xl text-text sm:text-5xl">{matchup.title}</h1>
+        <p className="display-sm mt-2 text-lg text-text-secondary sm:text-xl">
+          {left.name} <span className="text-accent">vs</span> {right.name}
+        </p>
+        <p className="mt-1 text-sm text-text-muted sm:text-base">{subline}</p>
       </header>
 
       <VersusCard view={view} />
@@ -105,11 +110,11 @@ export default async function VersusScreen({ matchup }: { matchup: VersusMatchup
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
         <ShareButton
           url={`/versus/${matchup.day}`}
-          title={`${left.name} vs ${right.name}`}
+          title={`${matchup.title}: ${left.name} vs ${right.name}`}
           text={
             view.closed
-              ? `${left.name} vs ${right.name}: the result on MULO`
-              : `${left.name} vs ${right.name}. Who you got?`
+              ? `${matchup.title}: ${left.name} vs ${right.name}. The result on MULO`
+              : `${matchup.title}: ${left.name} vs ${right.name}. Who you got?`
           }
         />
         {view.closed && (
@@ -121,6 +126,15 @@ export default async function VersusScreen({ matchup }: { matchup: VersusMatchup
           </Link>
         )}
       </div>
+
+      <Suspense fallback={null}>
+        <Takes
+          matchup={matchup}
+          mine={view.mine}
+          signedIn={view.signedIn}
+          closed={view.closed}
+        />
+      </Suspense>
 
       {!view.closed && (
         <Suspense fallback={null}>

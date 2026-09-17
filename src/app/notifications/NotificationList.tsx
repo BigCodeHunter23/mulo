@@ -41,11 +41,11 @@ function VersusResultText({ result }: { result: VersusResult }) {
     <>
       <p>
         <Link href={`/versus/${matchup.day}`} className={strong}>
-          {matchup.left.name} vs {matchup.right.name}
+          {matchup.title}
         </Link>{" "}
         {ahead
-          ? `is settled: ${matchup[ahead].name} took it with ${split[ahead]}%.`
-          : "finished dead even."}{" "}
+          ? `is settled: ${matchup[ahead].name} took it over ${matchup[ahead === "left" ? "right" : "left"].name} with ${split[ahead]}%.`
+          : `finished dead even between ${matchup.left.name} and ${matchup.right.name}.`}{" "}
         {mine === ahead ? "You called it." : `You picked ${matchup[mine].name}.`}
       </p>
       {sides.length > 0 && <p className="mt-0.5">{sides.join(" ")}</p>}
@@ -92,7 +92,7 @@ function Text({ item }: { item: Notification }) {
       return (
         <p>
           <Link href="/versus" className={strong}>
-            Today&rsquo;s Versus is up:
+            Today&rsquo;s Versus: {item.matchup.title}.
           </Link>{" "}
           {item.matchup.left.name} vs {item.matchup.right.name}. Who you got?
         </p>

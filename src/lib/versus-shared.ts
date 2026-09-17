@@ -7,6 +7,9 @@ export type VersusSideKey = "left" | "right";
 
 export const SIDES: readonly VersusSideKey[] = ["left", "right"];
 
+/** The longest a take on a Versus can be. */
+export const TAKE_LIMIT = 280;
+
 export type VersusSide = {
   mbid: string;
   name: string;
@@ -18,6 +21,8 @@ export type VersusMatchup = {
   id: number;
   /** The Sydney date it runs, such as "2026-09-17". */
   day: string;
+  /** The name of the clash: "King of New York". */
+  title: string;
   tagline: string;
   left: VersusSide;
   right: VersusSide;

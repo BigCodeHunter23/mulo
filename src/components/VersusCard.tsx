@@ -22,10 +22,20 @@ function VsMark({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border-strong bg-bg text-[11px] font-extrabold tracking-wide text-accent shadow-lg sm:h-11 sm:w-11 sm:text-xs ${className}`}
+      className={`clash-bang pointer-events-none flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border-strong bg-bg text-[11px] font-extrabold tracking-wide text-accent shadow-lg sm:h-11 sm:w-11 sm:text-xs ${className}`}
     >
       VS
     </span>
+  );
+}
+
+/** A number that counts up from zero, drawn by CSS so the page needs no script for it. */
+function Count({ value }: { value: number }) {
+  return (
+    <>
+      <span aria-hidden="true" className="count-up" style={{ "--count": value } as React.CSSProperties} />
+      <span className="sr-only">{value}</span>
+    </>
   );
 }
 
@@ -97,6 +107,7 @@ function Photo({
   mine,
   faded,
   hover,
+  punch = false,
   children,
 }: {
   artist: VersusSide;
@@ -104,6 +115,8 @@ function Photo({
   mine: boolean;
   faded: boolean;
   hover: boolean;
+  /** Just picked: land it with a punch. */
+  punch?: boolean;
   children?: React.ReactNode;
 }) {
   const src = artistPhotoSrc(artist.image, compact ? 240 : 640);
@@ -116,7 +129,7 @@ function Photo({
           : "aspect-[4/5] w-full rounded-2xl"
       } ${mine ? "ring-accent" : "ring-transparent"} ${
         hover ? "group-hover:ring-accent/60" : ""
-      }`}
+      } ${punch ? "pick-punch" : ""}`}
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -187,7 +200,7 @@ export default function VersusCard({
 
     const body = compact ? (
       <>
-        <Photo artist={artist} compact mine={isMine} faded={faded} hover={canPick} />
+        <Photo artist={artist} compact mine={isMine} faded={faded} hover={canPick} punch={isMine && picked !== null} />
         <span className="display-sm mt-2 block w-full truncate text-sm text-text">
           {artist.name}
         </span>
@@ -207,7 +220,7 @@ export default function VersusCard({
               ahead === side ? "text-accent" : "text-text-secondary"
             }`}
           >
-            {share}%
+            <Count value={share} />%
           </span>
         )}
         {isMine && <span className="block text-[11px] font-medium text-accent">Your pick</span>}
@@ -216,7 +229,14 @@ export default function VersusCard({
     ) : (
       <>
         <span className="relative block">
-          <Photo artist={artist} compact={false} mine={isMine} faded={faded} hover={canPick}>
+          <Photo
+            artist={artist}
+            compact={false}
+            mine={isMine}
+            faded={faded}
+            hover={canPick}
+            punch={isMine && picked !== null}
+          >
             {share !== undefined && (
               <span className="absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 pt-12">
                 <span
@@ -224,7 +244,7 @@ export default function VersusCard({
                     ahead === side ? "text-accent" : "text-white"
                   }`}
                 >
-                  {share}%
+                  <Count value={share} />%
                 </span>
               </span>
             )}
@@ -262,9 +282,8 @@ export default function VersusCard({
       ? "flex min-w-0 flex-col items-center text-center"
       : "flex min-w-0 flex-col text-left";
 
-    return canPick ? (
+    const inner = canPick ? (
       <button
-        key={side}
         type="button"
         onClick={() => pick(side)}
         disabled={pending}
@@ -274,8 +293,12 @@ export default function VersusCard({
         {body}
       </button>
     ) : (
-      <div key={side} className={layout}>
-        {body}
+      <div className={layout}>{body}</div>
+    );
+
+    return (
+      <div key={side} className={`min-w-0 ${side === "left" ? "clash-left" : "clash-right"}`}>
+        {inner}
       </div>
     );
   }
@@ -381,10 +404,11 @@ export default function VersusCard({
       </div>
 
       <div className="relative mx-auto max-w-xl">
+        <p className="display truncate text-center text-lg text-text sm:text-xl">
+          {matchup.title}
+        </p>
         {matchup.tagline && (
-          <p className="truncate text-center text-xs font-medium text-text-secondary">
-            {matchup.tagline}
-          </p>
+          <p className="truncate text-center text-xs text-text-muted">{matchup.tagline}</p>
         )}
         <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-6">
           {contender("left")}

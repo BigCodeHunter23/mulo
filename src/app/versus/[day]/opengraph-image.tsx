@@ -158,19 +158,18 @@ export default async function Image({ params }: { params: Promise<{ day: string 
             >
               DAILY VERSUS
             </div>
-            {matchup.tagline && (
-              <div
-                style={{
-                  display: "flex",
-                  marginTop: 4,
-                  fontSize: 28,
-                  fontWeight: 500,
-                  color: OG.secondary,
-                }}
-              >
-                {matchup.tagline}
-              </div>
-            )}
+            <div
+              style={{
+                display: "flex",
+                marginTop: 6,
+                fontSize: matchup.title.length > 22 ? 40 : 52,
+                fontWeight: 800,
+                color: OG.text,
+                letterSpacing: "-0.03em",
+              }}
+            >
+              {short(matchup.title, 32)}
+            </div>
           </div>
           <div
             style={{

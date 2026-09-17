@@ -107,12 +107,16 @@ function toMatchup(row: MatchupRow): VersusMatchup {
     image: artist.image_url,
   });
 
+  const left = side(row.left, pair?.leftName);
+  const right = side(row.right, pair?.rightName);
+
   return {
     id: row.id,
     day: row.day,
+    title: pair?.title ?? `${left.name} vs ${right.name}`,
     tagline: pair?.tagline ?? "",
-    left: side(row.left, pair?.leftName),
-    right: side(row.right, pair?.rightName),
+    left,
+    right,
   };
 }
 

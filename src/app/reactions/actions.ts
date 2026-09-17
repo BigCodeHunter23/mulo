@@ -27,7 +27,7 @@ export async function setReaction(
 
   const user = await getCurrentUser();
   if (!user) {
-    return { ok: false, error: "Log in to react to a review." };
+    return { ok: false, error: kind === "take" ? "Log in to react to a take." : "Log in to react to a review." };
   }
 
   const column = REACTION_COLUMNS[kind];

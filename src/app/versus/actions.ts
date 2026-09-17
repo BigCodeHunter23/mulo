@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, getTally } from "@/lib/versus";
-import type { VersusSideKey, VersusTally } from "@/lib/versus-shared";
+import { TAKE_LIMIT, type VersusSideKey, type VersusTally } from "@/lib/versus-shared";
 
 export type PickResult =
   | { ok: true; mine: VersusSideKey; tally: VersusTally }
@@ -53,4 +53,57 @@ export async function castVote(
 
   revalidatePath("/versus", "layout");
   return { ok: true, mine: pick, tally: await getTally(matchupId, user.id) };
+}
+
+export type TakeResult = { ok: true } | { ok: false; error: string };
+
+/** Your case for the side you picked: one take each, and only once you've picked. */
+export async function postTake(matchupId: number, body: string): Promise<TakeResult> {
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!Number.isSafeInteger(matchupId)) return { ok: false, error: TRY_AGAIN };
+  if (text.length === 0) return { ok: false, error: "Say something first." };
+  if (text.length > TAKE_LIMIT) {
+    return { ok: false, error: `Keep it to ${TAKE_LIMIT} characters.` };
+  }
+
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Log in to post a take." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("versus_takes")
+    .insert({ matchup_id: matchupId, user_id: user.id, body: text });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: false, error: "You've already had your say on this one." };
+    }
+    // The database only takes a take from somebody who picked a side.
+    if (error.code === "42501") {
+      return { ok: false, error: "Pick a side first, then make your case." };
+    }
+    return { ok: false, error: TRY_AGAIN };
+  }
+
+  revalidatePath("/versus", "layout");
+  return { ok: true };
+}
+
+export async function deleteTake(takeId: number): Promise<TakeResult> {
+  if (!Number.isSafeInteger(takeId)) return { ok: false, error: TRY_AGAIN };
+
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Log in first." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("versus_takes")
+    .delete()
+    .eq("id", takeId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: TRY_AGAIN };
+
+  revalidatePath("/versus", "layout");
+  return { ok: true };
 }

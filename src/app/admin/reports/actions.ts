@@ -37,3 +37,16 @@ export async function removeReview(kind: "album" | "artist", ratingId: number) {
 
   revalidatePath("/admin/reports");
 }
+
+/**
+ * Deletes a take on the Daily Versus. Its reports go with it, since there is
+ * nothing left to look at.
+ */
+export async function removeTake(takeId: number) {
+  if (!(await requireAdmin())) return;
+  if (!Number.isInteger(takeId)) return;
+
+  await createAdminClient().from("versus_takes").delete().eq("id", takeId);
+  revalidatePath("/admin/reports");
+  revalidatePath("/versus", "layout");
+}

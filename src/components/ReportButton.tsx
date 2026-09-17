@@ -33,12 +33,15 @@ export default function ReportButton({
   ratingId,
   artistRatingId,
   profileId,
+  takeId,
   signedIn,
   label = "Report",
 }: {
   ratingId?: number;
   artistRatingId?: number;
   profileId?: string;
+  /** A take on the Daily Versus. */
+  takeId?: number;
   signedIn: boolean;
   label?: string;
 }) {
@@ -81,6 +84,9 @@ export default function ReportButton({
       )}
       {profileId !== undefined && (
         <input type="hidden" name="profile_id" value={profileId} />
+      )}
+      {takeId !== undefined && (
+        <input type="hidden" name="versus_take_id" value={takeId} />
       )}
 
       <p className="text-sm font-medium text-text">

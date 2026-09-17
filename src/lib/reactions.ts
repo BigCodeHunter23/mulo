@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
-export type ReactionKind = "album" | "artist";
+export type ReactionKind = "album" | "artist" | "take";
 
 export type ReactionSummary = {
   love: number;
@@ -10,10 +10,11 @@ export type ReactionSummary = {
   mine: 1 | -1 | null;
 };
 
-/** Which column points at which kind of rating. */
+/** Which column points at which kind of rating, or at a Versus take. */
 export const REACTION_COLUMNS = {
   album: "rating_id",
   artist: "artist_rating_id",
+  take: "versus_take_id",
 } as const satisfies Record<ReactionKind, string>;
 
 export const NO_REACTIONS: ReactionSummary = { love: 0, dislike: 0, mine: null };
@@ -37,13 +38,11 @@ export async function getReactions(
     .select(`user_id, value, ${column}`)
     .in(column, ratingIds);
 
-  for (const row of (data ?? []) as unknown as {
+  for (const row of (data ?? []) as unknown as ({
     user_id: string;
     value: number;
-    rating_id?: number;
-    artist_rating_id?: number;
-  }[]) {
-    const id = kind === "album" ? row.rating_id : row.artist_rating_id;
+  } & Partial<Record<(typeof REACTION_COLUMNS)[ReactionKind], number>>)[]) {
+    const id = row[column];
     const summary = id === undefined ? undefined : summaries[id];
     if (!summary) continue;
 

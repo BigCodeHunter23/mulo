@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/moderation";
 import { buttonClass, EmptyState, SectionHeading } from "@/components/ui";
-import { removeReview, setReportStatus } from "./actions";
+import { removeReview, removeTake, setReportStatus } from "./actions";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -28,6 +28,13 @@ type ReportRow = {
   reported: { username: string; display_name: string | null } | null;
   ratings: (Rated & { releases: { mbid: string; title: string } | null }) | null;
   artist_ratings: (Rated & { artists: { mbid: string; name: string } | null }) | null;
+  /** Only there once takes on the Daily Versus exist. */
+  versus_takes?: {
+    id: number;
+    body: string;
+    profiles: { username: string } | null;
+    versus_matchups: { day: string } | null;
+  } | null;
 };
 
 // Reports point at profiles twice (who reported, and who was reported), so
@@ -38,6 +45,10 @@ const SELECT = `
   reported:profiles!reports_reported_profile_id_fkey ( username, display_name ),
   ratings ( id, score, review, profiles ( username ), releases ( mbid, title ) ),
   artist_ratings ( id, score, review, profiles ( username ), artists ( mbid, name ) )
+`;
+
+const SELECT_WITH_TAKES = `${SELECT},
+  versus_takes ( id, body, profiles ( username ), versus_matchups ( day ) )
 `;
 
 function timeAgo(iso: string) {
@@ -63,14 +74,19 @@ export default async function ReportsInbox({
   const { view } = await searchParams;
   const showAll = view === "all";
 
-  const query = createAdminClient()
-    .from("reports")
-    .select(SELECT)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (!showAll) query.eq("status", "open");
+  const load = (select: string) => {
+    const query = createAdminClient()
+      .from("reports")
+      .select(select)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (!showAll) query.eq("status", "open");
+    return query;
+  };
 
-  const { data, error } = await query;
+  // Before takes exist their join fails, so fall back to reviews and profiles.
+  let { data, error } = await load(SELECT_WITH_TAKES);
+  if (error) ({ data, error } = await load(SELECT));
   const reports = (data ?? []) as unknown as ReportRow[];
 
   const tab = (active: boolean) =>
@@ -139,7 +155,26 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-3 text-sm text-text-secondary">
-                  {report.reported ? (
+                  {report.versus_takes ? (
+                    <>
+                      <p>
+                        @{report.versus_takes.profiles?.username ?? "unknown"}&rsquo;s take on the{" "}
+                        {report.versus_takes.versus_matchups ? (
+                          <Link
+                            href={`/versus/${report.versus_takes.versus_matchups.day}`}
+                            className="font-medium text-text hover:text-accent"
+                          >
+                            Daily Versus
+                          </Link>
+                        ) : (
+                          "Daily Versus"
+                        )}
+                      </p>
+                      <blockquote className="mt-2 border-l-2 border-border-strong pl-3 text-text">
+                        {report.versus_takes.body}
+                      </blockquote>
+                    </>
+                  ) : report.reported ? (
                     <p>
                       Profile:{" "}
                       <Link
@@ -179,6 +214,13 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {report.versus_takes && (
+                    <form action={removeTake.bind(null, report.versus_takes.id)}>
+                      <button type="submit" className={buttonClass({ size: "sm" })}>
+                        Remove take
+                      </button>
+                    </form>
+                  )}
                   {rating?.review && (
                     <form action={removeReview.bind(null, kind, rating.id)}>
                       <button type="submit" className={buttonClass({ size: "sm" })}>

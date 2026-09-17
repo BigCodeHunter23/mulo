@@ -31,7 +31,8 @@ explaining, or reads like it's trying, it's the wrong name.
 | Top Shelf | Somebody's highest-scored albums, on their profile |
 | Love / Nah | Reactions to somebody else's rating |
 | Your Sound | The genres somebody rates highest, on their profile |
-| Daily Versus | Two artists from the same era and lane, one pick a day. "Who you got?" |
+| Daily Versus | Two artists from the same era and lane, one pick a day. "Who you got?" Each clash has its own title, like "King of New York" or "Under Pressure": a rivalry, a nickname, or album against album |
+| Takes | Somebody's case for the side they picked in a Versus |
 | Raised On | The record somebody grew up on, picked by decade and scene; it becomes their picture |
 | Rank-off | Head-to-head rounds that settle a tie for album or track of the month |
 
