@@ -25,7 +25,7 @@ import InviteButton from "@/components/InviteButton";
 import ShareButton from "@/components/ShareButton";
 import TopPicks from "@/components/TopPicks";
 import { SkeletonRows } from "@/components/Skeleton";
-import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+import { buttonClass, ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
   params,
@@ -105,9 +105,9 @@ function RaisedOnLine({ raisedOn, isSelf }: { raisedOn: RaisedOn | null; isSelf:
 
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <div className="flex flex-col">
-      <span className="display-sm text-lg tabular-nums text-text">{value}</span>
-      <span className="text-xs uppercase tracking-wider text-text-muted">
+    <div className="flex flex-col items-center sm:items-start">
+      <span className="display-sm text-lg tabular-nums text-text sm:text-xl">{value}</span>
+      <span className="text-[11px] text-text-muted sm:text-xs sm:font-medium sm:uppercase sm:tracking-wider">
         {label}
       </span>
     </div>
@@ -140,38 +140,60 @@ export default async function ProfilePage({
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <header className="mb-10">
-        <div className="flex items-start gap-5">
-          <Avatar url={profile.avatar_url} name={name} size="xl" />
-
-          <div className="min-w-0 flex-1">
-            <h1 className="display text-2xl text-text sm:text-3xl">{name}</h1>
-            <p className="text-sm text-text-muted">@{profile.username}</p>
-            <RaisedOnLine raisedOn={raisedOn} isSelf={followState.isSelf} />
-
-            <div className="mt-4 flex flex-wrap gap-6">
-              <Stat value={stats.ratings} label="Rated" />
-              <Stat value={stats.followers} label="Followers" />
-              <Stat value={stats.following} label="Following" />
-              {stats.averageScore !== null && (
-                <Stat value={stats.averageScore.toFixed(1)} label="Avg score" />
-              )}
-            </div>
+        {/* Phones: picture and numbers side by side, then the name, then the
+            buttons across the full width. Wider screens: the name and numbers
+            stack beside the picture, with the buttons to the right. */}
+        <div className="profile-head grid items-center gap-x-5 gap-y-4 sm:items-start sm:gap-x-6">
+          <div className="[grid-area:avatar]">
+            <Avatar url={profile.avatar_url} name={name} size="profile" eager />
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="min-w-0 [grid-area:name]">
+            <h1 className="display truncate text-2xl text-text sm:text-4xl">{name}</h1>
+            <p className="text-sm text-text-muted">@{profile.username}</p>
+            <RaisedOnLine raisedOn={raisedOn} isSelf={followState.isSelf} />
+          </div>
+
+          <div className="grid grid-cols-4 gap-1 [grid-area:stats] sm:flex sm:gap-7">
+            <Stat value={stats.ratings} label="Rated" />
+            <Stat value={stats.followers} label="Followers" />
+            <Stat value={stats.following} label="Following" />
+            <Stat
+              value={stats.averageScore !== null ? stats.averageScore.toFixed(1) : "–"}
+              label="Avg"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 [grid-area:actions] sm:flex-col sm:flex-nowrap sm:items-end">
             {followState.isSelf ? (
-              <ButtonLink href="/profile" variant="secondary" size="sm">
-                Edit profile
-              </ButtonLink>
+              <>
+                <div className="flex-1 sm:flex-none">
+                  <Link
+                    href="/profile"
+                    className={`${buttonClass({ variant: "secondary" })} w-full sm:w-auto`}
+                  >
+                    Edit profile
+                  </Link>
+                </div>
+                <ShareButton
+                  url={`/u/${profile.username}`}
+                  title={`${name} on MULO`}
+                  text="My GOAT, my ratings, my mixtape."
+                  label="Share"
+                />
+              </>
             ) : (
               <>
-                <FollowButton
-                  targetId={profile.id}
-                  username={profile.username}
-                  signedIn={followState.signedIn}
-                  isSelf={followState.isSelf}
-                  isFollowing={followState.isFollowing}
-                />
+                <div className="flex-1 sm:flex-none">
+                  <FollowButton
+                    targetId={profile.id}
+                    username={profile.username}
+                    signedIn={followState.signedIn}
+                    isSelf={followState.isSelf}
+                    isFollowing={followState.isFollowing}
+                    block
+                  />
+                </div>
                 <ShareButton url={`/u/${profile.username}`} title={`${name} on MULO`} />
                 <ReportButton
                   profileId={profile.id}
@@ -203,8 +225,9 @@ export default async function ProfilePage({
           </Suspense>
         )}
 
+        {/* Shortcuts: one swipeable row on phones rather than a wrapped pile. */}
         {followState.isSelf && (
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="rail -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [&>*]:shrink-0">
             <ButtonLink href="/goat" variant="secondary" size="sm">
               Your GOAT
             </ButtonLink>
@@ -218,12 +241,6 @@ export default async function ProfilePage({
             >
               Your mixtape
             </ButtonLink>
-            <ShareButton
-              url={`/u/${profile.username}`}
-              title={`${name} on MULO`}
-              text="My GOAT, my ratings, my mixtape."
-              label="Share profile"
-            />
             <InviteButton />
           </div>
         )}

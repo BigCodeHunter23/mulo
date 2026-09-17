@@ -2,14 +2,65 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import type { SearchResults } from "@/lib/search";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { SearchAlbum, SearchArtist, SearchResults } from "@/lib/search";
 import { coverSrc } from "@/lib/cover-url";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import { fieldClass, SectionHeading } from "@/components/ui";
 
 const EMPTY: SearchResults = { artists: [], albums: [], songs: [] };
+
+// Recent searches live in this browser only.
+const RECENT_KEY = "mulo:recent-searches";
+const listeners = new Set<() => void>();
+
+function readRecent() {
+  try {
+    return localStorage.getItem(RECENT_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function subscribeRecent(callback: () => void) {
+  listeners.add(callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    listeners.delete(callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function parseRecent(raw: string): string[] {
+  try {
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((item) => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(list: string[]) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    // Private browsing or storage turned off: recents just don't stick.
+  }
+  listeners.forEach((listener) => listener());
+}
+
+function remember(query: string) {
+  const q = query.trim();
+  if (q.length < 2) return;
+  const others = parseRecent(readRecent()).filter(
+    (item) => item.toLowerCase() !== q.toLowerCase(),
+  );
+  saveRecent([q, ...others].slice(0, 6));
+}
+
+const RAIL =
+  "rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:gap-x-4 sm:gap-y-6 sm:overflow-visible sm:px-0 sm:pb-0";
 
 /**
  * Searches MULO's catalogue as you type. Pressing Enter also runs the slower
@@ -19,10 +70,13 @@ const EMPTY: SearchResults = { artists: [], albums: [], songs: [] };
 export default function SearchClient({
   initialQuery,
   initialResults,
+  browse,
   children,
 }: {
   initialQuery: string;
   initialResults: SearchResults;
+  /** Shown before anything is typed. */
+  browse: { artists: SearchArtist[]; albums: SearchAlbum[] };
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -30,6 +84,9 @@ export default function SearchClient({
   const [results, setResults] = useState(initialResults);
   const [loading, setLoading] = useState(false);
   const lastSearched = useRef(initialQuery.trim());
+  const input = useRef<HTMLInputElement>(null);
+  const recentRaw = useSyncExternalStore(subscribeRecent, readRecent, () => "[]");
+  const recent = useMemo(() => parseRecent(recentRaw), [recentRaw]);
 
   useEffect(() => {
     const q = query.trim();
@@ -74,7 +131,10 @@ export default function SearchClient({
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const q = query.trim();
-    if (q.length >= 2) router.push(`/search?q=${encodeURIComponent(q)}`);
+    if (q.length < 2) return;
+    remember(q);
+    input.current?.blur();
+    router.push(`/search?q=${encodeURIComponent(q)}`);
   }
 
   const q = query.trim();
@@ -87,11 +147,17 @@ export default function SearchClient({
 
   return (
     <div>
-      <form onSubmit={submit} role="search" className="relative mb-10">
+      {/* The box stays in reach while you scroll the results. */}
+      <form
+        onSubmit={submit}
+        role="search"
+        className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 mb-8 bg-bg/90 px-4 pb-3 pt-1 backdrop-blur-xl sm:static sm:mx-0 sm:mb-10 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+      >
+        <div className="relative">
         <svg
           viewBox="0 0 24 24"
           aria-hidden="true"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
+          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
           fill="none"
           stroke="currentColor"
           strokeWidth={2}
@@ -100,27 +166,114 @@ export default function SearchClient({
           <path d="m20 20-3.5-3.5" strokeLinecap="round" />
         </svg>
         <input
+          ref={input}
           type="search"
+          inputMode="search"
+          enterKeyHint="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
           autoComplete="off"
-          placeholder="Search artists, albums and songs"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="Artists, albums, songs"
           aria-label="Search artists, albums and songs"
-          className={`${fieldClass} h-12 pl-11 pr-24 text-base`}
+          className={`${fieldClass} h-12 rounded-xl pl-12 pr-24 text-base sm:text-base [&::-webkit-search-cancel-button]:hidden`}
         />
-        {loading && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-text-muted">
-            Searching…
-          </span>
-        )}
+        <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          {loading && <span className="text-xs text-text-muted">Searching…</span>}
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                input.current?.focus();
+              }}
+              aria-label="Clear search"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-text-muted transition-colors hover:bg-surface-raised hover:text-text"
+            >
+              ×
+            </button>
+          )}
+        </span>
+        </div>
       </form>
 
       {q.length < 2 && (
-        <p className="text-sm text-text-secondary">
-          Start typing an artist, an album or a song.
-        </p>
+        <div className="step-in flex flex-col gap-10">
+          {recent.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                  Recent
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => saveRecent([])}
+                  className="text-xs text-text-muted transition-colors hover:text-text"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recent.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setQuery(item)}
+                    className="h-9 rounded-full border border-border bg-surface px-3.5 text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text active:scale-[0.97]"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {browse.artists.length > 0 && (
+            <section>
+              <SectionHeading>Popular artists</SectionHeading>
+              <ul className={`${RAIL} sm:grid-cols-4 lg:grid-cols-6`}>
+                {browse.artists.map((artist, i) => (
+                  <li key={artist.mbid} className="w-[29%] shrink-0 sm:w-auto">
+                    <ArtistCard
+                      mbid={artist.mbid}
+                      name={artist.name}
+                      imageUrl={artist.image_url}
+                      eager={i < 4}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {browse.albums.length > 0 && (
+            <section>
+              <SectionHeading>Most-played albums</SectionHeading>
+              <ul className={`${RAIL} sm:grid-cols-4 lg:grid-cols-5`}>
+                {browse.albums.map((album) => (
+                  <li key={album.mbid} className="w-[42%] shrink-0 sm:w-auto">
+                    <AlbumCard
+                      mbid={album.mbid}
+                      title={album.title}
+                      artist={album.artist}
+                      year={album.year}
+                      coverUrl={album.cover_art_url}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
+
+      {q.length >= 2 && (
+        // Opening a result counts as searching for it.
+        <div onClickCapture={(event) => {
+          if ((event.target as HTMLElement).closest("a")) remember(q);
+        }}>
 
       {results.artists.length > 0 && (
         <section className="mb-12">
@@ -208,6 +361,8 @@ export default function SearchClient({
         <p className="mb-10 text-sm text-text-secondary">
           Nothing in MULO matches &ldquo;{q}&rdquo; yet.
         </p>
+      )}
+        </div>
       )}
 
       {q.length >= 2 &&

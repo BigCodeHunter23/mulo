@@ -121,7 +121,7 @@ export default async function MyRatingsPage({
             <div className="flex gap-1">
               <Link
                 href={href(tab.param)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-md px-3 py-2 text-xs font-medium transition-colors sm:px-2.5 sm:py-1 ${
                   !recent ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
                 }`}
               >
@@ -129,7 +129,7 @@ export default async function MyRatingsPage({
               </Link>
               <Link
                 href={href(tab.param, { view: "recent" })}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-md px-3 py-2 text-xs font-medium transition-colors sm:px-2.5 sm:py-1 ${
                   recent ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
                 }`}
               >
@@ -156,7 +156,7 @@ export default async function MyRatingsPage({
               key={t.param}
               href={href(t.param, { view: recent ? "recent" : undefined })}
               aria-current={current ? "page" : undefined}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:py-1.5 ${
                 current ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
               }`}
             >

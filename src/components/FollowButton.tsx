@@ -16,6 +16,7 @@ export default function FollowButton({
   isSelf,
   isFollowing,
   size = "normal",
+  block = false,
 }: {
   targetId: string;
   username: string;
@@ -23,6 +24,8 @@ export default function FollowButton({
   isSelf: boolean;
   isFollowing: boolean;
   size?: "normal" | "small";
+  /** Fill the width it's given, for a row of actions on a phone. */
+  block?: boolean;
 }) {
   const [following, setFollowingState] = useState(isFollowing);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export default function FollowButton({
     return (
       <Link
         href="/login"
-        className={buttonClass({ size: size === "small" ? "sm" : "md" })}
+        className={`${buttonClass({ size: size === "small" ? "sm" : "md" })} ${block ? "w-full" : ""}`}
       >
         Follow
       </Link>
@@ -54,15 +57,16 @@ export default function FollowButton({
     });
   }
 
-  const dimensions = size === "small" ? "h-8 px-3" : "h-10 px-4";
+  const dimensions =
+    size === "small" ? "h-9 px-3.5 sm:h-8 sm:px-3" : "h-11 px-5 sm:h-10 sm:px-4";
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className={`flex flex-col gap-1 ${block ? "w-full items-stretch" : "items-end"}`}>
       <button
         type="button"
         onClick={toggle}
         aria-pressed={following}
-        className={`inline-flex items-center justify-center rounded-lg border text-sm font-medium transition-all active:scale-95 ${dimensions} ${
+        className={`inline-flex items-center justify-center rounded-lg border text-sm font-semibold transition-all active:scale-95 ${dimensions} ${
           following
             ? "border-border-strong bg-transparent text-text-secondary hover:border-score-you/50 hover:text-score-you"
             : "border-accent bg-accent text-[#0b0b0e] hover:bg-accent-hover"

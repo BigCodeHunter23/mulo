@@ -99,8 +99,8 @@ export default async function AlbumPage({
         </div>
 
         <div className="relative mx-auto w-full max-w-6xl px-4 pt-10 sm:px-6">
-          <div className="flex flex-col gap-7 sm:flex-row sm:gap-9">
-            <div className="artwork aspect-square w-44 shrink-0 overflow-hidden rounded-xl sm:w-60">
+          <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-end sm:gap-9 sm:text-left">
+            <div className="artwork aspect-square w-[64%] max-w-72 shrink-0 overflow-hidden rounded-xl sm:w-60">
               {release.cover_art_url && (
                 /* Cover Art Archive redirects to archive.org, so Next's
                    image optimizer adds nothing here. */
@@ -108,20 +108,21 @@ export default async function AlbumPage({
                 <img
                   src={release.cover_art_url}
                   alt={release.title}
+                  fetchPriority="high"
                   className="h-full w-full object-cover"
                 />
               )}
             </div>
 
-            <div className="flex min-w-0 flex-col gap-5 pb-2">
+            <div className="flex w-full min-w-0 flex-col items-center gap-5 pb-2 sm:w-auto sm:items-start">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
                   Album
                 </p>
-                <h1 className="display mt-2 text-4xl text-text sm:text-5xl">
+                <h1 className="display mt-2 text-balance text-4xl text-text sm:text-5xl">
                   {release.title}
                 </h1>
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-text-secondary sm:justify-start">
                   {artist && (
                     <Link
                       href={`/artist/${artist.mbid}`}
@@ -139,7 +140,7 @@ export default async function AlbumPage({
                 </div>
 
                 {release.genres.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-1.5">
+                  <div className="mt-4 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                     {release.genres.slice(0, 5).map((genre) => (
                       <span
                         key={genre}
@@ -152,7 +153,7 @@ export default async function AlbumPage({
                 )}
               </div>
 
-              <div className="w-fit">
+              <div className="w-full sm:w-fit">
                 <StarScore
                   overall={scores.overall}
                   overallCount={scores.overallCount}

@@ -1,7 +1,7 @@
 /**
  * MULO's signature three-score display.
  *
- * Gold "Ovr"     — the overall community score
+ * Gold "Everyone" — the overall community score
  * Red "You"      — the signed-in user's own score
  * Blue "Friends" — the average among people they follow
  *
@@ -12,7 +12,7 @@
 export type ScoreKind = "overall" | "you" | "friends";
 
 const STYLES: Record<ScoreKind, { label: string; color: string }> = {
-  overall: { label: "Ovr", color: "text-score-overall" },
+  overall: { label: "Everyone", color: "text-score-overall" },
   you: { label: "You", color: "text-score-you" },
   friends: { label: "Friends", color: "text-score-friends" },
 };
@@ -80,7 +80,7 @@ export default function StarScore({
   friendsCount?: number;
 }) {
   return (
-    <div className="flex items-start gap-5 rounded-xl border border-border bg-surface/60 px-5 py-3 backdrop-blur-sm sm:gap-7">
+    <div className="grid w-full grid-cols-[1fr_1px_1fr_1px_1fr] items-start gap-3 rounded-2xl border border-border bg-surface/70 px-3 py-3.5 backdrop-blur-md sm:flex sm:w-auto sm:gap-7 sm:px-5 sm:py-3">
       <Score kind="overall" value={overall} count={overallCount} />
       <div className="w-px self-stretch bg-border" />
       <Score kind="you" value={you} />

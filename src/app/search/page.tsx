@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
 import { searchCatalog } from "@/lib/search";
+import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
 import { SectionHeading } from "@/components/ui";
 import SearchClient from "./SearchClient";
 
@@ -22,7 +23,12 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
-  const results = await searchCatalog(query, 8);
+  // Before anything's typed, there's something to tap straight away.
+  const [results, artists, albums] = await Promise.all([
+    searchCatalog(query, 8),
+    popularArtists(12),
+    mostPlayedAlbums(10),
+  ]);
 
   const known = [
     ...results.artists.map((a) => a.mbid),
@@ -31,7 +37,25 @@ export default async function SearchPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      <SearchClient key={query} initialQuery={query} initialResults={results}>
+      <SearchClient
+        key={query}
+        initialQuery={query}
+        initialResults={results}
+        browse={{
+          artists: artists.map((artist) => ({
+            mbid: artist.mbid,
+            name: artist.name,
+            image_url: artist.image_url,
+          })),
+          albums: albums.map((album) => ({
+            mbid: album.mbid,
+            title: album.title,
+            artist: album.artist,
+            year: album.year,
+            cover_art_url: album.cover_art_url,
+          })),
+        }}
+      >
         {query.length >= 2 && (
           <Suspense
             fallback={

@@ -15,6 +15,7 @@ import AlbumCard from "@/components/AlbumCard";
 import RatingForm from "@/components/RatingForm";
 import ReviewList from "@/components/ReviewList";
 import StarScore from "@/components/StarScore";
+import ReadMore from "@/components/ReadMore";
 import TopSongs from "@/components/TopSongs";
 import { SectionHeading } from "@/components/ui";
 
@@ -89,24 +90,25 @@ export default async function ArtistPage({
         </div>
 
         <div className="relative mx-auto w-full max-w-6xl px-4 pt-10 sm:px-6">
-          <div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:gap-9">
+          <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-end sm:gap-9 sm:text-left">
             {artist.image_url && (
-              <div className="artwork h-40 w-40 shrink-0 overflow-hidden rounded-full sm:h-48 sm:w-48">
+              <div className="artwork h-48 w-48 shrink-0 overflow-hidden rounded-full sm:h-48 sm:w-48">
                 {/* Wikimedia Commons photo, served from their CDN. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={artist.image_url}
                   alt={artist.name}
+                  fetchPriority="high"
                   className="h-full w-full object-cover object-top"
                 />
               </div>
             )}
 
-            <div className="min-w-0 pb-2">
+            <div className="flex w-full min-w-0 flex-col items-center pb-2 sm:w-auto sm:items-start">
               <p className="text-xs font-medium uppercase tracking-[0.15em] text-text-muted">
                 Artist
               </p>
-              <h1 className="display mt-2 text-4xl text-text sm:text-6xl">
+              <h1 className="display mt-2 text-balance text-4xl text-text sm:text-6xl">
                 {artist.name}
               </h1>
               {albums.length > 0 && (
@@ -114,7 +116,7 @@ export default async function ArtistPage({
                   {albums.length} album{albums.length === 1 ? "" : "s"}
                 </p>
               )}
-              <div className="mt-5 w-fit">
+              <div className="mt-5 w-full sm:w-fit">
                 <StarScore
                   overall={scores.overall}
                   overallCount={scores.overallCount}
@@ -126,11 +128,7 @@ export default async function ArtistPage({
             </div>
           </div>
 
-          {artist.bio && (
-            <p className="mt-7 max-w-3xl text-sm leading-relaxed text-text-secondary">
-              {artist.bio}
-            </p>
-          )}
+          {artist.bio && <ReadMore text={artist.bio} className="mt-7 max-w-3xl" />}
         </div>
       </div>
 
@@ -174,7 +172,7 @@ export default async function ArtistPage({
             No albums found for this artist.
           </p>
         ) : (
-          <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-5">
             {albums.map((album, i) => (
               <li key={album.mbid}>
                 <AlbumCard

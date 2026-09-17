@@ -68,7 +68,7 @@ export default function HeavyRotation({
     return (
       <section className="mb-10">
         {heading}
-        <ol className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+        <ol className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-1 sm:px-1">
           {rotation.albums.map((album, i) => (
             <li key={album.mbid} className="w-28 shrink-0 sm:w-32">
               <Link href={`/album/${album.mbid}`} className="group block">
@@ -103,9 +103,9 @@ export default function HeavyRotation({
   return (
     <section>
       {heading}
-      <ol className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
+      <ol className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
         {rotation.albums.map((album, i) => (
-          <li key={album.mbid}>
+          <li key={album.mbid} className="w-[42%] shrink-0 sm:w-auto">
             <Link href={`/album/${album.mbid}`} className="group block">
               <span className="artwork relative block aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03]">
                 {album.cover && (

@@ -11,6 +11,7 @@ import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import DiscoverSections from "@/components/DiscoverSections";
 import RaisedOnPrompt from "@/components/RaisedOnPrompt";
+import CoverWall from "@/components/CoverWall";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export default async function Home() {
@@ -18,24 +19,32 @@ export default async function Home() {
 
   if (!user) {
     return (
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-14 sm:px-6">
-        <section className="mx-auto mb-16 max-w-3xl text-center">
-          <h1 className="display text-5xl text-text sm:text-6xl">
-            Every record,
-            <br />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
+        <section className="mx-auto max-w-3xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+            For music lovers
+          </p>
+          <h1 className="display mt-4 text-balance text-[2.75rem] leading-[1.02] text-text sm:text-6xl">
+            Every record,{" "}
             <span className="text-accent">rated by people you trust.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-secondary">
-            Rate and review the music you listen to, follow your friends, and
-            see what they&rsquo;re playing.
+            Rate the albums, artists and songs you love, crown your GOAT, and
+            settle the debate with your friends.
           </p>
-          <div className="mt-8 flex justify-center gap-3">
-            <ButtonLink href="/login">Get started</ButtonLink>
-            <ButtonLink href="/discover" variant="secondary">
-              Explore music
+          <div className="mx-auto mt-8 flex max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+            <ButtonLink href="/login?mode=signup">Join MULO, it&rsquo;s free</ButtonLink>
+            <ButtonLink href="/login" variant="secondary">
+              Log in
             </ButtonLink>
           </div>
         </section>
+
+        <Suspense fallback={<div className="h-56 sm:h-72" />}>
+          <div className="mb-16 mt-12">
+            <CoverWall />
+          </div>
+        </Suspense>
 
         <DiscoverSections />
       </main>

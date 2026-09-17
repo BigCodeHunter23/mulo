@@ -56,7 +56,7 @@ export default async function GoatPage({
             key={t.param}
             href={`/goat?kind=${t.param}`}
             aria-current={t.kind === pickKind ? "page" : undefined}
-            className={`flex-1 rounded-md px-5 py-1.5 text-center text-sm font-medium transition-colors sm:flex-none ${
+            className={`flex-1 rounded-md px-5 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none sm:py-1.5 ${
               t.kind === pickKind
                 ? "bg-surface-raised text-text"
                 : "text-text-muted hover:text-text"

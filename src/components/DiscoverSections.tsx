@@ -11,9 +11,14 @@ import FeedItem from "@/components/FeedItem";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
 import { SectionHeading } from "@/components/ui";
 
+// On phones each section is a row to swipe through, with the next card peeking
+// in; from tablet width up it's a grid.
 const ALBUM_GRID =
-  "grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-5";
-const ARTIST_GRID = "grid grid-cols-3 gap-x-4 gap-y-7 sm:grid-cols-5";
+  "rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5";
+const ALBUM_ITEM = "w-[42%] shrink-0 sm:w-auto";
+const ARTIST_GRID =
+  "rail -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-5 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0";
+const ARTIST_ITEM = "w-[29%] shrink-0 sm:w-auto";
 
 /**
  * The browsable parts of MULO, shared by the Discover page and the home page.
@@ -59,7 +64,7 @@ function GridPlaceholder({ title, round = false }: { title: string; round?: bool
       <SectionHeading>{title}</SectionHeading>
       <div className={round ? ARTIST_GRID : ALBUM_GRID}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i}>
+          <div key={i} className={round ? ARTIST_ITEM : ALBUM_ITEM}>
             <div
               className={`aspect-square animate-pulse bg-surface-raised ${
                 round ? "rounded-full" : "rounded-lg"
@@ -88,7 +93,7 @@ async function TopRated() {
       <SectionHeading>Top rated on MULO</SectionHeading>
       <ul className={ALBUM_GRID}>
         {topRated.map((album, i) => (
-          <li key={album.mbid}>
+          <li key={album.mbid} className={ALBUM_ITEM}>
             <AlbumCard
               mbid={album.mbid}
               title={album.title}
@@ -117,7 +122,7 @@ async function MostPlayed() {
       </SectionHeading>
       <ul className={ALBUM_GRID}>
         {mostPlayed.map((album, i) => (
-          <li key={album.mbid}>
+          <li key={album.mbid} className={ALBUM_ITEM}>
             <AlbumCard
               mbid={album.mbid}
               title={album.title}
@@ -142,7 +147,7 @@ async function ArtistsToExplore() {
       <SectionHeading>Artists to explore</SectionHeading>
       <ul className={ARTIST_GRID}>
         {artists.map((artist) => (
-          <li key={artist.mbid}>
+          <li key={artist.mbid} className={ARTIST_ITEM}>
             <ArtistCard mbid={artist.mbid} name={artist.name} imageUrl={artist.image_url} />
           </li>
         ))}

@@ -148,15 +148,16 @@ export default function RatingForm({
       <div
         role="group"
         aria-label="Your score out of 10"
-        className="flex flex-wrap gap-1.5"
+        className="grid grid-cols-5 gap-2 sm:flex sm:flex-wrap sm:gap-1.5"
       >
+        {/* Two even rows of five on a phone; one row of ten when there's room. */}
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => pick(n)}
             aria-pressed={score === n}
-            className={`h-11 w-11 rounded-lg border text-sm font-semibold tabular-nums transition-all active:scale-95 ${
+            className={`h-12 w-full rounded-lg border text-base font-semibold tabular-nums transition-all active:scale-95 sm:h-11 sm:w-11 sm:text-sm ${
               score === n
                 ? "border-score-you bg-score-you text-[#0b0b0e]"
                 : "border-border bg-surface-raised text-text-secondary hover:border-border-strong hover:text-text"

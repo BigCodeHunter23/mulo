@@ -16,19 +16,21 @@ export function SectionHeading({
   );
 }
 
+// Presses sink a touch, so a tap feels like it landed.
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50";
 
 const VARIANTS = {
-  primary: "bg-accent text-[#0b0b0e] hover:bg-accent-hover",
+  primary: "bg-accent font-semibold text-[#0b0b0e] hover:bg-accent-hover",
   secondary:
     "border border-border-strong bg-surface-raised text-text hover:bg-surface-hover",
   ghost: "text-text-secondary hover:text-text hover:bg-surface-raised",
 } as const;
 
+// A little taller on phones, where they're pressed with a thumb.
 const SIZES = {
-  sm: "h-8 px-3",
-  md: "h-10 px-4",
+  sm: "h-9 px-3.5 sm:h-8 sm:px-3",
+  md: "h-11 px-5 sm:h-10 sm:px-4",
 } as const;
 
 export function buttonClass({
@@ -59,9 +61,12 @@ export function ButtonLink({
   );
 }
 
-/** Text inputs, textareas and selects share one look. */
+/**
+ * Text inputs, textareas and selects share one look. On phones the text is
+ * 16px, the size below which iPhones zoom the page in when a field is tapped.
+ */
 export const fieldClass =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors focus:border-border-strong focus:outline-none focus-visible:outline-none";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-text placeholder:text-text-muted transition-colors focus:border-accent/60 focus:outline-none focus-visible:outline-none sm:py-2 sm:text-sm";
 
 export function Field({
   label,
