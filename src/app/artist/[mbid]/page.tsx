@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
 import {
   getOwnRating,
@@ -17,6 +18,7 @@ import ReviewList from "@/components/ReviewList";
 import StarScore from "@/components/StarScore";
 import ReadMore from "@/components/ReadMore";
 import TopSongs from "@/components/TopSongs";
+import WhereNext from "@/components/WhereNext";
 import { SectionHeading } from "@/components/ui";
 
 export async function generateMetadata({
@@ -187,6 +189,11 @@ export default async function ArtistPage({
             ))}
           </ul>
         )}
+
+        {/* The end of the page shouldn't be a dead end. */}
+        <Suspense fallback={null}>
+          <WhereNext mbid={mbid} name={artist.name} />
+        </Suspense>
       </main>
     </>
   );

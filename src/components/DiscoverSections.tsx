@@ -1,5 +1,10 @@
 import { Suspense } from "react";
-import { mostPlayedAlbums, popularArtists, topRatedOnMulo } from "@/lib/discover";
+import {
+  artistsToExplore,
+  mostPlayedAlbums,
+  newReleases,
+  topRatedOnMulo,
+} from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -9,16 +14,13 @@ import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
-import { SectionHeading } from "@/components/ui";
-
-// On phones each section is a row to swipe through, with the next card peeking
-// in; from tablet width up it's a grid.
-const ALBUM_GRID =
-  "rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5";
-const ALBUM_ITEM = "w-[42%] shrink-0 sm:w-auto";
-const ARTIST_GRID =
-  "rail -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-5 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0";
-const ARTIST_ITEM = "w-[29%] shrink-0 sm:w-auto";
+import {
+  ALBUM_GRID,
+  ALBUM_ITEM,
+  ARTIST_GRID,
+  ARTIST_ITEM,
+  SectionHeading,
+} from "@/components/ui";
 
 /**
  * The browsable parts of MULO, shared by the Discover page and the home page.
@@ -34,6 +36,9 @@ export default function DiscoverSections() {
       </Suspense>
       <Suspense fallback={null}>
         <Rotation />
+      </Suspense>
+      <Suspense fallback={<GridPlaceholder title="New releases" />}>
+        <NewReleases />
       </Suspense>
       <Suspense fallback={null}>
         <TopRated />
@@ -81,6 +86,35 @@ function GridPlaceholder({ title, round = false }: { title: string; round?: bool
 async function Rotation() {
   const rotation = await getHeavyRotation(10);
   return rotation ? <HeavyRotation rotation={rotation} /> : null;
+}
+
+export async function NewReleases() {
+  const fresh = await newReleases(10);
+  if (fresh.length < 4) return null;
+
+  return (
+    <section>
+      <SectionHeading
+        action={<span className="text-xs text-text-muted">Out in the last few months</span>}
+      >
+        New releases
+      </SectionHeading>
+      <ul className={ALBUM_GRID}>
+        {fresh.map((album, i) => (
+          <li key={album.mbid} className={ALBUM_ITEM}>
+            <AlbumCard
+              mbid={album.mbid}
+              title={album.title}
+              artist={album.artist}
+              year={album.year}
+              coverUrl={album.cover_art_url}
+              eager={i < 5}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 async function TopRated() {
@@ -139,12 +173,16 @@ async function MostPlayed() {
 }
 
 async function ArtistsToExplore() {
-  const artists = await popularArtists(10);
+  const artists = await artistsToExplore(15);
   if (artists.length === 0) return null;
 
   return (
     <section>
-      <SectionHeading>Artists to explore</SectionHeading>
+      <SectionHeading
+        action={<span className="text-xs text-text-muted">New picks every hour</span>}
+      >
+        Artists to explore
+      </SectionHeading>
       <ul className={ARTIST_GRID}>
         {artists.map((artist) => (
           <li key={artist.mbid} className={ARTIST_ITEM}>

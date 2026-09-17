@@ -13,6 +13,7 @@ import { getReactions } from "@/lib/reactions";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
+import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
 import ReviewList from "@/components/ReviewList";
 import { SkeletonLine } from "@/components/Skeleton";
@@ -203,6 +204,13 @@ export default async function AlbumPage({
             )}
           </section>
         </div>
+
+        {/* The end of the page shouldn't be a dead end. */}
+        {artist && (
+          <Suspense fallback={null}>
+            <WhereNext mbid={artist.mbid} name={artist.name} />
+          </Suspense>
+        )}
       </main>
     </>
   );

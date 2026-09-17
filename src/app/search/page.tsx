@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
 import { searchCatalog } from "@/lib/search";
-import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
+import { artistsToExplore, mostPlayedAlbums } from "@/lib/discover";
 import { SectionHeading } from "@/components/ui";
 import SearchClient from "./SearchClient";
 
@@ -26,7 +26,7 @@ export default async function SearchPage({
   // Before anything's typed, there's something to tap straight away.
   const [results, artists, albums] = await Promise.all([
     searchCatalog(query, 8),
-    popularArtists(12),
+    artistsToExplore(12),
     mostPlayedAlbums(10),
   ]);
 

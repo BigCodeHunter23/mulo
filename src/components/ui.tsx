@@ -127,3 +127,13 @@ export function EmptyState({
     </div>
   );
 }
+
+// Shelves of albums and artists: on phones a row to swipe through with the
+// next card peeking in, from tablet width up a grid. Shared so every shelf on
+// the site behaves the same way.
+export const ALBUM_GRID =
+  "rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5";
+export const ALBUM_ITEM = "w-[42%] shrink-0 sm:w-auto";
+export const ARTIST_GRID =
+  "rail -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-5 sm:gap-x-4 sm:gap-y-7 sm:overflow-visible sm:px-0 sm:pb-0";
+export const ARTIST_ITEM = "w-[29%] shrink-0 sm:w-auto";
