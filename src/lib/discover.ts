@@ -276,8 +276,15 @@ export async function similarArtists(
     (a, b) => b.score - a.score || (b.popularity ?? 0) - (a.popularity ?? 0),
   );
 
-  // Rotate within the close matches so a second visit isn't the same five.
-  return rotate(best.slice(0, limit * 2), 7)
-    .slice(0, limit)
-    .map(({ mbid: id, name, image_url }) => ({ mbid: id, name, image_url }));
+  // The closest few always lead, so the suggestions are believable; the rest
+  // of the row rotates through the near misses, so coming back shows fresh
+  // faces rather than the same six every time.
+  const pool = best.slice(0, limit * 2);
+  const lead = Math.ceil(limit / 2);
+  const shown = [
+    ...pool.slice(0, lead),
+    ...rotate(pool.slice(lead), 7).slice(0, limit - lead),
+  ];
+
+  return shown.map(({ mbid: id, name, image_url }) => ({ mbid: id, name, image_url }));
 }
