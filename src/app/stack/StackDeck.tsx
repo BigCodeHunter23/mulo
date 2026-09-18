@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { rate } from "@/app/ratings/actions";
 import type { StackAlbum } from "@/lib/stack";
 import { coverSrc } from "@/lib/cover-url";
+import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { ButtonLink, buttonClass } from "@/components/ui";
 
 /**
@@ -23,7 +24,14 @@ import { ButtonLink, buttonClass } from "@/components/ui";
 
 const SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
+export default function StackDeck({
+  albums,
+  runId = 0,
+}: {
+  albums: StackAlbum[];
+  /** Which run this is, so "Another run" can ask for the next one. */
+  runId?: number;
+}) {
   /**
    * The run is fixed the moment it starts.
    *
@@ -43,6 +51,7 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
   const [skipped, setSkipped] = useState<StackAlbum[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
   const [, startTransition] = useTransition();
+  const { celebrate, overlay } = useBadgeUnlock();
 
   const album = deck[at];
   const done = at >= deck.length;
@@ -62,10 +71,12 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
         if (!result.ok) {
           setRated((count) => count - 1);
           setFailed((list) => [...list, target.title]);
+          return;
         }
+        celebrate(result);
       });
     },
-    [deck, at, next],
+    [deck, at, next, celebrate],
   );
 
   const skip = useCallback(() => {
@@ -123,11 +134,15 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
         )}
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <ButtonLink href="/stack">Another run</ButtonLink>
+          {/* A plain link back to /stack goes nowhere: it's the address we're
+              already at, so nothing is built again and the finished screen
+              stays put. A new value moves us on. */}
+          <ButtonLink href={`/stack?run=${runId + 1}`}>Another run</ButtonLink>
           <ButtonLink href="/charts" variant="secondary">
             See the charts
           </ButtonLink>
         </div>
+        {overlay}
       </div>
     );
   }
@@ -201,6 +216,8 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
       <p className="mt-4 hidden text-center text-[11px] text-text-muted sm:block">
         Press 1&ndash;9 or 0 for ten. Space to skip.
       </p>
+
+      {overlay}
     </div>
   );
 }

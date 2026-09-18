@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { rate, removeRating } from "@/app/ratings/actions";
+import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { Star } from "@/components/StarScore";
 
 type Song = {
@@ -43,6 +44,7 @@ export default function SongList({
     null,
   );
   const [, startTransition] = useTransition();
+  const { celebrate, overlay } = useBadgeUnlock();
 
   /** A score to save, or null to remove this person's score. */
   function save(songMbid: string, value: number | null) {
@@ -64,7 +66,10 @@ export default function SongList({
         value === null
           ? await removeRating("song", songMbid, releaseMbid)
           : await rate("song", songMbid, value, releaseMbid);
-      if (result.ok) return;
+      if (result.ok) {
+        celebrate(result);
+        return;
+      }
 
       put(previous);
       setError({ text: result.error, needsProfile: result.needsProfile });
@@ -195,6 +200,8 @@ export default function SongList({
           );
         })}
       </ol>
+
+      {overlay}
     </div>
   );
 }

@@ -13,10 +13,25 @@ export const metadata: Metadata = {
 /** Long enough to be worth opening, short enough to finish. */
 const RUN = 40;
 
-export default async function StackPage() {
+/**
+ * A run is never reused. `getStack` leaves out anything already rated, and
+ * draws a different forty each time, so a cached page would hand somebody the
+ * run they just finished.
+ */
+export const dynamic = "force-dynamic";
+
+export default async function StackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ run?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  // "Another run" points at a new ?run= value. The address has to change for
+  // the deck to be built again rather than left sitting on its finished
+  // screen, and the value keys the deck so its state starts over.
+  const { run } = await searchParams;
   const albums = await getStack(user.id, RUN);
 
   return (
@@ -41,7 +56,7 @@ export default async function StackPage() {
           action={<ButtonLink href="/discover">Find something new</ButtonLink>}
         />
       ) : (
-        <StackDeck albums={albums} />
+        <StackDeck key={run ?? "first"} albums={albums} runId={Number(run) || 0} />
       )}
     </main>
   );

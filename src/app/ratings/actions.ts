@@ -3,9 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
+import { getBadges } from "@/lib/badges";
 
 export type RatingResult =
-  | { ok: true }
+  | {
+      ok: true;
+      /**
+       * Every badge this person now holds, sent back with each saved score.
+       * The browser keeps the last list it saw, so anything here that was not
+       * there before has just been unlocked and is worth making a fuss of.
+       * Badges stay worked out from ratings rather than stored, so this can
+       * never drift from the truth.
+       */
+      badges?: string[];
+    }
   | {
       ok: false;
       error: string;
@@ -98,7 +109,18 @@ export async function rate(
   if (error) return failure(error);
 
   refresh(kind, mbid, releaseMbid);
-  return { ok: true };
+
+  // A score is the only thing that can earn a badge, so this is the one place
+  // worth working them out. If that fails the rating still saved: a missed
+  // celebration is never worth losing somebody's score over.
+  let badges: string[] | undefined;
+  try {
+    badges = (await getBadges(user.id)).map((badge) => badge.slug);
+  } catch {
+    badges = undefined;
+  }
+
+  return { ok: true, badges };
 }
 
 /** A review hangs off a rating, so there has to be a score first. */

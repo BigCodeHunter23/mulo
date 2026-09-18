@@ -103,14 +103,39 @@ function RaisedOnLine({ raisedOn, isSelf }: { raisedOn: RaisedOn | null; isSelf:
   );
 }
 
-function Stat({ value, label }: { value: string | number; label: string }) {
-  return (
-    <div className="flex flex-col items-center sm:items-start">
+/**
+ * One figure from a profile header. Followers and Following carry a link,
+ * because the interesting question about a count is always who's in it.
+ */
+function Stat({
+  value,
+  label,
+  href,
+}: {
+  value: string | number;
+  label: string;
+  href?: string;
+}) {
+  const body = (
+    <>
       <span className="display-sm text-lg tabular-nums text-text sm:text-xl">{value}</span>
       <span className="text-[11px] text-text-muted sm:text-xs sm:font-medium sm:uppercase sm:tracking-wider">
         {label}
       </span>
-    </div>
+    </>
+  );
+
+  const shape = "flex flex-col items-center sm:items-start";
+
+  return href ? (
+    <Link
+      href={href}
+      className={`${shape} rounded-lg transition-colors hover:[&>span]:text-accent`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={shape}>{body}</div>
   );
 }
 
@@ -156,8 +181,16 @@ export default async function ProfilePage({
 
           <div className="grid grid-cols-4 gap-1 [grid-area:stats] sm:flex sm:gap-7">
             <Stat value={stats.ratings} label="Rated" />
-            <Stat value={stats.followers} label="Followers" />
-            <Stat value={stats.following} label="Following" />
+            <Stat
+              value={stats.followers}
+              label="Followers"
+              href={`/u/${profile.username}/follows?show=followers`}
+            />
+            <Stat
+              value={stats.following}
+              label="Following"
+              href={`/u/${profile.username}/follows?show=following`}
+            />
             <Stat
               value={stats.averageScore !== null ? stats.averageScore.toFixed(1) : "–"}
               label="Avg"

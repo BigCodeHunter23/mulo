@@ -8,6 +8,7 @@ import {
   saveReview,
   type RatingResult,
 } from "@/app/ratings/actions";
+import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { buttonClass, fieldClass } from "@/components/ui";
 
 type Status =
@@ -42,6 +43,7 @@ export default function RatingForm({
   const [draft, setDraft] = useState(existing?.review ?? "");
   const [status, setStatus] = useState<Status>(null);
   const [pending, startTransition] = useTransition();
+  const { celebrate, overlay } = useBadgeUnlock();
 
   // A success message fades after a moment; errors stay until acted on.
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function RatingForm({
   function settle(result: RatingResult, success: string) {
     if (result.ok) {
       setStatus({ tone: "saved", text: success });
+      celebrate(result);
       return true;
     }
     setStatus({
@@ -218,6 +221,8 @@ export default function RatingForm({
           )}
         </div>
       )}
+
+      {overlay}
     </div>
   );
 }

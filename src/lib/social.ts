@@ -102,6 +102,51 @@ export async function listProfiles(): Promise<PublicProfile[]> {
   return data ?? [];
 }
 
+/**
+ * The people following somebody, or the people they follow.
+ *
+ * A count on a profile is a dead end — the interesting question is always
+ * *who*. Both directions come from the same `follows` table read from opposite
+ * ends, so one function covers both.
+ */
+export async function listFollows(
+  userId: string,
+  direction: "followers" | "following",
+): Promise<PublicProfile[]> {
+  const supabase = await createClient();
+
+  // Following: rows where they are the follower, and we want whoever they
+  // point at. Followers: rows where they are the one being pointed at.
+  const [match, wanted] =
+    direction === "following"
+      ? ["follower_id", "following_id"]
+      : ["following_id", "follower_id"];
+
+  const { data: links } = await supabase
+    .from("follows")
+    .select(wanted)
+    .eq(match, userId)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  const ids = ((links ?? []) as unknown as Record<string, string>[]).map(
+    (row) => row[wanted],
+  );
+  if (ids.length === 0) return [];
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, avatar_url, bio, created_at")
+    .in("id", ids);
+
+  // Keep the order the follows came back in — most recent first — which
+  // fetching the profiles doesn't preserve.
+  const byId = new Map((data ?? []).map((row) => [row.id, row]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is PublicProfile => Boolean(row));
+}
+
 export async function getFollowingIds(userId: string): Promise<string[]> {
   const supabase = await createClient();
 

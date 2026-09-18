@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { rate } from "@/app/ratings/actions";
+import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { buttonClass } from "@/components/ui";
 
 export type QuickRateItem = {
@@ -43,6 +44,7 @@ export default function QuickRateGrid({
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const { celebrate, overlay } = useBadgeUnlock();
 
   function save(kind: Kind, mbid: string, value: number) {
     const key = `${kind}:${mbid}`;
@@ -61,6 +63,8 @@ export default function QuickRateGrid({
           return next;
         });
         setError(result.error);
+      } else {
+        celebrate(result);
       }
     });
   }
@@ -199,6 +203,8 @@ export default function QuickRateGrid({
           </Link>
         </div>
       </div>
+
+      {overlay}
     </>
   );
 }

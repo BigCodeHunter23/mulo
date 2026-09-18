@@ -142,6 +142,7 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
 
   const scored = ((data ?? []) as Row[])
     .filter((row) => !rated.has(row.mbid))
+
     .map((row, index) => {
       let score = 0;
       let reason: string | null = null;
@@ -175,7 +176,7 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
     })
     .sort((a, b) => b.score - a.score);
 
-  return spread(scored, limit).map(({ row, reason }) => ({
+  return spread(pickVaried(scored, limit), limit).map(({ row, reason }) => ({
     mbid: row.mbid,
     title: row.title,
     artist: row.artist_credit,
@@ -186,6 +187,35 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
 }
 
 type Scored = { row: Row; score: number; reason: string | null };
+
+/**
+ * How deep to reach for a run. Taking the top forty every time meant the same
+ * forty records came back run after run, minus whatever got rated — so anyone
+ * who skipped a few was handed them straight back. Drawing forty out of a
+ * few hundred good candidates keeps every run recognisably theirs while making
+ * each one different from the last.
+ */
+const CANDIDATES = 250;
+
+/**
+ * A run drawn from the best candidates, favouring the top without being stuck
+ * to it. Squaring a random number bends the draw towards the front of the
+ * list, so the strongest picks still lead most of the time and a record that
+ * was skipped last time isn't guaranteed to reappear.
+ */
+function pickVaried(scored: Scored[], limit: number): Scored[] {
+  const pool = scored.slice(0, Math.max(CANDIDATES, limit));
+  const picked: Scored[] = [];
+
+  while (pool.length > 0 && picked.length < limit) {
+    const at = Math.floor(Math.random() ** 2 * pool.length);
+    picked.push(pool.splice(at, 1)[0]);
+  }
+
+  // Ordering within the run should still be best-first, so the strongest
+  // records are the ones somebody definitely reaches.
+  return picked.sort((a, b) => b.score - a.score);
+}
 
 /**
  * Take the best of the run, but never more than a few in a row by the same

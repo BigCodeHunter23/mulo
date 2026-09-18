@@ -87,6 +87,12 @@ in plain language, and give them links and exact steps when they need to act.
   each (10 / 25 / 50 / 100 albums rated in that genre). Nothing is stored:
   every badge is worked out from ratings on each view, so it can never drift
   from the truth. The board lives at `/u/{username}/badges`, with `/badges` as
+  a shortcut to your own. Earning one is announced by `BadgeUnlock.tsx`: the
+  screen dims, the medal lands and sparks go, several queueing one after
+  another. `rate` sends back every badge the person now holds and the browser
+  compares it with the last list it saw in `localStorage`, so nothing has to
+  be stored server-side; an empty store is written down quietly rather than
+  celebrated, so a new device never replays old badges.
   a shortcut to your own. Each badge has its own glyph, shown dimmed while
   locked so the board reads as a collection to fill; what a locked badge took
   to earn stays hidden, which was always the part worth keeping back. Genre
