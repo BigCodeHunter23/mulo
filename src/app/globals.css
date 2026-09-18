@@ -953,3 +953,35 @@ select {
     animation: none;
   }
 }
+
+/* A live streak's flame never quite sits still. */
+@keyframes streak-flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 4px rgb(242 128 63 / 0.6));
+  }
+  30% {
+    transform: scale(1.08, 0.94) rotate(-3deg);
+  }
+  60% {
+    transform: scale(0.95, 1.07) rotate(2deg);
+    filter: drop-shadow(0 0 8px rgb(242 128 63 / 0.9));
+  }
+}
+
+.streak-flicker {
+  transform-origin: 50% 90%;
+  animation: streak-flicker 1.6s ease-in-out infinite;
+}
+
+.streak {
+  animation: stack-rise 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak-flicker,
+  .streak {
+    animation: none;
+  }
+}

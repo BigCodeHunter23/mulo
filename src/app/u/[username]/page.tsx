@@ -14,6 +14,8 @@ import { getSound } from "@/lib/sound";
 import { getTasteMatch } from "@/lib/taste";
 import { getHighestRatedAlbums } from "@/lib/ratings";
 import { getRaisedOn, type RaisedOn } from "@/lib/raised-on";
+import { getStreak } from "@/lib/streak";
+import StreakFlame from "@/components/StreakFlame";
 import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
 import Badges from "@/components/Badges";
@@ -154,10 +156,11 @@ export default async function ProfilePage({
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [stats, followState, raisedOn] = await Promise.all([
+  const [stats, followState, raisedOn, streak] = await Promise.all([
     getProfileStats(profile.id),
     getFollowState(profile.id),
     getRaisedOn(profile.id),
+    getStreak(profile.id),
   ]);
 
   const name = profile.display_name || profile.username;
@@ -177,6 +180,9 @@ export default async function ProfilePage({
             <h1 className="display truncate text-2xl text-text sm:text-4xl">{name}</h1>
             <p className="text-sm text-text-muted">@{profile.username}</p>
             <RaisedOnLine raisedOn={raisedOn} isSelf={followState.isSelf} />
+            <div className="mt-2.5 empty:hidden">
+              <StreakFlame streak={streak} isSelf={followState.isSelf} size="sm" />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 gap-1 [grid-area:stats] sm:flex sm:gap-7">
