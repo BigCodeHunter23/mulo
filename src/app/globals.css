@@ -716,7 +716,10 @@ select {
 @keyframes stack-track-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.96);
+    transform: translateY(14px) scale(0.8) rotate(-4deg);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.04) rotate(1deg);
   }
   to {
     opacity: 1;
@@ -725,7 +728,11 @@ select {
 }
 
 .stack-track {
-  animation: stack-track-in 0.35s cubic-bezier(0.2, 1, 0.3, 1) var(--at, 0s) backwards;
+  animation: stack-track-in 0.45s cubic-bezier(0.2, 1.4, 0.35, 1) var(--at, 0s) backwards;
+}
+
+.stack-reason {
+  animation: stack-track-in 0.4s ease-out both;
 }
 
 /* The cover settles in as the card changes, so each record feels handed over
@@ -747,6 +754,7 @@ select {
 
 @media (prefers-reduced-motion: reduce) {
   .stack-track,
+  .stack-reason,
   .stack-cover {
     animation: none;
   }

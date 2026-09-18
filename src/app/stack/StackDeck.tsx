@@ -164,6 +164,18 @@ export default function StackDeck({
         />
       </div>
 
+      {/* Why this record is in the run. It belongs up here with the rest of the
+          run's furniture: sitting under the title it read as a caption on the
+          songs below it, which is the one thing it isn't. */}
+      {album.reason && (
+        <p
+          key={`${album.mbid}-reason`}
+          className="stack-reason mt-3 text-[11px] uppercase tracking-[0.14em] text-text-muted"
+        >
+          {album.reason}
+        </p>
+      )}
+
       <div className="artwork mt-4 aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-xl sm:mt-6 sm:max-w-[17rem]">
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -186,25 +198,29 @@ export default function StackDeck({
         <p className="mt-1 text-sm text-text-secondary">
           {[album.artist, album.year].filter(Boolean).join(" · ")}
         </p>
-        {album.reason && (
-          <p className="mt-2 text-xs text-text-muted">{album.reason}</p>
-        )}
       </div>
 
-      {/* A few songs, dealt in one after another. A cover and a title often
-          aren't enough to place a record; one song you know and you can score
-          it honestly rather than guessing or waving it off. */}
+      {/* The songs, dealt onto the card one after another like a hand being
+          played. A cover and a title often aren't enough to place a record;
+          the moment somebody reads a song they know, they can score it
+          honestly rather than guessing or waving it off.
+
+          Numbered, so they read as a tracklist on sight and never get mistaken
+          for a caption on whatever sits above them. */}
       {album.tracks.length > 0 && (
         <ul
           key={`${album.mbid}-tracks`}
-          className="mt-3 flex w-full flex-wrap justify-center gap-1.5"
+          className="mt-3.5 flex w-full flex-wrap justify-center gap-1.5"
         >
           {album.tracks.map((track, i) => (
             <li
               key={`${track}-${i}`}
-              className="stack-track rounded-full border border-border/70 bg-surface/60 px-2.5 py-1 text-[11px] leading-none text-text-secondary"
-              style={{ "--at": `${i * 0.05}s` } as React.CSSProperties}
+              className="stack-track flex items-center gap-1.5 rounded-full border border-score-overall/25 bg-score-overall/[0.07] py-1 pl-1.5 pr-2.5 text-[11px] leading-none text-text"
+              style={{ "--at": `${i * 0.07}s` } as React.CSSProperties}
             >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-score-overall/20 text-[9px] font-bold tabular-nums text-score-overall">
+                {i + 1}
+              </span>
               {track}
             </li>
           ))}
