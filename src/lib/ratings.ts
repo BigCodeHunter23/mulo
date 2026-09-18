@@ -79,6 +79,60 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
+/** The starting score an album or artist borrows while MULO has too few of its own. */
+async function getSeed(
+  kind: "album" | "artist",
+  mbid: string,
+): Promise<number | null> {
+  const supabase = await createClient();
+  // An album also carries its artist's score, to fall back on.
+  const { data } = await supabase
+    .from(SEED_TABLES[kind])
+    .select(
+      kind === "album" ? "seed_score, artists ( seed_score )" : "seed_score",
+    )
+    .eq("mbid", mbid)
+    .maybeSingle();
+  // The column only exists once migration 0014 has been run, so a missing one
+  // reads as no seed and the page behaves exactly as it did before.
+  const row = data as {
+    seed_score: number | null;
+    artists?: { seed_score: number | null } | null;
+  } | null;
+  return row?.seed_score ?? fromArtist(row?.artists?.seed_score ?? null);
+}
+
+/**
+ * What everybody but one person gave something: the page's "Everyone" score
+ * as it stood before they rated, starting score included. Hot takes are
+ * measured against this, so one can fire on a quiet page where the only other
+ * voice is the starting score.
+ */
+export async function getCrowd(
+  kind: RatingKind,
+  mbid: string,
+  excludeUserId: string,
+): Promise<{ average: number; count: number } | undefined> {
+  const supabase = await createClient();
+  const { table, column } = RATING_TABLES[kind];
+  const [{ data }, seed] = await Promise.all([
+    supabase
+      .from(table)
+      .select("score")
+      .eq(column, mbid)
+      .neq("user_id", excludeUserId)
+      .limit(2000),
+    kind === "song" ? Promise.resolve(null) : getSeed(kind, mbid),
+  ]);
+  const crowd = withSeed(
+    (data ?? []).map((row) => row.score as number),
+    seed,
+  );
+  return crowd.count
+    ? { average: crowd.sum / crowd.count, count: crowd.count }
+    : undefined;
+}
+
 /** The three scores shown at the top of an album or artist page. */
 export async function getScores(
   kind: "album" | "artist",
@@ -88,16 +142,9 @@ export async function getScores(
   const user = await getCurrentUser();
   const { table, column } = RATING_TABLES[kind];
 
-  const [{ data }, { data: catalogue }, followingIds] = await Promise.all([
+  const [{ data }, seed, followingIds] = await Promise.all([
     supabase.from(table).select("user_id, score").eq(column, mbid),
-    // An album also carries its artist's score, to fall back on.
-    supabase
-      .from(SEED_TABLES[kind])
-      .select(
-        kind === "album" ? "seed_score, artists ( seed_score )" : "seed_score",
-      )
-      .eq("mbid", mbid)
-      .maybeSingle(),
+    getSeed(kind, mbid),
     user ? getFollowingIds(user.id) : Promise.resolve<string[]>([]),
   ]);
 
@@ -107,15 +154,6 @@ export async function getScores(
     .filter((r) => followed.has(r.user_id))
     .map((r) => r.score);
 
-  // The column only exists once migration 0014 has been run, so a missing one
-  // reads as no seed and the page behaves exactly as it did before.
-  const row = catalogue as {
-    seed_score: number | null;
-    artists?: { seed_score: number | null } | null;
-  } | null;
-
-  const seed =
-    row?.seed_score ?? fromArtist(row?.artists?.seed_score ?? null);
   const everyone = withSeed(
     all.map((r) => r.score),
     seed,

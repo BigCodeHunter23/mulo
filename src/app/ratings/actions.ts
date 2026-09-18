@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
 import { getBadges } from "@/lib/badges";
+import { getCrowd } from "@/lib/ratings";
 
 export type RatingResult =
   | {
@@ -125,18 +126,14 @@ export async function rate(
     badges = undefined;
   }
 
-  // Everybody else's scores for the same thing: a hot take only counts as one
-  // against a crowd.
-  const { data: others } = await supabase
-    .from(table)
-    .select("score")
-    .eq(column, mbid)
-    .neq("user_id", user.id)
-    .limit(2000);
-  const scores = (others ?? []).map((row) => row.score as number);
-  const crowd = scores.length
-    ? { average: scores.reduce((sum, s) => sum + s, 0) / scores.length, count: scores.length }
-    : undefined;
+  // Everybody else's scores for the same thing, starting score included, so
+  // a score far from the page's "Everyone" number can be called a hot take.
+  let crowd: { average: number; count: number } | undefined;
+  try {
+    crowd = await getCrowd(kind, mbid, user.id);
+  } catch {
+    crowd = undefined;
+  }
 
   return { ok: true, badges, crowd };
 }

@@ -29,8 +29,12 @@ const COPY = {
  */
 /** How far from the crowd a score has to land to count as a hot take. */
 const HOT_TAKE_GAP = 3;
-/** And how big a crowd it has to be against: one other person isn't a crowd. */
-const HOT_TAKE_CROWD = 2;
+/**
+ * And how big a crowd it has to be against. One voice is enough: the crowd
+ * includes the starting score, so on a quiet page it's the number on screen,
+ * and a 1 against it is worth asking about.
+ */
+const HOT_TAKE_CROWD = 1;
 
 export default function RatingForm({
   kind,
@@ -225,8 +229,7 @@ export default function RatingForm({
               <p className="relative mt-1.5 text-sm text-text">
                 You gave it a{" "}
                 <span className="font-semibold text-score-you">{hotTake.yours}</span>.{" "}
-                {hotTake.count === 1 ? "The one other person" : `The other ${hotTake.count}`} here
-                average{" "}
+                Everyone else here says{" "}
                 <span className="font-semibold text-score-overall">
                   {hotTake.crowd.toFixed(1)}
                 </span>
