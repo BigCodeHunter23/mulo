@@ -985,3 +985,31 @@ select {
     animation: none;
   }
 }
+
+/* Finish the set: the card rises in and its notches fill one by one. */
+.finish-set {
+  animation: stack-rise 0.45s ease-out both;
+}
+
+@keyframes finish-notch {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.finish-notch {
+  transform-origin: left;
+  animation: finish-notch 0.4s ease-out calc(0.2s + var(--at, 0s)) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finish-set,
+  .finish-notch {
+    animation: none;
+  }
+}

@@ -20,6 +20,9 @@ import ReadMore from "@/components/ReadMore";
 import TopSongs from "@/components/TopSongs";
 import WhereNext from "@/components/WhereNext";
 import { SectionHeading } from "@/components/ui";
+import FinishTheSet from "@/components/FinishTheSet";
+import { getSetProgress } from "@/lib/gauntlet";
+import { getUsername } from "@/lib/social";
 
 export async function generateMetadata({
   params,
@@ -77,6 +80,18 @@ export default async function ArtistPage({
       reviews.map((review) => review.id),
     ),
   ]);
+
+  // How much of the discography the signed-in person has rated, and where
+  // their ranking lives once it's done.
+  const [setProgress, me] = user
+    ? await Promise.all([
+        getSetProgress(
+          user.id,
+          albums.map((a) => a.mbid),
+        ),
+        getUsername(user.id),
+      ])
+    : [null, null];
 
   // A "top songs" list isn't worth a section until a few songs have scores.
   const showTopSongs = topSongs.length >= 3;
@@ -166,6 +181,15 @@ export default async function ArtistPage({
               </section>
             )}
           </div>
+        )}
+
+        {setProgress && (
+          <FinishTheSet
+            artistMbid={mbid}
+            artistName={artist.name}
+            progress={setProgress}
+            rankingHref={me ? `/u/${me}/ranks/${mbid}` : null}
+          />
         )}
 
         <SectionHeading>Albums</SectionHeading>

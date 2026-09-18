@@ -65,10 +65,13 @@ function Equaliser() {
 export default function StackDeck({
   albums,
   runId = 0,
+  finish,
 }: {
   albums: StackAlbum[];
   /** Which run this is, so "Another run" can ask for the next one. */
   runId?: number;
+  /** Where a run that isn't The Stack goes when it's done, like a Gauntlet's ranking. */
+  finish?: { href: string; label: string };
 }) {
   /**
    * The run is fixed the moment it starts.
@@ -248,10 +251,16 @@ export default function StackDeck({
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {/* A plain link back to /stack goes nowhere: it's the address we're
               already at. A new value moves us on. */}
-          <ButtonLink href={`/stack?run=${runId + 1}`}>Another run</ButtonLink>
-          <ButtonLink href="/charts" variant="secondary">
-            See the charts
-          </ButtonLink>
+          {finish ? (
+            <ButtonLink href={finish.href}>{finish.label}</ButtonLink>
+          ) : (
+            <>
+              <ButtonLink href={`/stack?run=${runId + 1}`}>Another run</ButtonLink>
+              <ButtonLink href="/charts" variant="secondary">
+                See the charts
+              </ButtonLink>
+            </>
+          )}
         </div>
         {undoToast}
         {overlay}

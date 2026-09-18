@@ -157,3 +157,14 @@ export async function getFollowingIds(userId: string): Promise<string[]> {
 
   return (data ?? []).map((f) => f.following_id);
 }
+
+/** Somebody's username from their id, for building links to their pages. */
+export async function getUsername(userId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("username")
+    .eq("id", userId)
+    .maybeSingle();
+  return (data?.username as string | undefined) ?? null;
+}

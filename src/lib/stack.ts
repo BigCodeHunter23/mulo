@@ -205,16 +205,42 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
 
   const run = spread(pickVaried(scored, limit), limit);
 
-  // Tracklists for the whole run in one go, and only ones already cached:
-  // fetching forty from MusicBrainz at a request a second would take longer
-  // than the run itself. An album with nothing cached simply shows no songs.
+  const hits = await hitsForAlbums(run.map(({ row }) => row.mbid));
+
+  return run.map(({ row, reason }) => {
+    const found = hits.get(row.mbid) ?? { hits: [], byPlays: false };
+    return {
+      mbid: row.mbid,
+      title: row.title,
+      artist: row.artist_credit,
+      cover: row.cover_art_url,
+      year: row.release_date ? row.release_date.slice(0, 4) : null,
+      reason,
+      hits: found.hits,
+      hitsByPlays: found.byPlays,
+    };
+  });
+}
+
+/**
+ * The songs each album is known by, for a card that has to be placed at a
+ * glance. Shared by The Stack and The Gauntlet.
+ *
+ * Tracklists are read only if already cached — fetching forty from
+ * MusicBrainz at a request a second would take longer than the run itself —
+ * and every song across all of them is looked up in one request.
+ */
+export async function hitsForAlbums(
+  mbids: string[],
+): Promise<Map<string, { hits: StackHit[]; byPlays: boolean }>> {
+  const result = new Map<string, { hits: StackHit[]; byPlays: boolean }>();
+  if (mbids.length === 0) return result;
+
+  const supabase = await createClient();
   const { data: trackRows } = await supabase
     .from("tracks")
     .select("release_mbid, position, title, song_mbid")
-    .in(
-      "release_mbid",
-      run.map(({ row }) => row.mbid),
-    )
+    .in("release_mbid", mbids)
     .order("position", { ascending: true })
     .limit(3000);
 
@@ -226,7 +252,6 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
   };
   const rows = (trackRows ?? []) as TrackRow[];
 
-  // Every song in the run, in one request, so each card can lead with its hits.
   const plays = await playCounts(
     rows.map((track) => track.song_mbid).filter((id): id is string => Boolean(id)),
   );
@@ -236,8 +261,7 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
     byAlbum.set(track.release_mbid, [...(byAlbum.get(track.release_mbid) ?? []), track]);
   }
 
-  function hitsFor(mbid: string): { hits: StackHit[]; byPlays: boolean } {
-    const list = byAlbum.get(mbid) ?? [];
+  for (const [mbid, list] of byAlbum) {
     const counted = list.map((track) => ({
       title: track.title,
       plays: track.song_mbid ? (plays.get(track.song_mbid) ?? 0) : 0,
@@ -246,10 +270,11 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
     const top = Math.max(0, ...counted.map((track) => track.plays));
     // No play counts to go on: the opening tracks are the next best thing.
     if (top === 0) {
-      return {
+      result.set(mbid, {
         hits: counted.slice(0, HITS_SHOWN).map((track) => ({ title: track.title, share: 0 })),
         byPlays: false,
-      };
+      });
+      continue;
     }
 
     // The same song can sit on a record twice (a remix, a reprise); show it once.
@@ -265,24 +290,11 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
       .slice(0, HITS_SHOWN)
       .map((track) => ({ title: track.title, share: track.plays / top }));
 
-    return { hits, byPlays: true };
+    result.set(mbid, { hits, byPlays: true });
   }
 
-  return run.map(({ row, reason }) => {
-    const { hits, byPlays } = hitsFor(row.mbid);
-    return {
-      mbid: row.mbid,
-      title: row.title,
-      artist: row.artist_credit,
-      cover: row.cover_art_url,
-      year: row.release_date ? row.release_date.slice(0, 4) : null,
-      reason,
-      hits,
-      hitsByPlays: byPlays,
-    };
-  });
+  return result;
 }
-
 type Scored = { row: Row; score: number; reason: string | null };
 
 /**
@@ -348,3 +360,4 @@ function spread(scored: Scored[], limit: number): Scored[] {
 
   return taken;
 }
+
