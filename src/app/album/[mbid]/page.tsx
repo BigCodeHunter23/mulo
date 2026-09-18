@@ -16,6 +16,9 @@ import StarScore from "@/components/StarScore";
 import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
 import ListenOn from "@/components/ListenOn";
+import AddToList from "@/components/AddToList";
+import ListCard from "@/components/ListCard";
+import { getListsWithAlbum, getMyListsFor } from "@/lib/lists";
 import ReviewList from "@/components/ReviewList";
 import { SkeletonLine } from "@/components/Skeleton";
 import { SectionHeading } from "@/components/ui";
@@ -76,11 +79,12 @@ export default async function AlbumPage({
   const user = await getCurrentUser();
   const signedIn = Boolean(user);
 
-  const [artist, scores, ownRating, reviews] = await Promise.all([
+  const [artist, scores, ownRating, reviews, myLists] = await Promise.all([
     release.artist_mbid ? getCachedArtist(release.artist_mbid) : null,
     getScores("album", mbid),
     getOwnRating("album", mbid),
     getReviews("album", mbid),
+    user ? getMyListsFor(user.id, mbid).catch(() => []) : Promise.resolve([]),
   ]);
 
   const reactions = await getReactions(
@@ -159,6 +163,9 @@ export default async function AlbumPage({
                   title={release.title}
                   className="mt-4"
                 />
+                <div className="mt-3 flex justify-center sm:justify-start">
+                  <AddToList releaseMbid={mbid} signedIn={signedIn} lists={myLists} />
+                </div>
               </div>
 
               <div className="w-full sm:w-fit">
@@ -212,6 +219,10 @@ export default async function AlbumPage({
             )}
           </section>
         </div>
+
+        <Suspense fallback={null}>
+          <OnLists releaseMbid={mbid} />
+        </Suspense>
 
         {/* The end of the page shouldn't be a dead end. */}
         {artist && (
@@ -285,5 +296,24 @@ function TracklistPlaceholder() {
         ))}
       </div>
     </>
+  );
+}
+
+/** Lists this album is on, so one good list leads to the next. */
+async function OnLists({ releaseMbid }: { releaseMbid: string }) {
+  const lists = (await getListsWithAlbum(releaseMbid).catch(() => [])).filter((list) => list.count > 0);
+  if (lists.length === 0) return null;
+
+  return (
+    <section className="mt-12">
+      <SectionHeading>On these lists</SectionHeading>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {lists.map((list) => (
+          <li key={list.id}>
+            <ListCard list={list} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

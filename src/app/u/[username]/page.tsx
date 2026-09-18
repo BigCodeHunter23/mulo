@@ -10,6 +10,8 @@ import {
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
 import { getBadges } from "@/lib/badges";
+import { getUserLists } from "@/lib/lists";
+import ListCard from "@/components/ListCard";
 import { getSound } from "@/lib/sound";
 import { getTasteMatch } from "@/lib/taste";
 import { getHighestRatedAlbums } from "@/lib/ratings";
@@ -280,6 +282,9 @@ export default async function ProfilePage({
             <ButtonLink href="/ratings" variant="secondary" size="sm">
               My ratings
             </ButtonLink>
+            <ButtonLink href="/lists" variant="secondary" size="sm">
+              Your lists
+            </ButtonLink>
             <ButtonLink
               href={`/u/${profile.username}/mixtape`}
               variant="secondary"
@@ -298,6 +303,10 @@ export default async function ProfilePage({
 
       <Suspense fallback={null}>
         <ProfileTopShelf userId={profile.id} isSelf={followState.isSelf} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ProfileLists userId={profile.id} username={profile.username} />
       </Suspense>
 
       <SectionHeading
@@ -550,5 +559,37 @@ async function ProfileRatings({
         />
       ))}
     </ul>
+  );
+}
+
+/** A few of their lists, newest first; hidden until they've made one with albums in. */
+async function ProfileLists({ userId, username }: { userId: string; username: string }) {
+  const lists = (await getUserLists(userId)).filter((list) => list.count > 0);
+  if (lists.length === 0) return null;
+
+  return (
+    <section className="mb-12">
+      <SectionHeading
+        action={
+          lists.length > 3 ? (
+            <Link
+              href={`/u/${username}/lists`}
+              className="text-xs text-text-muted transition-colors hover:text-text"
+            >
+              All {lists.length} →
+            </Link>
+          ) : undefined
+        }
+      >
+        Lists
+      </SectionHeading>
+      <ul className="flex flex-col gap-2">
+        {lists.slice(0, 3).map((list) => (
+          <li key={list.id}>
+            <ListCard list={list} showOwner={false} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -42,6 +42,16 @@ export async function removeReview(kind: "album" | "artist", ratingId: number) {
  * Deletes a take on the Daily Versus. Its reports go with it, since there is
  * nothing left to look at.
  */
+/** A reported list goes entirely: its title and notes are the whole of it. */
+export async function removeList(listId: number) {
+  if (!(await requireAdmin())) return;
+  if (!Number.isInteger(listId)) return;
+
+  await createAdminClient().from("lists").delete().eq("id", listId);
+  revalidatePath("/admin/reports");
+  revalidatePath("/lists", "layout");
+}
+
 export async function removeTake(takeId: number) {
   if (!(await requireAdmin())) return;
   if (!Number.isInteger(takeId)) return;

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/moderation";
 import { buttonClass, EmptyState, SectionHeading } from "@/components/ui";
-import { removeReview, removeTake, setReportStatus } from "./actions";
+import { removeList, removeReview, removeTake, setReportStatus } from "./actions";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -35,6 +35,12 @@ type ReportRow = {
     profiles: { username: string } | null;
     versus_matchups: { day: string } | null;
   } | null;
+  lists?: {
+    id: number;
+    title: string;
+    description: string | null;
+    profiles: { username: string } | null;
+  } | null;
 };
 
 // Reports point at profiles twice (who reported, and who was reported), so
@@ -49,6 +55,10 @@ const SELECT = `
 
 const SELECT_WITH_TAKES = `${SELECT},
   versus_takes ( id, body, profiles ( username ), versus_matchups ( day ) )
+`;
+
+const SELECT_WITH_LISTS = `${SELECT_WITH_TAKES},
+  lists ( id, title, description, profiles ( username ) )
 `;
 
 function timeAgo(iso: string) {
@@ -85,7 +95,8 @@ export default async function ReportsInbox({
   };
 
   // Before takes exist their join fails, so fall back to reviews and profiles.
-  let { data, error } = await load(SELECT_WITH_TAKES);
+  let { data, error } = await load(SELECT_WITH_LISTS);
+  if (error) ({ data, error } = await load(SELECT_WITH_TAKES));
   if (error) ({ data, error } = await load(SELECT));
   const reports = (data ?? []) as unknown as ReportRow[];
 
@@ -155,7 +166,24 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-3 text-sm text-text-secondary">
-                  {report.versus_takes ? (
+                  {report.lists ? (
+                    <>
+                      <p>
+                        @{report.lists.profiles?.username ?? "unknown"}&rsquo;s list{" "}
+                        <Link
+                          href={`/lists/${report.lists.id}`}
+                          className="font-medium text-text hover:text-accent"
+                        >
+                          {report.lists.title}
+                        </Link>
+                      </p>
+                      {report.lists.description && (
+                        <blockquote className="mt-2 border-l-2 border-border-strong pl-3 text-text">
+                          {report.lists.description}
+                        </blockquote>
+                      )}
+                    </>
+                  ) : report.versus_takes ? (
                     <>
                       <p>
                         @{report.versus_takes.profiles?.username ?? "unknown"}&rsquo;s take on the{" "}
@@ -214,6 +242,13 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {report.lists && (
+                    <form action={removeList.bind(null, report.lists.id)}>
+                      <button type="submit" className={buttonClass({ size: "sm" })}>
+                        Remove list
+                      </button>
+                    </form>
+                  )}
                   {report.versus_takes && (
                     <form action={removeTake.bind(null, report.versus_takes.id)}>
                       <button type="submit" className={buttonClass({ size: "sm" })}>

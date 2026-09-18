@@ -16,6 +16,8 @@ import GuessBanner from "@/components/GuessBanner";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
+import ListCard from "@/components/ListCard";
+import { getRecentLists } from "@/lib/lists";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
 import {
   ALBUM_GRID,
@@ -57,6 +59,9 @@ export default function DiscoverSections() {
       </Suspense>
       <Suspense fallback={<GridPlaceholder title="Artists to explore" round />}>
         <ArtistsToExplore />
+      </Suspense>
+      <Suspense fallback={null}>
+        <RecentLists />
       </Suspense>
       <Suspense
         fallback={
@@ -224,6 +229,33 @@ async function JustRated() {
       <ul className="grid gap-3 md:grid-cols-2">
         {recent.map((item) => (
           <FeedItem key={item.key} item={item} signedIn={Boolean(user)} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** People's lists, newest first. Only shows once somebody has made one. */
+async function RecentLists() {
+  const lists = await getRecentLists(4).catch(() => []);
+  if (lists.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHeading
+        action={
+          <Link href="/lists" className="text-xs text-text-muted transition-colors hover:text-text">
+            All lists →
+          </Link>
+        }
+      >
+        Lists
+      </SectionHeading>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {lists.map((list) => (
+          <li key={list.id}>
+            <ListCard list={list} />
+          </li>
         ))}
       </ul>
     </section>

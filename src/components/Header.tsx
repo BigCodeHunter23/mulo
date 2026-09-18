@@ -53,6 +53,9 @@ export default async function Header() {
             <NavLink href="/">Home</NavLink>
             <NavLink href="/discover">Discover</NavLink>
             <NavLink href="/charts">Charts</NavLink>
+            <NavLink href="/lists" className="hidden lg:inline">
+              Lists
+            </NavLink>
             <NavLink href="/search">Search</NavLink>
             <NavLink href="/people">People</NavLink>
             <NavLink href="/versus">Versus</NavLink>

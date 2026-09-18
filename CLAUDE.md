@@ -139,6 +139,17 @@ in plain language, and give them links and exact steps when they need to act.
   Vercel's). Apple's terms: stream only, never store, credit Apple Music and
   link to the song beside the player. Deezer was rejected: its API terms
   forbid any commercial use.
+- Lists (migration 0015, `src/lib/lists.ts`, `src/app/lists`): people's own
+  lists of up to 100 albums, ranked or not, each with an optional note.
+  `/lists` (yours and recent), `/lists/new?add=<mbid>`, `/lists/[id]` (owner
+  edits in place: reorder, notes, add by catalogue search, delete; others can
+  report), `/u/[username]/lists`. `AddToList` on album pages, "On these lists"
+  at their foot, a row on Discover. Actions keep positions running 1, 2, 3.
+  Reported lists show in the admin inbox with a Remove list button.
+- Versus nominations (0015, `src/lib/nominations.ts`, `Nominations.tsx` at
+  the foot of today's Versus): two artists, no free text. A pairing is stored
+  once with the lower id on the left; nominating an existing one backs it.
+  Most-backed first: the owner picks from here for `versus-pairs.ts`.
 - Taste twin of the week (`src/lib/taste-twin.ts`, `TasteTwin` on the home
   page): the closest scorer on shared albums and artists (5+ in common), with
   the closest few (within 5 points) taking turns by The Drop's week number.

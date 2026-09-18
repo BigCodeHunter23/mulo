@@ -34,6 +34,7 @@ export default function ReportButton({
   artistRatingId,
   profileId,
   takeId,
+  listId,
   signedIn,
   label = "Report",
 }: {
@@ -42,6 +43,8 @@ export default function ReportButton({
   profileId?: string;
   /** A take on the Daily Versus. */
   takeId?: number;
+  /** Somebody's list of albums. */
+  listId?: number;
   signedIn: boolean;
   label?: string;
 }) {
@@ -88,6 +91,7 @@ export default function ReportButton({
       {takeId !== undefined && (
         <input type="hidden" name="versus_take_id" value={takeId} />
       )}
+      {listId !== undefined && <input type="hidden" name="list_id" value={listId} />}
 
       <p className="text-sm font-medium text-text">
         What&rsquo;s wrong with this?

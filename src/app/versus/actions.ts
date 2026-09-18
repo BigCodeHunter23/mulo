@@ -107,3 +107,82 @@ export async function deleteTake(takeId: number): Promise<TakeResult> {
   revalidatePath("/versus", "layout");
   return { ok: true };
 }
+
+export type NominationResult = { ok: true } | { ok: false; error: string };
+
+const ARTIST_MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Puts a matchup forward. The pair is stored with the lower id on the left,
+ * so either order finds the same nomination; one that already exists just
+ * gets backed.
+ */
+export async function nominateMatchup(a: string, b: string): Promise<NominationResult> {
+  if (!ARTIST_MBID.test(a) || !ARTIST_MBID.test(b)) return { ok: false, error: TRY_AGAIN };
+  const [left, right] = [a.toLowerCase(), b.toLowerCase()].sort();
+  if (left === right) return { ok: false, error: "Pick two different artists." };
+
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Log in to nominate." };
+
+  const supabase = await createClient();
+  let { data: existing } = await supabase
+    .from("versus_nominations")
+    .select("id")
+    .eq("left_artist_mbid", left)
+    .eq("right_artist_mbid", right)
+    .maybeSingle();
+
+  if (!existing) {
+    const { data, error } = await supabase
+      .from("versus_nominations")
+      .insert({ left_artist_mbid: left, right_artist_mbid: right, nominated_by: user.id })
+      .select("id")
+      .single();
+    if (error?.code === "23505") {
+      // Somebody nominated it a moment ago.
+      ({ data: existing } = await supabase
+        .from("versus_nominations")
+        .select("id")
+        .eq("left_artist_mbid", left)
+        .eq("right_artist_mbid", right)
+        .maybeSingle());
+    } else if (error || !data) {
+      return {
+        ok: false,
+        error: error?.code === "23503" ? "Pick a username first, then come back." : TRY_AGAIN,
+      };
+    } else {
+      existing = data;
+    }
+  }
+  if (!existing) return { ok: false, error: TRY_AGAIN };
+
+  const { error } = await supabase
+    .from("versus_nomination_backers")
+    .insert({ nomination_id: existing.id, user_id: user.id });
+  if (error && error.code !== "23505") return { ok: false, error: TRY_AGAIN };
+
+  revalidatePath("/versus", "layout");
+  return { ok: true };
+}
+
+/** Backs a nomination, or takes the backing back. */
+export async function backNomination(id: number, back: boolean): Promise<NominationResult> {
+  if (!Number.isSafeInteger(id)) return { ok: false, error: TRY_AGAIN };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Log in to back a matchup." };
+
+  const supabase = await createClient();
+  const { error } = back
+    ? await supabase.from("versus_nomination_backers").insert({ nomination_id: id, user_id: user.id })
+    : await supabase
+        .from("versus_nomination_backers")
+        .delete()
+        .eq("nomination_id", id)
+        .eq("user_id", user.id);
+  if (error && error.code !== "23505") return { ok: false, error: TRY_AGAIN };
+
+  revalidatePath("/versus", "layout");
+  return { ok: true };
+}

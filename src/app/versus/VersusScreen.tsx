@@ -13,6 +13,9 @@ import VersusFaces from "@/components/VersusFaces";
 import ShareButton from "@/components/ShareButton";
 import { SectionHeading } from "@/components/ui";
 import Takes from "./Takes";
+import Nominations from "./Nominations";
+import { getNominations } from "@/lib/nominations";
+import { getCurrentUser } from "@/lib/supabase/server";
 
 export function versusMetadata(matchup: VersusMatchup): Metadata {
   const pair = `${matchup.left.name} vs ${matchup.right.name}`;
@@ -141,6 +144,18 @@ export default async function VersusScreen({ matchup }: { matchup: VersusMatchup
           <Yesterday day={shiftDay(matchup.day, -1)} />
         </Suspense>
       )}
+
+      {!view.closed && (
+        <Suspense fallback={null}>
+          <NominationsSection signedIn={view.signedIn} />
+        </Suspense>
+      )}
     </main>
   );
+}
+
+async function NominationsSection({ signedIn }: { signedIn: boolean }) {
+  const user = signedIn ? await getCurrentUser() : null;
+  const nominations = await getNominations(user?.id ?? null);
+  return <Nominations nominations={nominations} signedIn={signedIn} />;
 }

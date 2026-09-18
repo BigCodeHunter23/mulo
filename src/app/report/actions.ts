@@ -24,6 +24,7 @@ export async function submitReport(
   const artistRatingId = formData.get("artist_rating_id");
   const profileId = formData.get("profile_id");
   const takeId = formData.get("versus_take_id");
+  const listId = formData.get("list_id");
 
   if (!REPORT_REASONS.includes(reason as ReportReason)) {
     return { error: "Please choose a reason." };
@@ -36,6 +37,7 @@ export async function submitReport(
     reported_profile_id: profileId ? String(profileId) : null,
     // Only sent for takes, so other reports still work before takes exist.
     ...(takeId ? { reported_versus_take_id: Number(takeId) } : {}),
+    ...(listId ? { reported_list_id: Number(listId) } : {}),
     reason,
     detail: detail || null,
   });
