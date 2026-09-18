@@ -139,13 +139,15 @@ export type Seed = {
 export function seedFrom(rating: MbRating | undefined): Seed | {
   seed_score: null;
   seed_votes: null;
-  seed_source: null;
+  seed_source: "none";
 } {
   const value = rating?.value;
   const votes = rating?.["votes-count"] ?? 0;
 
   if (typeof value !== "number" || value <= 0 || votes < MIN_SEED_VOTES) {
-    return { seed_score: null, seed_votes: null, seed_source: null };
+    // "none" rather than null records that we looked and there was nothing
+    // worth borrowing, so the backfill script doesn't ask all over again.
+    return { seed_score: null, seed_votes: null, seed_source: "none" };
   }
 
   return {
