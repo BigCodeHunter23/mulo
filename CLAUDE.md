@@ -74,7 +74,11 @@ in plain language, and give them links and exact steps when they need to act.
   ratings can't outrank one with four hundred; the number shown stays the plain
   average. Charts count MULO's own ratings only — never the starting scores
   below. `getChartProgress` marks what the signed-in person has rated, which is
-  the reason to scroll a chart at all.
+  the reason to scroll a chart at all. Genre charts are strict: each artist has one main
+  genre (`src/lib/main-genre.ts`: a tag is what its last word says, "pop
+  rap" is rap; the family their albums' tags point at most wins) and their
+  albums and songs appear under that genre only. The badge ladders still
+  match loosely on purpose.
 - Starting scores (migration 0014): an album or artist nobody here has rated
   borrows MusicBrainz's own community rating, doubled from five to ten, as
   exactly one vote, retiring past ten real ratings (`SEED_RETIRES_AT` in
