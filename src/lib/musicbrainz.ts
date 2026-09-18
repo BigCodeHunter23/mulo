@@ -25,6 +25,8 @@ type FetchOptions = {
   retries?: number;
   /** Give up on one request after this long. */
   timeoutMs?: number;
+  /** Wait this much longer before each retry. Patient work backs off slowly. */
+  backoffMs?: number;
 };
 
 async function mbFetch<T>(
@@ -32,7 +34,7 @@ async function mbFetch<T>(
   options: FetchOptions = {},
   attempt = 1,
 ): Promise<T> {
-  const { retries = 4, timeoutMs } = options;
+  const { retries = 4, timeoutMs, backoffMs = 2000 } = options;
 
   const response = await throttle(() =>
     fetch(`${API}${path}`, {
@@ -45,8 +47,8 @@ async function mbFetch<T>(
   );
 
   // 503 means MusicBrainz is busy or rate-limiting. Back off and retry.
-  if (response.status === 503 && attempt <= retries) {
-    await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+  if ((response.status === 503 || response.status === 429) && attempt <= retries) {
+    await new Promise((resolve) => setTimeout(resolve, attempt * backoffMs));
     return mbFetch<T>(path, options, attempt + 1);
   }
 
@@ -172,12 +174,18 @@ export function creditText(credit: MbCredit[] = []): string | null {
 }
 
 /**
- * Search is somebody waiting at a text box, so it gets one quick try. From
- * Vercel's shared servers MusicBrainz often answers "busy", and retrying with
- * back-off held the search page open for 25 seconds.
+ * Search is somebody waiting at a text box. From Vercel's shared servers
+ * MusicBrainz often answers "busy" — the address is shared with a great many
+ * other sites — so a single try meant searches failed at random. Two quick
+ * retries a moment apart get past most of those refusals. The long, patient
+ * back-off catalogue work uses would hold a search for half a minute, so this
+ * backs off in under a second and gives up inside nine.
+ *
+ * It can afford that now because the wider search loads in the background,
+ * under MULO's own results, rather than holding up the page.
  */
-const SEARCH: FetchOptions = { retries: 0, timeoutMs: 4000 };
-const SEARCH_DEADLINE_MS = 5000;
+const SEARCH: FetchOptions = { retries: 2, timeoutMs: 4000, backoffMs: 700 };
+const SEARCH_DEADLINE_MS = 9000;
 
 /** Also counts time spent queued behind other MusicBrainz requests. */
 function withDeadline<T>(work: Promise<T>): Promise<T> {

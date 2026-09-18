@@ -159,12 +159,25 @@ export default function SearchClient({
     const timer = setTimeout(async () => {
       setWiderLoading(true);
       try {
-        const response = await fetch(`/api/search/wider?q=${encodeURIComponent(q)}`, {
-          signal: controller.signal,
-        });
-        if (response.ok) {
-          setWider((await response.json()) as Wider);
+        // A busy moment at MusicBrainz is usually over a couple of seconds
+        // later, so one quiet second try comes before any "busy" message.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2500));
+          if (controller.signal.aborted) return;
+
+          const response = await fetch(
+            `/api/search/wider?q=${encodeURIComponent(q)}${attempt ? "&again=1" : ""}`,
+            { signal: controller.signal },
+          );
+          if (!response.ok) continue;
+
+          const answer = (await response.json()) as Wider;
+          const empty = answer.artists.length === 0 && answer.albums.length === 0;
+          if (answer.failed && empty && attempt === 0) continue;
+
+          setWider(answer);
           setWiderFor(q);
+          break;
         }
       } catch {
         // Superseded by newer typing; nothing to do.

@@ -15,18 +15,23 @@ export async function GET(request: NextRequest) {
     searchArtists(query),
     searchReleaseGroups(query),
   ]);
+  const failed = artists.status === "rejected" || albums.status === "rejected";
 
   return NextResponse.json(
     widerResults(
       artists.status === "fulfilled" ? artists.value : [],
       albums.status === "fulfilled" ? albums.value : [],
-      artists.status === "rejected" || albums.status === "rejected",
+      failed,
     ),
     {
       headers: {
-        // The same search from anybody within a few minutes is the same answer,
-        // and every one saved is a request MusicBrainz doesn't have to answer.
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+        // A good answer is the same for anybody for a few minutes, and every
+        // one served from the cache is a request MusicBrainz doesn't have to
+        // answer. A failed one must never be kept: it once meant a search that
+        // hit a busy moment kept failing for everybody for up to an hour.
+        "Cache-Control": failed
+          ? "no-store"
+          : "public, s-maxage=300, stale-while-revalidate=3600",
       },
     },
   );
