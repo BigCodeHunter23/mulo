@@ -59,6 +59,7 @@ export default async function Header() {
             {/* The rest appear as the screen has room; Log out is also on Edit profile. */}
             {user && (
               <>
+                <NavLink href="/stack">The Stack</NavLink>
                 <NavLink href={profileHref} className="hidden md:inline">
                   My profile
                 </NavLink>

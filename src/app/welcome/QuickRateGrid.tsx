@@ -15,7 +15,13 @@ export type QuickRateItem = {
 
 type Kind = "artist" | "album";
 
-const GOAL = 5;
+/**
+ * Five was too few. A rating site runs on the weight of its ratings, and five
+ * each across a few hundred people leaves nearly every record sitting on one
+ * opinion. Ten is still well under a minute of tapping, and The Stack is there
+ * afterwards for anyone with more in them.
+ */
+const GOAL = 10;
 
 /**
  * Artists and albums a new person is likely to know, in two tabs. Tap one to
@@ -65,7 +71,7 @@ export default function QuickRateGrid({
       ? "Tap an artist or album to rate it."
       : count < GOAL
         ? `${count} rated · ${GOAL - count} more to go`
-        : `${count} rated · you're set`;
+        : `${count} rated · that's plenty to start`;
 
   const items = tab === "artist" ? artists : albums;
   const round = tab === "artist";

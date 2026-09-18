@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { mostPlayedAlbums, popularArtists } from "@/lib/discover";
+import { popularArtists } from "@/lib/discover";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import { getRaisedOn } from "@/lib/raised-on";
+import { getStack } from "@/lib/stack";
 import { isRecordAvatar } from "@/lib/record-avatar";
 import FollowButton from "@/components/FollowButton";
 import InviteButton from "@/components/InviteButton";
@@ -146,10 +147,14 @@ async function RaisedStep({ userId }: { userId: string }) {
 
 async function RateStep({ userId }: { userId: string }) {
   const supabase = await createClient();
+  // Albums come from The Stack rather than a plain popularity list, so what a
+  // new person sees leans on the decade and scene they picked a moment ago.
+  // Somebody raised on nineties hip hop shouldn't be handed the same thirty
+  // records as somebody raised on seventies rock.
   const [artists, albums, { data: ratedArtists }, { data: ratedAlbums }] =
     await Promise.all([
       popularArtists(20),
-      mostPlayedAlbums(30),
+      getStack(userId, 30),
       supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId),
       supabase.from("ratings").select("release_mbid, score").eq("user_id", userId),
     ]);
@@ -163,7 +168,7 @@ async function RateStep({ userId }: { userId: string }) {
       <h1 className="display text-3xl text-text">Rate some music you know</h1>
       <p className="mt-2 max-w-xl text-sm text-text-secondary">
         Tap an artist or an album, then a score out of 10. Skip anything you
-        don&rsquo;t know; five or so is plenty to start.
+        don&rsquo;t know; ten or so is plenty to start.
       </p>
       <div className="mt-8">
         <QuickRateGrid
@@ -177,7 +182,7 @@ async function RateStep({ userId }: { userId: string }) {
             mbid: a.mbid,
             title: a.title,
             subtitle: a.artist,
-            image: coverSrc(a.cover_art_url, 250),
+            image: coverSrc(a.cover, 250),
           }))}
           initialScores={scores}
         />

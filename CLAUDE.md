@@ -92,6 +92,13 @@ in plain language, and give them links and exact steps when they need to act.
   to earn stays hidden, which was always the part worth keeping back. Genre
   families match whole words against MusicBrainz genre tags, so "rap" catches
   "pop rap" but not "trap"; a ladder's four rungs share their family's glyph.
+- The Stack (`src/lib/stack.ts`, `src/app/stack`): a run of forty albums to
+  rate quickly, one card at a time, ranked for one person — artists they
+  already rate, then the decade and scene from Raised On, then genres they
+  rate in, then popularity as the floor, with no more than three in a row by
+  one artist. Nothing is stored; the run is worked out fresh each time.
+  Onboarding's rate step draws its albums from here too, so a new account sees
+  its own decade rather than one generic popularity list.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool
   once an hour, so the same ten famous names don't always lead; `newReleases`
   is the last few months; `similarArtists` ranks by shared genres, weighted by
