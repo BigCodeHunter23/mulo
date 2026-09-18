@@ -1,7 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getRaisedOn } from "@/lib/raised-on";
-import { familiesFor } from "@/lib/badge-catalog";
+import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
+import { playCounts } from "@/lib/hits";
 
 /**
  * The Stack: a run of records to rate quickly, picked for one person.
@@ -37,21 +38,31 @@ export type StackAlbum = {
   /** Why it's in the run, shown as a quiet line under the cover. */
   reason: string | null;
   /**
-   * A few track titles, to jog a memory. A cover and a title often aren't
-   * enough to place a record — the moment somebody reads a song they know,
-   * they can score it honestly instead of guessing or skipping.
+   * The album's biggest songs, to jog a memory. A cover and a title often
+   * aren't enough to place a record — the moment somebody reads a song they
+   * know, they can score it honestly instead of guessing or skipping.
    */
-  tracks: string[];
+  hits: StackHit[];
+  /** True when the order is by plays; false when it fell back to track order. */
+  hitsByPlays: boolean;
+};
+
+export type StackHit = {
+  title: string;
+  /** Plays relative to the album's biggest song, 0 to 1, for the bar. */
+  share: number;
 };
 
 /** Enough to recognise a record by, without turning a card into a list. */
-const TRACKS_SHOWN = 5;
+const HITS_SHOWN = 4;
 
 /** Points for each reason a record might be one somebody knows. */
 const WEIGHT = {
   ratedArtist: 100,
   era: 45,
   genre: 30,
+  /** A card with its hits on it is a far easier call than a bare cover. */
+  tracklist: 20,
 };
 
 /** Read enough of the catalogue to choose from without pulling all of it. */
@@ -66,6 +77,7 @@ type Row = {
   release_date: string | null;
   genres: string[] | null;
   popularity: number | null;
+  tracks_cached_at: string | null;
 };
 
 /** The decade a release belongs to, as a number: 1994 becomes 1990. */
@@ -143,7 +155,7 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
   const { data } = await supabase
     .from("releases")
     .select(
-      "mbid, title, artist_mbid, artist_credit, cover_art_url, release_date, genres, popularity",
+      "mbid, title, artist_mbid, artist_credit, cover_art_url, release_date, genres, popularity, tracks_cached_at",
     )
     .not("cover_art_url", "is", null)
     .order("popularity", { ascending: false, nullsFirst: false })
@@ -158,13 +170,15 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
 
       if (row.artist_mbid && knownArtists.has(row.artist_mbid)) {
         score += WEIGHT.ratedArtist;
-        reason = "More from an artist you rate";
+        reason = row.artist_credit
+          ? `Because you rate ${row.artist_credit}`
+          : "Because you rate this artist";
       }
 
       const decade = decadeOf(row.release_date);
       if (eraDecade !== null && decade === eraDecade) {
         score += WEIGHT.era;
-        reason ??= `From the ${eraDecade}s, like the record you were raised on`;
+        reason ??= `From the ${eraDecade}s, the decade you were raised on`;
       }
 
       const families = familiesFor(row.genres ?? []);
@@ -172,9 +186,13 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
         if (familyHits.has(family)) score += WEIGHT.genre;
         if (sceneGenres.has(family)) score += WEIGHT.genre;
       }
-      if (reason === null && families.some((f) => familyHits.has(f))) {
-        reason = "In a genre you rate";
+      const liked = families.find((f) => familyHits.has(f));
+      if (reason === null && liked) {
+        const name = GENRE_FAMILIES.find((f) => f.id === liked)?.name;
+        reason = name ? `More ${name.toLowerCase()} for you` : "In a genre you rate";
       }
+
+      if (row.tracks_cached_at) score += WEIGHT.tracklist;
 
       // Popularity is the tie-breaker and the floor. The pool already arrives
       // most-played first, so its position stands in for the listen count and
@@ -192,33 +210,77 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
   // than the run itself. An album with nothing cached simply shows no songs.
   const { data: trackRows } = await supabase
     .from("tracks")
-    .select("release_mbid, position, title")
+    .select("release_mbid, position, title, song_mbid")
     .in(
       "release_mbid",
       run.map(({ row }) => row.mbid),
     )
     .order("position", { ascending: true })
-    .limit(2000);
+    .limit(3000);
 
-  const tracks = new Map<string, string[]>();
-  for (const track of (trackRows ?? []) as {
+  type TrackRow = {
     release_mbid: string;
+    position: number;
     title: string;
-  }[]) {
-    const list = tracks.get(track.release_mbid) ?? [];
-    if (list.length < TRACKS_SHOWN) list.push(track.title);
-    tracks.set(track.release_mbid, list);
+    song_mbid: string | null;
+  };
+  const rows = (trackRows ?? []) as TrackRow[];
+
+  // Every song in the run, in one request, so each card can lead with its hits.
+  const plays = await playCounts(
+    rows.map((track) => track.song_mbid).filter((id): id is string => Boolean(id)),
+  );
+
+  const byAlbum = new Map<string, TrackRow[]>();
+  for (const track of rows) {
+    byAlbum.set(track.release_mbid, [...(byAlbum.get(track.release_mbid) ?? []), track]);
   }
 
-  return run.map(({ row, reason }) => ({
-    mbid: row.mbid,
-    title: row.title,
-    artist: row.artist_credit,
-    cover: row.cover_art_url,
-    year: row.release_date ? row.release_date.slice(0, 4) : null,
-    reason,
-    tracks: tracks.get(row.mbid) ?? [],
-  }));
+  function hitsFor(mbid: string): { hits: StackHit[]; byPlays: boolean } {
+    const list = byAlbum.get(mbid) ?? [];
+    const counted = list.map((track) => ({
+      title: track.title,
+      plays: track.song_mbid ? (plays.get(track.song_mbid) ?? 0) : 0,
+    }));
+
+    const top = Math.max(0, ...counted.map((track) => track.plays));
+    // No play counts to go on: the opening tracks are the next best thing.
+    if (top === 0) {
+      return {
+        hits: counted.slice(0, HITS_SHOWN).map((track) => ({ title: track.title, share: 0 })),
+        byPlays: false,
+      };
+    }
+
+    // The same song can sit on a record twice (a remix, a reprise); show it once.
+    const seen = new Set<string>();
+    const hits = counted
+      .sort((a, b) => b.plays - a.plays)
+      .filter((track) => {
+        const key = track.title.toLowerCase().replace(/\s*[([].*$/, "");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, HITS_SHOWN)
+      .map((track) => ({ title: track.title, share: track.plays / top }));
+
+    return { hits, byPlays: true };
+  }
+
+  return run.map(({ row, reason }) => {
+    const { hits, byPlays } = hitsFor(row.mbid);
+    return {
+      mbid: row.mbid,
+      title: row.title,
+      artist: row.artist_credit,
+      cover: row.cover_art_url,
+      year: row.release_date ? row.release_date.slice(0, 4) : null,
+      reason,
+      hits,
+      hitsByPlays: byPlays,
+    };
+  });
 }
 
 type Scored = { row: Row; score: number; reason: string | null };

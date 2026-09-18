@@ -401,10 +401,59 @@ async function seedAlbumDetails(group, listens) {
   return `${row.genres.length} genres, ${await seedTracklist(full.id)}`;
 }
 
+/**
+ * Tracklists for albums already in the catalogue that don't have one yet,
+ * most-played first. Albums reached through an artist's page arrive with a
+ * title and a cover but no songs, and a Stack card for one of those has no
+ * hits to show. Safe to stop and rerun.
+ *
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --tracklists
+ */
+async function fillTracklists() {
+  let done = 0;
+  let failed = 0;
+
+  const mark = (mbid) =>
+    supabase
+      .from("releases")
+      .update({ tracks_cached_at: new Date().toISOString() })
+      .eq("mbid", mbid);
+
+  for (;;) {
+    // Every album gets marked as it's dealt with, even one with nothing to
+    // show, so each batch is simply whatever is still unmarked.
+    const { data, error } = await supabase
+      .from("releases")
+      .select("mbid, title")
+      .is("tracks_cached_at", null)
+      .order("popularity", { ascending: false, nullsFirst: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+
+    for (const release of data) {
+      done++;
+      try {
+        const result = await seedTracklist(release.mbid);
+        log(`Tracklist ${done} ${release.title}: ${result}`);
+        if (!/songs from/.test(result)) await mark(release.mbid);
+      } catch (problem) {
+        failed++;
+        log(`Tracklist ${done} ${release.title} failed: ${problem.message}`);
+        await mark(release.mbid);
+      }
+    }
+  }
+
+  log(`Tracklists finished: ${done} albums, ${failed} failures.`);
+}
+
 async function main() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Run with: node --env-file=.env.local scripts/seed-catalog.mjs");
   }
+
+  if (options.tracklists) return fillTracklists();
 
   log(`Preparing up to ${ALBUM_LIMIT} of the most-listened-to studio albums`);
 
