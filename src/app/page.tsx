@@ -15,6 +15,7 @@ import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus
 import DiscoverSections, { NewReleases } from "@/components/DiscoverSections";
 import RaisedOnPrompt from "@/components/RaisedOnPrompt";
 import CoverWall from "@/components/CoverWall";
+import TasteTwin from "@/components/TasteTwin";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 /** How much of the feed to show before the first break, and between breaks. */
@@ -90,6 +91,11 @@ export default async function Home() {
             action={<ButtonLink href="/people">Find people to follow</ButtonLink>}
           />
         </div>
+        <Suspense fallback={null}>
+          <div className="mb-14 empty:hidden">
+            <TasteTwin userId={user.id} />
+          </div>
+        </Suspense>
         <DiscoverSections />
       </main>
     );
@@ -134,6 +140,12 @@ export default async function Home() {
           <Feed items={middle} />
         </div>
       )}
+
+      <Suspense fallback={null}>
+        <div className="mt-12 empty:hidden">
+          <TasteTwin userId={user.id} />
+        </div>
+      </Suspense>
 
       <Suspense fallback={null}>
         <div className="mt-12 empty:hidden">

@@ -5,6 +5,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
 import { getBadges } from "@/lib/badges";
 import { getCrowd } from "@/lib/ratings";
+import { isMilestone, milestonePath } from "@/lib/milestones";
 
 export type RatingResult =
   | {
@@ -22,6 +23,11 @@ export type RatingResult =
        * can be spotted and the person invited to say why.
        */
       crowd?: { average: number; count: number };
+      /**
+       * Set when this score was somebody's tenth, hundredth (and so on) album,
+       * with the share page to celebrate it on.
+       */
+      milestone?: { count: number; url: string };
     }
   | {
       ok: false;
@@ -135,7 +141,43 @@ export async function rate(
     crowd = undefined;
   }
 
-  return { ok: true, badges, crowd };
+  let milestone: { count: number; url: string } | undefined;
+  if (kind === "album") {
+    try {
+      milestone = await reachedMilestone(user.id, mbid);
+    } catch {
+      milestone = undefined;
+    }
+  }
+
+  return { ok: true, badges, crowd, milestone };
+}
+
+/**
+ * Whether the album just rated took somebody to a milestone. Only a fresh
+ * rating counts, not a changed score: the trigger that keeps `updated_at`
+ * current means a row that has never been changed still has both times equal.
+ */
+async function reachedMilestone(userId: string, mbid: string) {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("ratings")
+    .select("release_mbid", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (!count || !isMilestone(count)) return undefined;
+
+  const [{ data: row }, { data: profile }] = await Promise.all([
+    supabase
+      .from("ratings")
+      .select("created_at, updated_at")
+      .eq("user_id", userId)
+      .eq("release_mbid", mbid)
+      .maybeSingle(),
+    supabase.from("profiles").select("username").eq("id", userId).maybeSingle(),
+  ]);
+  if (!row || !profile || row.created_at !== row.updated_at) return undefined;
+
+  return { count, url: milestonePath(String(profile.username), count) };
 }
 
 /** A review hangs off a rating, so there has to be a score first. */

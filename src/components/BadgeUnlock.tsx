@@ -6,6 +6,7 @@ import { SOLO_BADGES, GENRE_FAMILIES, type Badge } from "@/lib/badge-catalog";
 import BadgeIcon from "@/components/BadgeIcon";
 import { Sparks } from "@/components/Celebrate";
 import Portal from "@/components/Portal";
+import ShareButton from "@/components/ShareButton";
 import { buttonClass } from "@/components/ui";
 
 /**
@@ -86,6 +87,28 @@ export function newlyEarned(slugs: string[] | undefined): Badge[] {
     .filter((badge): badge is Badge => Boolean(badge));
 }
 
+/** A milestone reached: the tenth album, the hundredth, and so on. */
+type Milestone = { milestone: number; url: string };
+type Moment = Badge | Milestone;
+
+const MILESTONE_STORE = "mulo:milestones";
+
+/**
+ * Whether this browser has already celebrated a milestone. Removing a rating
+ * and adding it back can land on the same count twice; once is enough.
+ */
+function firstTime(count: number): boolean {
+  try {
+    const raw = window.localStorage.getItem(MILESTONE_STORE);
+    const seen = raw ? (JSON.parse(raw) as number[]) : [];
+    if (seen.includes(count)) return false;
+    window.localStorage.setItem(MILESTONE_STORE, JSON.stringify([...seen, count]));
+  } catch {
+    // No storage: celebrate anyway, the server only says so on a fresh rating.
+  }
+  return true;
+}
+
 /**
  * Everything a rating form needs to celebrate: hand it whatever `rate` gave
  * back, and drop `overlay` into the markup. Keeping the queue in one place
@@ -93,13 +116,20 @@ export function newlyEarned(slugs: string[] | undefined): Badge[] {
  * same way.
  */
 export function useBadgeUnlock() {
-  const [queue, setQueue] = useState<Badge[]>([]);
+  const [queue, setQueue] = useState<Moment[]>([]);
 
-  const celebrate = useCallback((result: { ok: boolean; badges?: string[] }) => {
-    if (!result.ok) return;
-    const fresh = newlyEarned(result.badges);
-    if (fresh.length > 0) setQueue((current) => [...current, ...fresh]);
-  }, []);
+  const celebrate = useCallback(
+    (result: { ok: boolean; badges?: string[]; milestone?: { count: number; url: string } }) => {
+      if (!result.ok) return;
+      const fresh: Moment[] = newlyEarned(result.badges);
+      // The milestone goes first: it's the bigger moment, and the one to share.
+      if (result.milestone && firstTime(result.milestone.count)) {
+        fresh.unshift({ milestone: result.milestone.count, url: result.milestone.url });
+      }
+      if (fresh.length > 0) setQueue((current) => [...current, ...fresh]);
+    },
+    [],
+  );
 
   const overlay =
     queue.length > 0 ? (
@@ -114,7 +144,7 @@ export default function BadgeUnlock({
   onDone,
 }: {
   /** The queue, shown one at a time. */
-  badges: Badge[];
+  badges: Moment[];
   onDone: () => void;
 }) {
   const [at, setAt] = useState(0);
@@ -139,6 +169,55 @@ export default function BadgeUnlock({
   }, [next]);
 
   if (!badge) return null;
+
+  if ("milestone" in badge) {
+    return (
+      <Portal>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="milestone-count"
+          className="badge-unlock-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-bg/85 px-6 backdrop-blur-md"
+          onClick={next}
+        >
+          <div
+            className="relative flex w-full max-w-sm flex-col items-center text-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="badge-unlock-label text-xs font-semibold uppercase tracking-[0.3em] text-accent">
+              Milestone
+            </p>
+            <div className="relative mt-4 flex items-center justify-center">
+              <Sparks count={24} reach={170} delay={0.5} />
+              <h2
+                id="milestone-count"
+                className="badge-unlock-medal display text-8xl leading-none text-score-overall sm:text-9xl"
+              >
+                {badge.milestone}
+              </h2>
+            </div>
+            <p className="badge-unlock-name display mt-4 text-3xl text-[#f3d98a]">albums rated</p>
+            <p className="badge-unlock-copy mt-2 text-sm text-text-secondary">
+              Your top-rated records are on a card, ready to share.
+            </p>
+            <div className="badge-unlock-copy mt-8 flex flex-wrap items-center justify-center gap-3">
+              <ShareButton
+                url={badge.url}
+                title={`${badge.milestone} albums rated on MULO`}
+                text={`${badge.milestone} albums rated on MULO.`}
+              />
+              <Link href={badge.url} className={buttonClass({ variant: "secondary" })} onClick={onDone}>
+                See the card
+              </Link>
+              <button type="button" autoFocus onClick={next} className={buttonClass({ variant: "ghost" })}>
+                {at + 1 < badges.length ? "Next" : "Nice"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Portal>
+    );
+  }
 
   return (
     <Portal>

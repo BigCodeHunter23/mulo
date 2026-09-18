@@ -64,7 +64,8 @@ export default function QuickRateGrid({
         });
         setError(result.error);
       } else {
-        celebrate(result);
+        // A milestone's share card would pull somebody out of signing up.
+        celebrate({ ...result, milestone: undefined });
       }
     });
   }

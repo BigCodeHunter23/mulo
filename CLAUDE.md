@@ -139,6 +139,15 @@ in plain language, and give them links and exact steps when they need to act.
   Vercel's). Apple's terms: stream only, never store, credit Apple Music and
   link to the song beside the player. Deezer was rejected: its API terms
   forbid any commercial use.
+- Taste twin of the week (`src/lib/taste-twin.ts`, `TasteTwin` on the home
+  page): the closest scorer on shared albums and artists (5+ in common), with
+  the closest few (within 5 points) taking turns by The Drop's week number.
+  Nothing stored; hides itself when nobody qualifies.
+- Milestones (`src/lib/milestones.ts`): the 10th, 25th, 50th, 100th… album
+  rating. `rate` reports one only for a fresh rating (`created_at` equals
+  `updated_at`); `BadgeUnlock` celebrates it first in the queue (not during
+  `/welcome`) and links the share page `/u/[username]/milestone/[count]`,
+  which 404s for a count not yet reached.
 - Search runs the wider MusicBrainz search automatically once typing pauses
   (`/api/search/wider`, `WiderResults`), rather than needing Enter.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool
