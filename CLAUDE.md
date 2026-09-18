@@ -108,6 +108,28 @@ in plain language, and give them links and exact steps when they need to act.
   one artist. Nothing is stored; the run is worked out fresh each time.
   Onboarding's rate step draws its albums from here too, so a new account sees
   its own decade rather than one generic popularity list.
+- The Drop (`src/lib/drop.ts`, `src/lib/drop-lineup.ts`, `/drop`): one album a
+  week for everybody, opening Monday midnight Sydney from a hand-picked
+  26-week lineup (`DROP_START` fixes week one). Scores are ordinary album
+  ratings; the spread stays hidden until you've rated. `DropBanner` and
+  `GuessBanner` sit at the top of `DiscoverSections`.
+- The Gauntlet (`src/lib/gauntlet.ts`, `/artist/[mbid]/gauntlet`): an artist's
+  unrated albums as a Stack run, oldest first, ending at the shareable ranking
+  `/u/[username]/ranks/[artist]` (podium, then the rest). `FinishTheSet` on
+  artist pages shows progress and leads into it.
+- Guess the score (`src/lib/guess.ts`, `/guess`): ten popular albums, guess
+  the "Everyone" score; best score kept in localStorage.
+- Streaks (`src/lib/streak.ts`, `StreakFlame`): consecutive Sydney days with
+  any activity, read from timestamps on ratings, reactions, Versus picks and
+  takes, GOAT and Mixtape rows. Nothing stored.
+- Stack cards lead with "Hits from this album": ListenBrainz play counts per
+  song (`src/lib/hits.ts`, one POST per run, cached a day), falling back to
+  opening tracks. Cards fly off on rate or pass, with a five-second undo.
+  `seed-catalog.mjs --tracklists` fills missing tracklists.
+- Hot takes: `rate` returns the crowd's average; `RatingForm` asks for a
+  review when a score lands 3+ away from at least two others.
+- Search runs the wider MusicBrainz search automatically once typing pauses
+  (`/api/search/wider`, `WiderResults`), rather than needing Enter.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool
   once an hour, so the same ten famous names don't always lead; `newReleases`
   is the last few months; `similarArtists` ranks by shared genres, weighted by
