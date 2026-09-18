@@ -129,8 +129,16 @@ in plain language, and give them links and exact steps when they need to act.
   song (`src/lib/hits.ts`, one POST per run, cached a day), falling back to
   opening tracks. Cards fly off on rate or pass, with a five-second undo.
   `seed-catalog.mjs --tracklists` fills missing tracklists.
-- Hot takes: `rate` returns the crowd's average; `RatingForm` asks for a
-  review when a score lands 3+ away from at least two others.
+- Hot takes: `rate` returns the crowd (`getCrowd`: everyone else plus the
+  starting score, so the page's "Everyone" number before you rated);
+  `RatingForm` asks for a review when a score lands 3+ away from it.
+- Listening: `ListenOn` links album pages to Spotify, Apple Music and YouTube
+  Music searches. `PreviewPlayer` plays Apple's 30-second previews on album
+  tracklists and Stack hits, looked up in the browser (`src/lib/preview.ts`;
+  Apple allows about 20 searches a minute per address, too few to share
+  Vercel's). Apple's terms: stream only, never store, credit Apple Music and
+  link to the song beside the player. Deezer was rejected: its API terms
+  forbid any commercial use.
 - Search runs the wider MusicBrainz search automatically once typing pauses
   (`/api/search/wider`, `WiderResults`), rather than needing Enter.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool

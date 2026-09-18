@@ -7,6 +7,7 @@ import type { StackAlbum } from "@/lib/stack";
 import { coverSrc } from "@/lib/cover-url";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { ButtonLink, buttonClass } from "@/components/ui";
+import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 
 /**
  * One record at a time, ten buttons, and a way past anything you haven't
@@ -390,9 +391,13 @@ export default function StackDeck({
                     Biggest
                   </span>
                 )}
+                {album.artist && (
+                  <PlayButton artist={album.artist} title={hit.title} scope={album.mbid} className="h-6 w-6 bg-bg/60" />
+                )}
               </li>
             ))}
           </ol>
+          {album.artist && <PreviewCredit scope={album.mbid} className="mt-1.5 justify-center" />}
         </div>
       )}
 

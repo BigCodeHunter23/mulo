@@ -15,6 +15,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
 import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
+import ListenOn from "@/components/ListenOn";
 import ReviewList from "@/components/ReviewList";
 import { SkeletonLine } from "@/components/Skeleton";
 import { SectionHeading } from "@/components/ui";
@@ -152,6 +153,12 @@ export default async function AlbumPage({
                     ))}
                   </div>
                 )}
+
+                <ListenOn
+                  artist={artist?.name ?? null}
+                  title={release.title}
+                  className="mt-4"
+                />
               </div>
 
               <div className="w-full sm:w-fit">
@@ -185,7 +192,7 @@ export default async function AlbumPage({
             {/* The first visit to an album fetches its tracklist from
                 MusicBrainz, so it streams in rather than holding up the page. */}
             <Suspense fallback={<TracklistPlaceholder />}>
-              <Tracklist releaseMbid={mbid} signedIn={signedIn} />
+              <Tracklist releaseMbid={mbid} artist={artist?.name ?? null} signedIn={signedIn} />
             </Suspense>
           </section>
 
@@ -219,9 +226,11 @@ export default async function AlbumPage({
 
 async function Tracklist({
   releaseMbid,
+  artist,
   signedIn,
 }: {
   releaseMbid: string;
+  artist: string | null;
   signedIn: boolean;
 }) {
   const tracks = await getCachedTracks(releaseMbid);
@@ -252,6 +261,7 @@ async function Tracklist({
         <SongList
           key={releaseMbid}
           releaseMbid={releaseMbid}
+          artist={artist}
           tracks={tracks}
           community={scores.community}
           initialOwn={scores.own}

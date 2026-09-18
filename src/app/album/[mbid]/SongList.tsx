@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { rate, removeRating } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
+import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 import { Star } from "@/components/StarScore";
 
 type Song = {
@@ -27,12 +28,15 @@ function formatDuration(ms: number | null) {
  */
 export default function SongList({
   releaseMbid,
+  artist,
   tracks,
   community,
   initialOwn,
   signedIn,
 }: {
   releaseMbid: string;
+  /** For finding each song's preview; without it there are no play buttons. */
+  artist: string | null;
   tracks: Song[];
   community: Record<string, { average: number; count: number }>;
   initialOwn: Record<string, number>;
@@ -147,20 +151,25 @@ export default function SongList({
               key={track.position}
               className={isOpen ? "bg-surface-raised" : i % 2 ? "bg-surface/40" : ""}
             >
-              {signedIn && songMbid ? (
-                <button
-                  type="button"
-                  onClick={() => setOpen(isOpen ? null : songMbid)}
-                  aria-expanded={isOpen}
-                  className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
-                >
-                  {row}
-                </button>
-              ) : (
-                <div className="flex min-h-11 items-center gap-3 px-4 py-2.5 text-sm">
-                  {row}
-                </div>
-              )}
+              <div className="flex items-center">
+                {artist && (
+                  <PlayButton artist={artist} title={track.title} scope={releaseMbid} className="ml-3" />
+                )}
+                {signedIn && songMbid ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpen(isOpen ? null : songMbid)}
+                    aria-expanded={isOpen}
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
+                  >
+                    {row}
+                  </button>
+                ) : (
+                  <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-sm">
+                    {row}
+                  </div>
+                )}
+              </div>
 
               {isOpen && songMbid && (
                 <div className="px-4 pb-4 pt-1">
@@ -200,6 +209,7 @@ export default function SongList({
           );
         })}
       </ol>
+      {artist && <PreviewCredit scope={releaseMbid} className="mt-2" />}
 
       {overlay}
     </div>
