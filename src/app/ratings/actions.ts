@@ -16,6 +16,11 @@ export type RatingResult =
        * never drift from the truth.
        */
       badges?: string[];
+      /**
+       * What everybody else gave the same thing, so a score far from the crowd
+       * can be spotted and the person invited to say why.
+       */
+      crowd?: { average: number; count: number };
     }
   | {
       ok: false;
@@ -120,7 +125,20 @@ export async function rate(
     badges = undefined;
   }
 
-  return { ok: true, badges };
+  // Everybody else's scores for the same thing: a hot take only counts as one
+  // against a crowd.
+  const { data: others } = await supabase
+    .from(table)
+    .select("score")
+    .eq(column, mbid)
+    .neq("user_id", user.id)
+    .limit(2000);
+  const scores = (others ?? []).map((row) => row.score as number);
+  const crowd = scores.length
+    ? { average: scores.reduce((sum, s) => sum + s, 0) / scores.length, count: scores.length }
+    : undefined;
+
+  return { ok: true, badges, crowd };
 }
 
 /** A review hangs off a rating, so there has to be a score first. */

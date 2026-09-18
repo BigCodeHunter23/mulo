@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   rate,
   removeRating,
@@ -27,6 +27,11 @@ const COPY = {
  * rolls back if the save fails. A review is typed, so it gets an explicit
  * save that only appears once there's something new to save.
  */
+/** How far from the crowd a score has to land to count as a hot take. */
+const HOT_TAKE_GAP = 3;
+/** And how big a crowd it has to be against: one other person isn't a crowd. */
+const HOT_TAKE_CROWD = 2;
+
 export default function RatingForm({
   kind,
   mbid,
@@ -44,6 +49,14 @@ export default function RatingForm({
   const [status, setStatus] = useState<Status>(null);
   const [pending, startTransition] = useTransition();
   const { celebrate, overlay } = useBadgeUnlock();
+  /**
+   * Set when a score lands a long way from everybody else's. Disagreement is
+   * the most interesting thing on a rating site, and it's usually silent: a 3
+   * against a crowd of 8s says something, but nobody learns what unless they're
+   * asked. This asks, once, right when it's fresh.
+   */
+  const [hotTake, setHotTake] = useState<{ yours: number; crowd: number; count: number } | null>(null);
+  const reviewBox = useRef<HTMLTextAreaElement>(null);
 
   // A success message fades after a moment; errors stay until acted on.
   useEffect(() => {
@@ -90,9 +103,17 @@ export default function RatingForm({
     setScore(value);
     setStatus(null);
     startTransition(async () => {
-      if (!settle(await rate(kind, mbid, value), "Saved")) {
+      const result = await rate(kind, mbid, value);
+      if (!settle(result, "Saved")) {
         setScore(previous);
+        return;
       }
+      const crowd = result.ok ? result.crowd : undefined;
+      setHotTake(
+        crowd && crowd.count >= HOT_TAKE_CROWD && Math.abs(value - crowd.average) >= HOT_TAKE_GAP
+          ? { yours: value, crowd: crowd.average, count: crowd.count }
+          : null,
+      );
     });
   }
 
@@ -192,6 +213,37 @@ export default function RatingForm({
         <p className="mt-3 text-xs text-text-muted">Tap a score to save it.</p>
       ) : (
         <div className="mt-5 flex flex-col gap-2">
+          {hotTake && !savedReview && (
+            <div className="hot-take relative mb-2 overflow-hidden rounded-xl border border-accent/40 bg-accent/[0.08] p-4">
+              <span
+                aria-hidden="true"
+                className="hot-take-glow absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/25 blur-2xl"
+              />
+              <p className="relative text-[10px] font-semibold uppercase tracking-[0.22em] text-accent">
+                Hot take
+              </p>
+              <p className="relative mt-1.5 text-sm text-text">
+                You gave it a{" "}
+                <span className="font-semibold text-score-you">{hotTake.yours}</span>.{" "}
+                {hotTake.count === 1 ? "The one other person" : `The other ${hotTake.count}`} here
+                average{" "}
+                <span className="font-semibold text-score-overall">
+                  {hotTake.crowd.toFixed(1)}
+                </span>
+                .{" "}
+                {hotTake.yours < hotTake.crowd
+                  ? "What are they hearing that you're not?"
+                  : "What are they missing?"}
+              </p>
+              <button
+                type="button"
+                onClick={() => reviewBox.current?.focus()}
+                className="relative mt-3 text-sm font-semibold text-accent underline-offset-4 hover:underline"
+              >
+                Say why &rarr;
+              </button>
+            </div>
+          )}
           <label
             htmlFor={`review-${mbid}`}
             className="text-xs font-medium uppercase tracking-wider text-text-secondary"
@@ -199,6 +251,7 @@ export default function RatingForm({
             Review <span className="normal-case text-text-muted">optional</span>
           </label>
           <textarea
+            ref={reviewBox}
             id={`review-${mbid}`}
             rows={3}
             maxLength={1000}

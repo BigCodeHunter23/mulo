@@ -914,3 +914,42 @@ select {
     animation: none;
   }
 }
+
+/* A hot take arrives with a little heat: it slides in and its glow breathes. */
+@keyframes hot-take-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hot-take {
+  animation: hot-take-in 0.4s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+
+@keyframes hot-take-glow {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+.hot-take-glow {
+  animation: hot-take-glow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hot-take,
+  .hot-take-glow {
+    animation: none;
+  }
+}
