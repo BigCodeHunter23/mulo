@@ -10,6 +10,7 @@ import {
   getArtistReleaseGroups,
   getReleaseGroup,
   getTracklist,
+  seedFrom,
   wikidataQid,
   MbNotFoundError,
 } from "@/lib/musicbrainz";
@@ -48,6 +49,54 @@ function byNewest(a: Release, b: Release) {
   if (!a.release_date) return 1;
   if (!b.release_date) return -1;
   return b.release_date.localeCompare(a.release_date);
+}
+
+/**
+ * The seed columns only exist once migration 0014 has been run, and the owner
+ * runs migrations by hand. Between a deploy and that SQL, writing a seed would
+ * fail the whole upsert and quietly stop the catalogue caching anything new —
+ * a far worse outcome than a missing starting score. So the first write that
+ * comes back complaining about the column turns seeding off for the life of
+ * the server, and everything else carries on exactly as before.
+ */
+let seedColumnsExist = true;
+
+function withoutSeed<T extends Record<string, unknown>>(row: T) {
+  const { seed_score, seed_votes, seed_source, ...rest } = row;
+  void seed_score;
+  void seed_votes;
+  void seed_source;
+  return rest;
+}
+
+/** PostgREST's code for "no such column", which is what a missing seed is. */
+function isUnknownColumn(error: { code?: string; message?: string } | null) {
+  return (
+    error?.code === "PGRST204" ||
+    (error?.message?.includes("seed_") ?? false)
+  );
+}
+
+/**
+ * Save a catalogue row, dropping the seed and trying once more if this
+ * database hasn't got the columns yet.
+ */
+async function saveWithSeed<T extends Record<string, unknown>>(
+  write: (row: Record<string, unknown>) => PromiseLike<{
+    error: { code?: string; message?: string } | null;
+  }>,
+  row: T,
+): Promise<void> {
+  if (!seedColumnsExist) {
+    await write(withoutSeed(row));
+    return;
+  }
+
+  const { error } = await write(row);
+  if (error && isUnknownColumn(error)) {
+    seedColumnsExist = false;
+    await write(withoutSeed(row));
+  }
 }
 
 /** A cover still served by the archive gets copied to our storage, later. */
@@ -97,9 +146,12 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
     ...new Set([mb.name, ...(mb.aliases ?? []).map((a) => a.name)].filter(Boolean)),
   ].join(" | ");
 
-  await createAdminClient()
-    .from("artists")
-    .upsert({ ...artist, search_names: searchNames });
+  const artists = createAdminClient().from("artists");
+  await saveWithSeed((row) => artists.upsert(row), {
+    ...artist,
+    search_names: searchNames,
+    ...seedFrom(mb.rating),
+  });
 
   return artist;
 }
@@ -218,17 +270,23 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
     genres: (mb.genres ?? []).map((g) => g.name),
     artist_credit: creditText(credit),
     details_cached_at: new Date().toISOString(),
+    // A starting score from MusicBrainz, until MULO has its own crowd.
+    ...seedFrom(mb.rating),
   };
 
   // An existing row keeps its cover, which may already be in our storage.
   const cover: string | null = cached ? cached.cover_art_url : coverArtUrl(mb.id);
 
   if (cached) {
-    await admin.from("releases").update(details).eq("mbid", mb.id);
+    await saveWithSeed(
+      (row) => admin.from("releases").update(row).eq("mbid", mb.id),
+      details,
+    );
   } else {
-    await admin
-      .from("releases")
-      .upsert({ mbid: mb.id, cover_art_url: cover, ...details }, { onConflict: "mbid" });
+    await saveWithSeed(
+      (row) => admin.from("releases").upsert(row, { onConflict: "mbid" }),
+      { mbid: mb.id, cover_art_url: cover, ...details },
+    );
   }
 
   const release: Release = {

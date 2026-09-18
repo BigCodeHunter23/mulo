@@ -161,6 +161,7 @@ export default async function AlbumPage({
                   you={scores.you}
                   friends={scores.friends}
                   friendsCount={scores.friendsCount}
+                  seeded={scores.seeded}
                 />
               </div>
             </div>

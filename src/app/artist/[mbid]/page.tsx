@@ -125,6 +125,7 @@ export default async function ArtistPage({
                   you={scores.you}
                   friends={scores.friends}
                   friendsCount={scores.friendsCount}
+                  seeded={scores.seeded}
                 />
               </div>
             </div>

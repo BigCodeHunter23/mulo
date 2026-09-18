@@ -72,20 +72,34 @@ export default function StarScore({
   you,
   friends,
   friendsCount,
+  seeded = false,
 }: {
   overall: number | null;
   overallCount?: number;
   you: number | null;
   friends: number | null;
   friendsCount?: number;
+  /** The gold score still leans on a starting score borrowed from elsewhere. */
+  seeded?: boolean;
 }) {
   return (
-    <div className="grid w-full grid-cols-[1fr_1px_1fr_1px_1fr] items-start gap-3 rounded-2xl border border-border bg-surface/70 px-3 py-3.5 backdrop-blur-md sm:flex sm:w-auto sm:gap-7 sm:px-5 sm:py-3">
-      <Score kind="overall" value={overall} count={overallCount} />
-      <div className="w-px self-stretch bg-border" />
-      <Score kind="you" value={you} />
-      <div className="w-px self-stretch bg-border" />
-      <Score kind="friends" value={friends} count={friendsCount} />
+    <div className="w-full sm:w-auto">
+      <div className="grid w-full grid-cols-[1fr_1px_1fr_1px_1fr] items-start gap-3 rounded-2xl border border-border bg-surface/70 px-3 py-3.5 backdrop-blur-md sm:flex sm:w-auto sm:gap-7 sm:px-5 sm:py-3">
+        <Score kind="overall" value={overall} count={overallCount} />
+        <div className="w-px self-stretch bg-border" />
+        <Score kind="you" value={you} />
+        <div className="w-px self-stretch bg-border" />
+        <Score kind="friends" value={friends} count={friendsCount} />
+      </div>
+
+      {/* Said out loud rather than hidden: borrowing a number so a new page
+          isn't blank is fair, passing it off as MULO's own crowd is not. */}
+      {seeded && (
+        <p className="mt-2 text-center text-[11px] leading-snug text-text-muted sm:text-left">
+          Includes a starting score from MusicBrainz, which fades out as MULO
+          rates it.
+        </p>
+      )}
     </div>
   );
 }

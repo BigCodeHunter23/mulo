@@ -10,7 +10,38 @@ export type Scores = {
   you: number | null;
   friends: number | null;
   friendsCount: number;
+  /**
+   * True while the overall score still leans on the starting score borrowed
+   * from MusicBrainz, so a page can say so rather than passing an outside
+   * number off as MULO's own. See `supabase/migrations/0014_seed_ratings.sql`.
+   */
+  seeded: boolean;
 };
+
+/**
+ * Past this many real MULO ratings the borrowed starting score is dropped.
+ * By then MULO has an answer of its own and an outside number would only
+ * muddy it; below it, one extra vote is the difference between a page with a
+ * score on it and a page with a dash.
+ */
+const SEED_RETIRES_AT = 10;
+
+/** Where each kind's seed lives, since seeds sit on the catalogue row. */
+const SEED_TABLES = {
+  album: "releases",
+  artist: "artists",
+} as const;
+
+type Seeded = { sum: number; count: number; seeded: boolean };
+
+/** Everyone's ratings, plus the starting score while it still counts. */
+function withSeed(scores: number[], seed: number | null): Seeded {
+  const sum = scores.reduce((total, score) => total + score, 0);
+  if (seed === null || scores.length >= SEED_RETIRES_AT) {
+    return { sum, count: scores.length, seeded: false };
+  }
+  return { sum: sum + seed, count: scores.length + 1, seeded: true };
+}
 
 export type OwnRating = {
   score: number;
@@ -33,8 +64,9 @@ export async function getScores(
   const user = await getCurrentUser();
   const { table, column } = RATING_TABLES[kind];
 
-  const [{ data }, followingIds] = await Promise.all([
+  const [{ data }, { data: catalogue }, followingIds] = await Promise.all([
     supabase.from(table).select("user_id, score").eq(column, mbid),
+    supabase.from(SEED_TABLES[kind]).select("seed_score").eq("mbid", mbid).maybeSingle(),
     user ? getFollowingIds(user.id) : Promise.resolve<string[]>([]),
   ]);
 
@@ -44,12 +76,21 @@ export async function getScores(
     .filter((r) => followed.has(r.user_id))
     .map((r) => r.score);
 
+  // The column only exists once migration 0014 has been run, so a missing one
+  // reads as no seed and the page behaves exactly as it did before.
+  const seed = (catalogue as { seed_score: number | null } | null)?.seed_score ?? null;
+  const everyone = withSeed(
+    all.map((r) => r.score),
+    seed,
+  );
+
   return {
-    overall: average(all.map((r) => r.score)),
-    overallCount: all.length,
+    overall: everyone.count === 0 ? null : everyone.sum / everyone.count,
+    overallCount: everyone.count,
     you: user ? (all.find((r) => r.user_id === user.id)?.score ?? null) : null,
     friends: average(friendScores),
     friendsCount: friendScores.length,
+    seeded: everyone.seeded,
   };
 }
 
@@ -65,10 +106,10 @@ export async function getScoresForReleases(
 
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("ratings")
-    .select("release_mbid, score")
-    .in("release_mbid", releaseMbids);
+  const [{ data }, { data: seeds }] = await Promise.all([
+    supabase.from("ratings").select("release_mbid, score").in("release_mbid", releaseMbids),
+    supabase.from("releases").select("mbid, seed_score").in("mbid", releaseMbids),
+  ]);
 
   const grouped = new Map<string, number[]>();
   for (const row of data ?? []) {
@@ -77,9 +118,18 @@ export async function getScoresForReleases(
     grouped.set(row.release_mbid, scores);
   }
 
-  for (const [mbid, scores] of grouped) {
-    const mean = average(scores);
-    if (mean !== null) result.set(mbid, mean);
+  // A shelf of dashes is the thing the starting score exists to prevent, so
+  // grids blend it in the same way an album page does.
+  const seed = new Map(
+    ((seeds ?? []) as { mbid: string; seed_score: number | null }[]).map((row) => [
+      row.mbid,
+      row.seed_score,
+    ]),
+  );
+
+  for (const mbid of releaseMbids) {
+    const everyone = withSeed(grouped.get(mbid) ?? [], seed.get(mbid) ?? null);
+    if (everyone.count > 0) result.set(mbid, everyone.sum / everyone.count);
   }
 
   return result;

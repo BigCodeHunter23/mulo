@@ -70,6 +70,12 @@ export type MbCredit = {
   artist: { id: string; name: string };
 };
 
+export type MbRating = {
+  /** Out of five. MULO doubles it. */
+  value?: number;
+  "votes-count"?: number;
+};
+
 export type MbArtist = {
   id: string;
   name: string;
@@ -78,6 +84,7 @@ export type MbArtist = {
   score?: number;
   aliases?: { name: string }[];
   relations?: { type: string; url?: { resource?: string } }[];
+  rating?: MbRating;
 };
 
 export type MbReleaseGroup = {
@@ -89,6 +96,7 @@ export type MbReleaseGroup = {
   genres?: { name: string }[];
   "artist-credit"?: MbCredit[];
   score?: number;
+  rating?: MbRating;
 };
 
 export type MbTrack = {
@@ -107,6 +115,47 @@ type MbEdition = {
   country?: string;
   media?: { "track-count"?: number }[];
 };
+
+/**
+ * How many people have to have voted on MusicBrainz before their score is
+ * worth borrowing. A five out of five from one person is noise; a handful
+ * agreeing is a signal.
+ */
+const MIN_SEED_VOTES = 3;
+
+export type Seed = {
+  /** Out of ten, to match MULO. */
+  seed_score: number;
+  seed_votes: number;
+  seed_source: string;
+};
+
+/**
+ * A starting score borrowed from MusicBrainz's own community, for things
+ * nobody on MULO has rated yet. MusicBrainz scores out of five, so it is
+ * doubled. Returns nulls when there is nothing worth borrowing, which clears
+ * any stale seed on a row rather than leaving one behind.
+ */
+export function seedFrom(rating: MbRating | undefined): Seed | {
+  seed_score: null;
+  seed_votes: null;
+  seed_source: null;
+} {
+  const value = rating?.value;
+  const votes = rating?.["votes-count"] ?? 0;
+
+  if (typeof value !== "number" || value <= 0 || votes < MIN_SEED_VOTES) {
+    return { seed_score: null, seed_votes: null, seed_source: null };
+  }
+
+  return {
+    // Clamped because MULO's scale starts at one, and rounded to the one
+    // decimal place every score on the site is shown to.
+    seed_score: Math.min(10, Math.max(1, Math.round(value * 2 * 10) / 10)),
+    seed_votes: votes,
+    seed_source: "musicbrainz",
+  };
+}
 
 /** The artist credit as printed on a release, e.g. "JAY-Z & Kanye West". */
 export function creditText(credit: MbCredit[] = []): string | null {
@@ -206,7 +255,7 @@ export async function searchReleaseGroups(
 }
 
 export async function getArtist(mbid: string): Promise<MbArtist> {
-  return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels+aliases&fmt=json`);
+  return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels+aliases+ratings&fmt=json`);
 }
 
 /**
@@ -259,7 +308,7 @@ export async function getArtistReleaseGroups(
 
 export async function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {
   return mbFetch<MbReleaseGroup>(
-    `/release-group/${mbid}?inc=artists+genres&fmt=json`,
+    `/release-group/${mbid}?inc=artists+genres+ratings&fmt=json`,
   );
 }
 
