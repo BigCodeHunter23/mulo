@@ -37,9 +37,10 @@ in plain language, and give them links and exact steps when they need to act.
 - `src/lib/`: `catalog.ts` (MusicBrainz caching), `ratings.ts`, `feed.ts`,
   `reviews.ts`, `reactions.ts`, `badges.ts` + `badge-catalog.ts`, `taste.ts`,
   `top-picks.ts` (GOAT),
-  `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`.
+  `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`,
+  `charts.ts` (The Charts).
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),
-  `goat`, `ratings`, `discover`, `search`, `welcome` (onboarding, with intro
+  `goat`, `ratings`, `discover`, `charts`, `search`, `welcome` (onboarding, with intro
   cards after signup), `profile` (settings), `notifications`, and
   `admin/reports` (the moderation inbox, open only to emails in the
   `ADMIN_EMAILS` environment variable).
@@ -66,14 +67,31 @@ in plain language, and give them links and exact steps when they need to act.
   photo replaces it. The picker keeps its step (decade, scene, record, the
   confirm sheet) in the address bar through `history.pushState`, so a phone's
   back swipe goes back one step.
+- The Charts (`src/lib/charts.ts`, `src/app/charts`): top hundred albums, songs
+  and artists, over everything or one of the twelve genre families the badge
+  ladders already match on, at `/charts?type=&genre=`. Ordering uses a weighted
+  average in the shape IMDb ranks its Top 250 with, so a record with three
+  ratings can't outrank one with four hundred; the number shown stays the plain
+  average. Charts count MULO's own ratings only — never the starting scores
+  below. `getChartProgress` marks what the signed-in person has rated, which is
+  the reason to scroll a chart at all.
+- Starting scores (migration 0014): an album or artist nobody here has rated
+  borrows MusicBrainz's own community rating, doubled from five to ten, as
+  exactly one vote, retiring past ten real ratings (`SEED_RETIRES_AT` in
+  `ratings.ts`). It rides along on `inc=ratings` on calls `catalog.ts` already
+  makes. Pages that lean on one say so. Writes drop the seed and retry if the
+  columns aren't there yet, so code and migration can land in either order.
 - Badges (`src/lib/badge-catalog.ts` for the list, `src/lib/badges.ts` for who
-  has what): one-offs in five groups, plus twelve genre ladders of four rungs
+  has what, `src/components/BadgeIcon.tsx` for the glyphs): one-offs in five
+  groups, plus twelve genre ladders of four rungs
   each (10 / 25 / 50 / 100 albums rated in that genre). Nothing is stored:
   every badge is worked out from ratings on each view, so it can never drift
   from the truth. The board lives at `/u/{username}/badges`, with `/badges` as
-  a shortcut to your own; a locked badge shows its name and nothing else, on
-  purpose. Genre families match whole words against MusicBrainz genre tags, so
-  "rap" catches "pop rap" but not "trap".
+  a shortcut to your own. Each badge has its own glyph, shown dimmed while
+  locked so the board reads as a collection to fill; what a locked badge took
+  to earn stays hidden, which was always the part worth keeping back. Genre
+  families match whole words against MusicBrainz genre tags, so "rap" catches
+  "pop rap" but not "trap"; a ladder's four rungs share their family's glyph.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool
   once an hour, so the same ten famous names don't always lead; `newReleases`
   is the last few months; `similarArtists` ranks by shared genres, weighted by
