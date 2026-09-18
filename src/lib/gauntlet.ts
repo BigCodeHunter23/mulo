@@ -54,6 +54,8 @@ export async function getSetProgress(
 export async function getGauntletRun(
   userId: string,
   artistMbid: string,
+  /** Shown on each card, and what the song previews search Apple with. */
+  artistName: string,
 ): Promise<{ run: StackAlbum[]; total: number }> {
   const albums = await getCachedArtistAlbums(artistMbid);
   const progress = await getSetProgress(
@@ -75,7 +77,7 @@ export async function getGauntletRun(
       return {
         mbid: album.mbid,
         title: album.title,
-        artist: null,
+        artist: artistName,
         cover: album.cover_art_url,
         year: album.release_date?.slice(0, 4) ?? null,
         reason: `Album ${progress.rated + i + 1} of ${albums.length}`,

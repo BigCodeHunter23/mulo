@@ -36,7 +36,7 @@ export default async function GauntletPage({
 
   const supabase = await createClient();
   const [{ run, total }, { data: me }] = await Promise.all([
-    getGauntletRun(user.id, mbid),
+    getGauntletRun(user.id, mbid, artist.name),
     supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
   ]);
 
