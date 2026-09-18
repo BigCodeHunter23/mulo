@@ -1013,3 +1013,82 @@ select {
     animation: none;
   }
 }
+
+/* The Drop: the sleeve lands, the record slides out from behind it and keeps
+   spinning, then the title follows. The spread's bars grow from the floor. */
+@keyframes drop-sleeve-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.9) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.drop-sleeve {
+  animation: drop-sleeve-in 0.7s cubic-bezier(0.2, 1.1, 0.3, 1) 0.1s both;
+}
+
+@keyframes drop-record-out {
+  from {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(34%);
+    opacity: 1;
+  }
+}
+
+.drop-record {
+  animation: drop-record-out 0.9s cubic-bezier(0.2, 1, 0.3, 1) 0.65s both;
+}
+
+.drop-eyebrow {
+  animation: stack-rise 0.5s ease-out both;
+}
+
+.drop-title {
+  animation: stack-rise 0.5s ease-out 0.5s both;
+}
+
+@keyframes drop-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.drop-bar {
+  transform-origin: bottom;
+  animation: drop-bar-grow 0.7s cubic-bezier(0.2, 1, 0.3, 1) var(--at, 0s) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-sleeve,
+  .drop-eyebrow,
+  .drop-title,
+  .drop-bar {
+    animation: none;
+  }
+
+  /* Still out from the sleeve, just not sliding there. */
+  .drop-record {
+    animation: none;
+    transform: translateX(34%);
+  }
+}
+
+.drop-banner {
+  animation: stack-rise 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-banner {
+    animation: none;
+  }
+}

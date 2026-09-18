@@ -11,6 +11,7 @@ import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
 import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
+import DropBanner from "@/components/DropBanner";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
@@ -32,6 +33,9 @@ import {
 export default function DiscoverSections() {
   return (
     <div className="flex flex-col gap-14">
+      <Suspense fallback={null}>
+        <DropBanner />
+      </Suspense>
       <Suspense fallback={<TodaysVersusPlaceholder />}>
         <TodaysVersus />
       </Suspense>
