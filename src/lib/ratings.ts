@@ -307,6 +307,8 @@ export type AlbumRating = {
     title: string;
     cover_art_url: string | null;
     release_date: string | null;
+    /** MusicBrainz genre tags, for filtering somebody's ratings by genre. */
+    genres?: string[];
     artist: ArtistRef | null;
   };
 };
@@ -350,7 +352,7 @@ export async function getOwnAlbumRatings(sort: Sort = "recent"): Promise<AlbumRa
     .from("ratings")
     .select(
       `score, review, created_at,
-       releases!inner ( mbid, title, cover_art_url, release_date, artists ( mbid, name ) )`,
+       releases!inner ( mbid, title, cover_art_url, release_date, genres, artists ( mbid, name ) )`,
     )
     .eq("user_id", user.id);
   for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
@@ -368,6 +370,7 @@ export async function getOwnAlbumRatings(sort: Sort = "recent"): Promise<AlbumRa
       title: releases.title,
       cover_art_url: releases.cover_art_url,
       release_date: releases.release_date,
+      genres: releases.genres ?? [],
       artist: releases.artists,
     },
   }));

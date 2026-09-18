@@ -13,6 +13,7 @@ import {
 } from "@/lib/ratings";
 import type { RatingKind } from "@/lib/rating-kinds";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 export const metadata: Metadata = { title: "My ratings" };
@@ -47,6 +48,12 @@ const TABS: {
   },
 ];
 
+const CHIP =
+  "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors";
+const CHIP_ON = "border-accent bg-accent-subtle text-accent";
+const CHIP_OFF =
+  "border-border bg-surface text-text-secondary hover:border-border-strong hover:text-text";
+
 /** How many of a score to show before the band gets a "see all" link. */
 const PER_BAND = 8;
 
@@ -74,9 +81,15 @@ function byScore<T extends { score: number }>(items: T[]): [number, T[]][] {
 export default async function MyRatingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; view?: string; score?: string }>;
+  searchParams: Promise<{
+    type?: string;
+    view?: string;
+    score?: string;
+    decade?: string;
+    genre?: string;
+  }>;
 }) {
-  const { type, view, score } = await searchParams;
+  const { type, view, score, decade: decadeParam, genre: genreParam } = await searchParams;
   const tab = TABS.find((t) => t.param === type) ?? TABS[0];
   const recent = view === "recent";
   const band = Number(score);
@@ -96,10 +109,29 @@ export default async function MyRatingsPage({
     tab.kind === "song" ? getOwnSongRatings(sort) : [],
   ]);
 
-  const href = (param: string, options: { view?: string; score?: number } = {}) => {
+  // Album filters: a decade ("1990") and a genre family ("hip-hop"). They
+  // only mean anything for albums, which carry a date and genre tags.
+  const decade = tab.kind === "album" && /^\d{4}$/.test(decadeParam ?? "") ? Number(decadeParam) : null;
+  const genre =
+    tab.kind === "album" && GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
+
+  const href = (
+    param: string,
+    options: {
+      view?: string;
+      score?: number;
+      decade?: number | null;
+      genre?: string | null;
+    } = {},
+  ) => {
     const search = new URLSearchParams({ type: param });
     if (options.view) search.set("view", options.view);
     if (options.score) search.set("score", String(options.score));
+    // Filters carry across views and bands unless explicitly changed.
+    const d = options.decade === undefined ? decade : options.decade;
+    const g = options.genre === undefined ? genre : options.genre;
+    if (param === "albums" && d) search.set("decade", String(d));
+    if (param === "albums" && g) search.set("genre", g);
     return `/ratings?${search}`;
   };
 
@@ -109,8 +141,25 @@ export default async function MyRatingsPage({
     return <SongItems ratings={list as SongRating[]} />;
   }
 
+  const decadeOf = (rating: AlbumRating) => {
+    const year = Number(rating.release.release_date?.slice(0, 4));
+    return Number.isFinite(year) && year > 1900 ? Math.floor(year / 10) * 10 : null;
+  };
+
+  // Only the decades and genres somebody actually has, so no chip leads nowhere.
+  const decades = [...new Set(albums.map(decadeOf).filter((d): d is number => d !== null))].sort();
+  const genresHeld = GENRE_FAMILIES.filter((family) =>
+    albums.some((rating) => familiesFor(rating.release.genres ?? []).includes(family.id)),
+  );
+
+  const filteredAlbums = albums.filter(
+    (rating) =>
+      (decade === null || decadeOf(rating) === decade) &&
+      (genre === null || familiesFor(rating.release.genres ?? []).includes(genre)),
+  );
+
   const all: (AlbumRating | ArtistRating | SongRating)[] =
-    tab.kind === "album" ? albums : tab.kind === "artist" ? artists : songs;
+    tab.kind === "album" ? filteredAlbums : tab.kind === "artist" ? artists : songs;
   const shown = openBand ? all.filter((r) => r.score === openBand) : all;
 
   return (
@@ -168,6 +217,44 @@ export default async function MyRatingsPage({
           );
         })}
       </nav>
+
+      {tab.kind === "album" && albums.length > 1 && (decades.length > 1 || genresHeld.length > 1) && (
+        <div className="mb-8 flex flex-col gap-2.5">
+          {decades.length > 1 && (
+            <nav aria-label="Decade" className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              {[null, ...decades].map((d) => (
+                <Link
+                  key={d ?? "all"}
+                  href={href("albums", { view: recent ? "recent" : undefined, decade: d })}
+                  aria-current={decade === d ? "page" : undefined}
+                  className={`${CHIP} ${decade === d ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {d === null ? "All decades" : `${String(d).slice(2)}s`}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {genresHeld.length > 1 && (
+            <nav aria-label="Genre" className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              {[null, ...genresHeld].map((family) => (
+                <Link
+                  key={family?.id ?? "all"}
+                  href={href("albums", { view: recent ? "recent" : undefined, genre: family?.id ?? null })}
+                  aria-current={genre === (family?.id ?? null) ? "page" : undefined}
+                  className={`${CHIP} ${genre === (family?.id ?? null) ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {family?.name ?? "All genres"}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {(decade !== null || genre !== null) && (
+            <p className="text-xs text-text-muted">
+              {filteredAlbums.length} of {albums.length} albums
+            </p>
+          )}
+        </div>
+      )}
 
       {counts[tab.kind] === 0 ? (
         <EmptyState
