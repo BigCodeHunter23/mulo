@@ -30,7 +30,7 @@ const options = Object.fromEntries(
     return [key, value ?? "true"];
   }),
 );
-const LIMIT = Number(options.limit ?? 5000);
+const LIMIT = Number(options.limit ?? 100000);
 /** "albums", "artists", or both when not given. */
 const ONLY = options.only ?? null;
 
@@ -93,6 +93,15 @@ function seedFrom(rating) {
   };
 }
 
+/**
+ * Supabase caps any one query at a thousand rows however big a limit you ask
+ * for, so a catalogue bigger than that needs several passes. Each record is
+ * marked as it's dealt with, so the next pass simply picks up whatever is
+ * still unmarked — no page numbers to keep track of, and stopping partway
+ * costs nothing.
+ */
+const PAGE = 1000;
+
 async function backfill(kind) {
   const table = kind === "albums" ? "releases" : "artists";
   const path = kind === "albums" ? "release-group" : "artist";
@@ -100,60 +109,71 @@ async function backfill(kind) {
   // `releases` has a title and `artists` a name; neither has the other.
   const naming = kind === "albums" ? "title" : "name";
 
-  // Most-played first, so a run stopped early has still done the records
-  // people are most likely to open.
-  const { data, error } = await supabase
-    .from(table)
-    .select(`mbid, ${naming}, popularity`)
-    .is("seed_source", null)
-    .order("popularity", { ascending: false, nullsFirst: false })
-    .limit(LIMIT);
-
-  if (error) {
-    if (error.message?.includes("seed_source")) {
-      log(`Run migration 0014_seed_ratings.sql first — ${table} has no seed columns yet.`);
-      process.exit(1);
-    }
-    throw error;
-  }
-
-  const rows = data ?? [];
-  log(`${rows.length} ${label}s with no starting score.`);
-
   let seeded = 0;
   let skipped = 0;
+  let done = 0;
 
-  for (const [i, row] of rows.entries()) {
-    const name = row.title ?? row.name ?? row.mbid;
-    let mb;
-    try {
-      mb = await musicbrainz(`/${path}/${row.mbid}?inc=ratings&fmt=json`);
-    } catch (problem) {
-      log(`  ${name}: ${problem.message}`);
-      continue;
+  while (done < LIMIT) {
+    // Most-played first, so a run stopped early has still done the records
+    // people are most likely to open.
+    const { data, error } = await supabase
+      .from(table)
+      .select(`mbid, ${naming}, popularity`)
+      .is("seed_source", null)
+      .order("popularity", { ascending: false, nullsFirst: false })
+      .limit(Math.min(PAGE, LIMIT - done));
+
+    if (error) {
+      if (error.message?.includes("seed_source")) {
+        log(
+          `Run migration 0014_seed_ratings.sql first — ${table} has no seed columns yet.`,
+        );
+        process.exit(1);
+      }
+      throw error;
     }
 
-    const seed = seedFrom(mb?.rating);
-    if (!seed) {
-      // Remember that we looked, so a rerun doesn't ask MusicBrainz again for
-      // a record it has no useful rating for.
-      await supabase
-        .from(table)
-        .update({ seed_source: "none" })
-        .eq("mbid", row.mbid);
-      skipped += 1;
-    } else {
-      await supabase.from(table).update(seed).eq("mbid", row.mbid);
-      seeded += 1;
-      log(`  ${name} → ${seed.seed_score} (${seed.seed_votes} votes)`);
-    }
+    const rows = data ?? [];
+    if (rows.length === 0) break;
+    log(`${label}s: ${rows.length} to go through in this batch.`);
 
-    if ((i + 1) % 50 === 0) {
-      log(`${i + 1}/${rows.length} ${label}s done.`);
+    for (const row of rows) {
+      const name = row.title ?? row.name ?? row.mbid;
+      let mb;
+      try {
+        mb = await musicbrainz(`/${path}/${row.mbid}?inc=ratings&fmt=json`);
+      } catch (problem) {
+        log(`  ${name}: ${problem.message}`);
+        // Leave it unmarked so a later run tries again, but step past it here
+        // rather than asking for the same batch forever.
+        await supabase
+          .from(table)
+          .update({ seed_source: "retry" })
+          .eq("mbid", row.mbid);
+        continue;
+      }
+
+      const seed = seedFrom(mb?.rating);
+      if (!seed) {
+        // Remember that we looked, so a rerun doesn't ask MusicBrainz again
+        // for a record it has no useful rating for.
+        await supabase
+          .from(table)
+          .update({ seed_source: "none" })
+          .eq("mbid", row.mbid);
+        skipped += 1;
+      } else {
+        await supabase.from(table).update(seed).eq("mbid", row.mbid);
+        seeded += 1;
+        log(`  ${name} → ${seed.seed_score} (${seed.seed_votes} votes)`);
+      }
+
+      done += 1;
+      if (done % 100 === 0) log(`${done} ${label}s done so far.`);
     }
   }
 
-  log(`${label}s: ${seeded} seeded, ${skipped} with nothing worth borrowing.`);
+  log(`${label}s finished: ${seeded} seeded, ${skipped} with nothing to borrow.`);
 }
 
 if (!ONLY || ONLY === "albums") await backfill("albums");
