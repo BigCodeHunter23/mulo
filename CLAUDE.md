@@ -80,7 +80,10 @@ in plain language, and give them links and exact steps when they need to act.
   exactly one vote, retiring past ten real ratings (`SEED_RETIRES_AT` in
   `ratings.ts`). It rides along on `inc=ratings` on calls `catalog.ts` already
   makes. Pages that lean on one say so. Writes drop the seed and retry if the
-  columns aren't there yet, so code and migration can land in either order.
+  columns aren't there yet, so code and migration can land in either order. An album
+  with no rating of its own falls back to its artist.s, pulled towards the
+  middle of the scale (`FROM_ARTIST` in `ratings.ts`), which covers the nine in
+  ten empty albums whose artist does have one.
 - Badges (`src/lib/badge-catalog.ts` for the list, `src/lib/badges.ts` for who
   has what, `src/components/BadgeIcon.tsx` for the glyphs): one-offs in five
   groups, plus twelve genre ladders of four rungs

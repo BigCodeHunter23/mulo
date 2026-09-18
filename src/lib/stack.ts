@@ -36,7 +36,16 @@ export type StackAlbum = {
   year: string | null;
   /** Why it's in the run, shown as a quiet line under the cover. */
   reason: string | null;
+  /**
+   * A few track titles, to jog a memory. A cover and a title often aren't
+   * enough to place a record — the moment somebody reads a song they know,
+   * they can score it honestly instead of guessing or skipping.
+   */
+  tracks: string[];
 };
+
+/** Enough to recognise a record by, without turning a card into a list. */
+const TRACKS_SHOWN = 5;
 
 /** Points for each reason a record might be one somebody knows. */
 const WEIGHT = {
@@ -176,13 +185,39 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
     })
     .sort((a, b) => b.score - a.score);
 
-  return spread(pickVaried(scored, limit), limit).map(({ row, reason }) => ({
+  const run = spread(pickVaried(scored, limit), limit);
+
+  // Tracklists for the whole run in one go, and only ones already cached:
+  // fetching forty from MusicBrainz at a request a second would take longer
+  // than the run itself. An album with nothing cached simply shows no songs.
+  const { data: trackRows } = await supabase
+    .from("tracks")
+    .select("release_mbid, position, title")
+    .in(
+      "release_mbid",
+      run.map(({ row }) => row.mbid),
+    )
+    .order("position", { ascending: true })
+    .limit(2000);
+
+  const tracks = new Map<string, string[]>();
+  for (const track of (trackRows ?? []) as {
+    release_mbid: string;
+    title: string;
+  }[]) {
+    const list = tracks.get(track.release_mbid) ?? [];
+    if (list.length < TRACKS_SHOWN) list.push(track.title);
+    tracks.set(track.release_mbid, list);
+  }
+
+  return run.map(({ row, reason }) => ({
     mbid: row.mbid,
     title: row.title,
     artist: row.artist_credit,
     cover: row.cover_art_url,
     year: row.release_date ? row.release_date.slice(0, 4) : null,
     reason,
+    tracks: tracks.get(row.mbid) ?? [],
   }));
 }
 

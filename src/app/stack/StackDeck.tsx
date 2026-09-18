@@ -164,19 +164,19 @@ export default function StackDeck({
         />
       </div>
 
-      <div className="artwork mt-6 aspect-square w-full max-w-[19rem] overflow-hidden rounded-xl">
+      <div className="artwork mt-4 aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-xl sm:mt-6 sm:max-w-[17rem]">
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={album.mbid}
             src={cover}
             alt={album.title}
-            className="h-full w-full object-cover"
+            className="stack-cover h-full w-full object-cover"
           />
         )}
       </div>
 
-      <div className="mt-5 w-full text-center">
+      <div className="mt-4 w-full text-center">
         <Link
           href={`/album/${album.mbid}`}
           className="display-sm text-xl text-text transition-colors hover:text-accent sm:text-2xl"
@@ -191,8 +191,28 @@ export default function StackDeck({
         )}
       </div>
 
+      {/* A few songs, dealt in one after another. A cover and a title often
+          aren't enough to place a record; one song you know and you can score
+          it honestly rather than guessing or waving it off. */}
+      {album.tracks.length > 0 && (
+        <ul
+          key={`${album.mbid}-tracks`}
+          className="mt-3 flex w-full flex-wrap justify-center gap-1.5"
+        >
+          {album.tracks.map((track, i) => (
+            <li
+              key={`${track}-${i}`}
+              className="stack-track rounded-full border border-border/70 bg-surface/60 px-2.5 py-1 text-[11px] leading-none text-text-secondary"
+              style={{ "--at": `${i * 0.05}s` } as React.CSSProperties}
+            >
+              {track}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* Ten targets in one place, so the thumb stops having to aim */}
-      <div className="mt-6 grid w-full grid-cols-5 gap-2">
+      <div className="mt-4 grid w-full grid-cols-5 gap-2 sm:mt-6">
         {SCORES.map((score) => (
           <button
             key={score}

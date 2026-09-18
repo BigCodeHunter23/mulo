@@ -80,6 +80,8 @@ export type MbArtist = {
   id: string;
   name: string;
   disambiguation?: string;
+  /** Person, Group, Orchestra, Character and so on. */
+  type?: string;
   country?: string;
   score?: number;
   aliases?: { name: string }[];
@@ -190,6 +192,40 @@ function withDeadline<T>(work: Promise<T>): Promise<T> {
   ]);
 }
 
+/**
+ * People who share a name with a musician. MusicBrainz carries actors,
+ * authors and footballers because they turn up on soundtracks and audiobooks,
+ * and a plain text search can't tell them from the artist being looked for.
+ */
+const NOT_A_MUSICIAN =
+  /\bactress|\bactor\b|voice actor|author\b|writer\b|novelist|footballer|presenter|comedian|politician|journalist|narrator/i;
+
+/**
+ * MusicBrainz ranks artists purely on how closely the text matches, with no
+ * notion of who anybody is. Searching "Fisher" put a trance singer, an
+ * actress, a fifties crooner and a pop duo above the house producer almost
+ * everybody means — they all match the word equally well.
+ *
+ * Nudging exact matches up and non-musicians down doesn't make it clever, but
+ * it puts the likely answer where somebody will actually see it.
+ */
+function artistRelevance(artist: MbArtist, query: string) {
+  const q = query.toLowerCase().trim();
+  const name = artist.name.toLowerCase();
+  const about = artist.disambiguation ?? "";
+
+  let boost = 0;
+  if (name === q) boost += 300;
+  else if (name.startsWith(q)) boost += 120;
+
+  if (NOT_A_MUSICIAN.test(about)) boost -= 400;
+  // A group or a person is more likely to be who somebody means than a
+  // character, an orchestra credit or some other odd entry.
+  if (artist.type === "Person" || artist.type === "Group") boost += 40;
+
+  return boost + (artist.score ?? 0);
+}
+
 export async function searchArtists(query: string): Promise<MbArtist[]> {
   const data = await withDeadline(
     mbFetch<{ artists: MbArtist[] }>(
@@ -197,7 +233,9 @@ export async function searchArtists(query: string): Promise<MbArtist[]> {
       SEARCH,
     ),
   );
-  return (data.artists ?? []).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return (data.artists ?? []).sort(
+    (a, b) => artistRelevance(b, query) - artistRelevance(a, query),
+  );
 }
 
 /** Escape characters that would otherwise be Lucene query syntax. */

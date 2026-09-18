@@ -710,3 +710,44 @@ select {
     opacity: 0;
   }
 }
+
+/* Songs dealt onto a Stack card, one just after another, so a record arrives
+   rather than appearing. The stagger comes from --at, set per song. */
+@keyframes stack-track-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.stack-track {
+  animation: stack-track-in 0.35s cubic-bezier(0.2, 1, 0.3, 1) var(--at, 0s) backwards;
+}
+
+/* The cover settles in as the card changes, so each record feels handed over
+   rather than swapped. */
+@keyframes stack-cover-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.stack-cover {
+  animation: stack-cover-in 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack-track,
+  .stack-cover {
+    animation: none;
+  }
+}

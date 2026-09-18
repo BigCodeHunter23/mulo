@@ -32,6 +32,30 @@ const SEED_TABLES = {
   artist: "artists",
 } as const;
 
+/**
+ * When MusicBrainz has no rating for an album, its artist usually has one —
+ * about nine in ten of the albums that came back empty belong to an artist
+ * that didn't. Rather than leave those on a dash, the album borrows its
+ * artist's score.
+ *
+ * It gets pulled towards the middle on the way, because an artist averaging
+ * 8.7 does not mean every record they made is an 8.7 — it means their good
+ * ones are and their weakest aren't. Six parts artist to four parts the middle
+ * of the scale keeps the ranking roughly right while refusing to claim more
+ * than the evidence supports. It still only ever counts as one vote, and still
+ * steps aside once MULO has ratings of its own.
+ */
+const FROM_ARTIST = 0.6;
+const TOWARDS_MIDDLE = 1 - FROM_ARTIST;
+const MIDDLE = 6.5;
+
+function fromArtist(artistSeed: number | null): number | null {
+  if (artistSeed === null) return null;
+  return (
+    Math.round((artistSeed * FROM_ARTIST + MIDDLE * TOWARDS_MIDDLE) * 10) / 10
+  );
+}
+
 type Seeded = { sum: number; count: number; seeded: boolean };
 
 /** Everyone's ratings, plus the starting score while it still counts. */
@@ -66,7 +90,14 @@ export async function getScores(
 
   const [{ data }, { data: catalogue }, followingIds] = await Promise.all([
     supabase.from(table).select("user_id, score").eq(column, mbid),
-    supabase.from(SEED_TABLES[kind]).select("seed_score").eq("mbid", mbid).maybeSingle(),
+    // An album also carries its artist's score, to fall back on.
+    supabase
+      .from(SEED_TABLES[kind])
+      .select(
+        kind === "album" ? "seed_score, artists ( seed_score )" : "seed_score",
+      )
+      .eq("mbid", mbid)
+      .maybeSingle(),
     user ? getFollowingIds(user.id) : Promise.resolve<string[]>([]),
   ]);
 
@@ -78,7 +109,13 @@ export async function getScores(
 
   // The column only exists once migration 0014 has been run, so a missing one
   // reads as no seed and the page behaves exactly as it did before.
-  const seed = (catalogue as { seed_score: number | null } | null)?.seed_score ?? null;
+  const row = catalogue as {
+    seed_score: number | null;
+    artists?: { seed_score: number | null } | null;
+  } | null;
+
+  const seed =
+    row?.seed_score ?? fromArtist(row?.artists?.seed_score ?? null);
   const everyone = withSeed(
     all.map((r) => r.score),
     seed,
@@ -108,7 +145,10 @@ export async function getScoresForReleases(
 
   const [{ data }, { data: seeds }] = await Promise.all([
     supabase.from("ratings").select("release_mbid, score").in("release_mbid", releaseMbids),
-    supabase.from("releases").select("mbid, seed_score").in("mbid", releaseMbids),
+    supabase
+      .from("releases")
+      .select("mbid, seed_score, artists ( seed_score )")
+      .in("mbid", releaseMbids),
   ]);
 
   const grouped = new Map<string, number[]>();
@@ -121,9 +161,15 @@ export async function getScoresForReleases(
   // A shelf of dashes is the thing the starting score exists to prevent, so
   // grids blend it in the same way an album page does.
   const seed = new Map(
-    ((seeds ?? []) as { mbid: string; seed_score: number | null }[]).map((row) => [
+    (
+      (seeds ?? []) as unknown as {
+        mbid: string;
+        seed_score: number | null;
+        artists: { seed_score: number | null } | null;
+      }[]
+    ).map((row) => [
       row.mbid,
-      row.seed_score,
+      row.seed_score ?? fromArtist(row.artists?.seed_score ?? null),
     ]),
   );
 
