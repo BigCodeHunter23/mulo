@@ -24,20 +24,34 @@ import { ButtonLink, buttonClass } from "@/components/ui";
 const SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
+  /**
+   * The run is fixed the moment it starts.
+   *
+   * Saving a rating is a server action, and a server action revalidates, which
+   * makes Next.js render this page's server half again. `getStack` then leaves
+   * out the record just rated, every record after it shifts up one, and the
+   * card index — already moved on — lands a place further down the list than
+   * it should. The effect is that every second record gets stepped over
+   * without being shown.
+   *
+   * Keeping the deck in state means the list can't move under the index. A
+   * fresh run picks up whatever has been rated since.
+   */
+  const [deck] = useState(albums);
   const [at, setAt] = useState(0);
   const [rated, setRated] = useState(0);
   const [skipped, setSkipped] = useState<StackAlbum[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
   const [, startTransition] = useTransition();
 
-  const album = albums[at];
-  const done = at >= albums.length;
+  const album = deck[at];
+  const done = at >= deck.length;
 
   const next = useCallback(() => setAt((current) => current + 1), []);
 
   const save = useCallback(
     (score: number) => {
-      const target = albums[at];
+      const target = deck[at];
       if (!target) return;
 
       setRated((count) => count + 1);
@@ -51,14 +65,14 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
         }
       });
     },
-    [albums, at, next],
+    [deck, at, next],
   );
 
   const skip = useCallback(() => {
-    const target = albums[at];
+    const target = deck[at];
     if (target) setSkipped((list) => [...list, target]);
     next();
-  }, [albums, at, next]);
+  }, [deck, at, next]);
 
   // A number key rates, space skips: on a laptop the whole run is one hand.
   useEffect(() => {
@@ -66,6 +80,9 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
 
     function onKey(event: KeyboardEvent) {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // Holding a key down repeats it, which would score several records at
+      // once with a number the person only meant for one.
+      if (event.repeat) return;
 
       if (event.key === "0") {
         event.preventDefault();
@@ -116,7 +133,7 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
   }
 
   const cover = coverSrc(album.cover, 500);
-  const left = albums.length - at;
+  const left = deck.length - at;
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center">
@@ -128,7 +145,7 @@ export default function StackDeck({ albums }: { albums: StackAlbum[] }) {
       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-raised">
         <div
           className="h-full rounded-full bg-score-you transition-[width] duration-300"
-          style={{ width: `${(at / albums.length) * 100}%` }}
+          style={{ width: `${(at / deck.length) * 100}%` }}
         />
       </div>
 

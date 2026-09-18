@@ -254,8 +254,15 @@ async function FollowStep({ userId }: { userId: string }) {
         </ul>
       )}
 
-      <div className="mt-10 flex justify-end">
-        <ButtonLink href="/">Go to my feed</ButtonLink>
+      {/* Straight into The Stack rather than the feed. A brand new account has
+          a handful of ratings and follows nobody much, so a feed is the
+          emptiest room on the site; a run of records picked from the decade
+          they just told us about is the fullest. */}
+      <div className="mt-10 flex flex-wrap justify-end gap-3">
+        <ButtonLink href="/" variant="secondary">
+          Go to my feed
+        </ButtonLink>
+        <ButtonLink href="/stack">Start rating</ButtonLink>
       </div>
     </div>
   );
