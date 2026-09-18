@@ -885,3 +885,32 @@ select {
     opacity: 0;
   }
 }
+
+/* Search: a pulse while the wider database is being asked, and results that
+   rise in rather than snapping into place. */
+@keyframes search-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.search-dot {
+  animation: search-dot 1s ease-in-out infinite;
+}
+
+.search-wider {
+  animation: stack-rise 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-dot,
+  .search-wider {
+    animation: none;
+  }
+}

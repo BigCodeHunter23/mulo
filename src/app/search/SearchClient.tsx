@@ -8,8 +8,18 @@ import { coverSrc } from "@/lib/cover-url";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import { fieldClass, SectionHeading } from "@/components/ui";
+import WiderResults, { type WiderAlbum, type WiderArtist } from "./WiderResults";
 
 const EMPTY: SearchResults = { artists: [], albums: [], songs: [] };
+
+type Wider = { artists: WiderArtist[]; albums: WiderAlbum[]; failed: boolean };
+
+/**
+ * How long typing has to pause before the wider music database is asked.
+ * Longer than the catalogue search, because every one of these is a request
+ * to MusicBrainz, which allows about one a second across the whole site.
+ */
+const WIDER_PAUSE_MS = 650;
 
 // Recent searches live in this browser only.
 const RECENT_KEY = "mulo:recent-searches";
@@ -127,6 +137,47 @@ export default function SearchClient({
       controller.abort();
     };
   }, [query]);
+
+  /**
+   * The wider music database, asked automatically once typing pauses.
+   *
+   * It used to need Enter, with a small grey line saying so. Anybody who typed
+   * "Fisher" and waited saw "Nothing in MULO matches" and reasonably concluded
+   * he wasn't on MULO at all — when MusicBrainz had him the whole time. Now
+   * both arrive without asking, MULO's own results first.
+   */
+  const [wider, setWider] = useState<Wider | null>(null);
+  const [widerFor, setWiderFor] = useState("");
+  const [widerLoading, setWiderLoading] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    // A search that arrived from a link already has these from the server.
+    if (q.length < 2 || q === initialQuery.trim()) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setWiderLoading(true);
+      try {
+        const response = await fetch(`/api/search/wider?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          setWider((await response.json()) as Wider);
+          setWiderFor(q);
+        }
+      } catch {
+        // Superseded by newer typing; nothing to do.
+      } finally {
+        if (!controller.signal.aborted) setWiderLoading(false);
+      }
+    }, WIDER_PAUSE_MS);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, initialQuery]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -357,9 +408,11 @@ export default function SearchClient({
         </section>
       )}
 
+      {/* Not a dead end: whatever MULO hasn't got yet is on its way below. */}
       {nothing && (
-        <p className="mb-10 text-sm text-text-secondary">
-          Nothing in MULO matches &ldquo;{q}&rdquo; yet.
+        <p className="mb-8 text-sm text-text-secondary">
+          Nobody&rsquo;s rated &ldquo;{q}&rdquo; on MULO yet &mdash; here&rsquo;s
+          everything else we found.
         </p>
       )}
         </div>
@@ -368,9 +421,20 @@ export default function SearchClient({
       {q.length >= 2 &&
         (q === initialQuery.trim() ? (
           children
+        ) : widerFor === q && wider ? (
+          wider.artists.length || wider.albums.length ? (
+            <WiderResults artists={wider.artists} albums={wider.albums} />
+          ) : (
+            <p className="text-sm text-text-muted">
+              {wider.failed
+                ? "The wider music database is busy right now. Give it a moment and try again."
+                : `Nothing found for “${q}”. Check the spelling, or try the artist's name.`}
+            </p>
+          )
         ) : (
-          <p className="text-sm text-text-muted">
-            Press Enter to also search the whole MusicBrainz database.
+          <p className="flex items-center gap-2 text-sm text-text-muted">
+            <span className="search-dot h-1.5 w-1.5 rounded-full bg-accent" />
+            {widerLoading ? "Searching the wider music database…" : "Keep typing…"}
           </p>
         ))}
     </div>

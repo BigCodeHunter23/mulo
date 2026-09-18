@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
 import { searchCatalog } from "@/lib/search";
 import { artistsToExplore, mostPlayedAlbums } from "@/lib/discover";
-import { SectionHeading } from "@/components/ui";
 import SearchClient from "./SearchClient";
+import WiderResults from "./WiderResults";
+import { widerResults } from "@/lib/wider-search";
 
 export async function generateMetadata({
   searchParams,
@@ -95,10 +95,13 @@ async function MoreFromMusicBrainz({
   const artists = artistResult.status === "fulfilled" ? artistResult.value : [];
   const albums = albumResult.status === "fulfilled" ? albumResult.value : [];
 
-  const moreArtists = artists.filter((a) => !skip.has(a.id)).slice(0, 6);
-  const moreAlbums = albums.filter((a) => !skip.has(a.id)).slice(0, 10);
+  const wider = widerResults(
+    artists.filter((a) => !skip.has(a.id)).slice(0, 6),
+    albums.filter((a) => !skip.has(a.id)).slice(0, 10),
+    failed,
+  );
 
-  if (moreArtists.length === 0 && moreAlbums.length === 0) {
+  if (wider.artists.length === 0 && wider.albums.length === 0) {
     return failed ? (
       <p className="rounded-lg border border-score-overall/30 bg-score-overall/10 px-3 py-2 text-sm text-[#f3d98a]">
         The wider music database is busy right now, so these are MULO&rsquo;s
@@ -107,57 +110,5 @@ async function MoreFromMusicBrainz({
     ) : null;
   }
 
-  const row =
-    "flex items-baseline justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-hover";
-
-  return (
-    <section>
-      <SectionHeading>More from MusicBrainz</SectionHeading>
-      <p className="-mt-2 mb-4 text-xs text-text-muted">
-        Not in MULO yet. Opening one adds it.
-      </p>
-
-      {moreArtists.length > 0 && (
-        <ul className="mb-6 overflow-hidden rounded-xl border border-border">
-          {moreArtists.map((artist, i) => (
-            <li key={artist.id} className={i % 2 ? "bg-surface/40" : ""}>
-              <Link href={`/artist/${artist.id}`} className={row}>
-                <span className="min-w-0 truncate">
-                  <span className="font-medium text-text">{artist.name}</span>
-                  {artist.disambiguation && (
-                    <span className="ml-2 text-sm text-text-muted">
-                      {artist.disambiguation}
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-xs text-text-muted">Artist</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {moreAlbums.length > 0 && (
-        <ul className="overflow-hidden rounded-xl border border-border">
-          {moreAlbums.map((album, i) => (
-            <li key={album.id} className={i % 2 ? "bg-surface/40" : ""}>
-              <Link href={`/album/${album.id}`} className={row}>
-                <span className="min-w-0 truncate">
-                  <span className="font-medium text-text">{album.title}</span>
-                  <span className="ml-2 text-sm text-text-secondary">
-                    {album["artist-credit"]?.[0]?.artist.name}
-                  </span>
-                </span>
-                {album["first-release-date"] && (
-                  <span className="shrink-0 text-xs tabular-nums text-text-muted">
-                    {album["first-release-date"].slice(0, 4)}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
+  return <WiderResults artists={wider.artists} albums={wider.albums} />;
 }
