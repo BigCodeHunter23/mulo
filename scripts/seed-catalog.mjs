@@ -355,7 +355,9 @@ async function seedAlbumDetails(group, listens) {
     .maybeSingle();
 
   if (existing?.details_cached_at) {
-    await supabase.from("releases").update({ popularity: listens }).eq("mbid", group.id);
+    if (listens !== null) {
+      await supabase.from("releases").update({ popularity: listens }).eq("mbid", group.id);
+    }
     if (existing.tracks_cached_at) return "already prepared";
     return await seedTracklist(group.id);
   }
@@ -384,7 +386,7 @@ async function seedAlbumDetails(group, listens) {
     release_date: full["first-release-date"] || null,
     genres: (full.genres ?? []).map((g) => g.name),
     artist_credit: creditText(credit),
-    popularity: listens,
+    ...(listens !== null ? { popularity: listens } : {}),
     details_cached_at: new Date().toISOString(),
   };
 
@@ -448,12 +450,156 @@ async function fillTracklists() {
   log(`Tracklists finished: ${done} albums, ${failed} failures.`);
 }
 
+/**
+ * The main run picks albums by ListenBrainz plays, which leans hard towards
+ * hip hop and rock: house, techno, country, reggae and the rest barely make
+ * it in, so their artists' "more like" rows have nobody to suggest. This
+ * fills each genre on its own terms: the most-played artists whose main tags
+ * include it, their full album lists, and details and songs for their three
+ * biggest albums. Safe to stop and rerun.
+ *
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --genres
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --genres=house,techno --per-genre=40
+ */
+const GENRES = [
+  "house", "deep house", "tech house", "progressive house", "techno",
+  "melodic techno", "trance", "drum and bass", "dubstep", "uk garage",
+  "electro house", "edm", "ambient", "downtempo", "disco", "nu disco",
+  "synthwave", "country", "reggae", "dancehall", "afrobeats", "latin",
+  "reggaeton", "k-pop", "jazz", "soul", "neo soul", "blues", "folk",
+  "classical", "indie rock", "psychedelic rock", "metal",
+];
+
+const VARIOUS_ARTISTS = "89ad4ac3-39f7-470e-963a-56509c546377";
+
+/** ListenBrainz play counts for artists or albums, by MusicBrainz id. */
+async function popularity(kind, ids) {
+  const counts = new Map();
+  const [path, key, idKey] =
+    kind === "artists"
+      ? ["artist", "artist_mbids", "artist_mbid"]
+      : ["release-group", "release_group_mbids", "release_group_mbid"];
+  for (let i = 0; i < ids.length; i += 500) {
+    try {
+      const response = await fetch(`https://api.listenbrainz.org/1/popularity/${path}`, {
+        method: "POST",
+        headers: { ...HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: ids.slice(i, i + 500) }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!response.ok) continue;
+      for (const row of await response.json()) {
+        if (row.total_listen_count) counts.set(row[idKey], row.total_listen_count);
+      }
+    } catch {
+      // Carry on with what came back.
+    }
+    await sleep(500);
+  }
+  return counts;
+}
+
+/**
+ * Artists MusicBrainz tags with a genre. Its search is loose (Prince turns up
+ * under house), so keep only artists for whom the genre is one of their main
+ * tags: at least half as many votes as their most-voted one.
+ */
+async function artistsTagged(genre) {
+  const found = new Set();
+  for (let offset = 0; offset < 300; offset += 100) {
+    const data = await musicbrainz(
+      `/artist?query=${encodeURIComponent(`tag:"${genre}"`)}&limit=100&offset=${offset}&fmt=json`,
+    );
+    const artists = data?.artists ?? [];
+    for (const artist of artists) {
+      if (artist.id === VARIOUS_ARTISTS) continue;
+      const tags = artist.tags ?? [];
+      const top = Math.max(0, ...tags.map((t) => t.count ?? 0));
+      const tag = tags.find((t) => t.name === genre);
+      if (tag && top > 0 && (tag.count ?? 0) * 2 >= top) found.add(artist.id);
+    }
+    if (artists.length < 100) break;
+  }
+  return [...found];
+}
+
+/** An artist, their album list, and details and songs for their three biggest albums. */
+async function prepareArtist(id, listens, label) {
+  log(`  ${label}: ${await seedArtist(id, listens, new Map())}`);
+
+  const { data: albums } = await supabase
+    .from("releases")
+    .select("mbid, title, popularity")
+    .eq("artist_mbid", id);
+  const albumPlays = await popularity("albums", (albums ?? []).map((a) => a.mbid));
+  for (const album of albums ?? []) {
+    const count = albumPlays.get(album.mbid);
+    if (count && count !== album.popularity) {
+      await supabase.from("releases").update({ popularity: count }).eq("mbid", album.mbid);
+    }
+  }
+
+  // With no play counts at all, any three albums beat none.
+  const biggest = [...(albums ?? [])]
+    .sort((a, b) => (albumPlays.get(b.mbid) ?? 0) - (albumPlays.get(a.mbid) ?? 0))
+    .slice(0, 3);
+  for (const album of biggest) {
+    const result = await seedAlbumDetails({ id: album.mbid }, albumPlays.get(album.mbid) ?? null);
+    log(`    ${album.title}: ${result}`);
+  }
+}
+
+/**
+ * Artists MusicBrainz hasn't tagged with any genre, which no genre run can
+ * find (Ben Böhmer, for one), by MusicBrainz id.
+ *
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --artists=e4f12dfc-1ee7-4250-8e24-549b6d46676d
+ */
+async function fillArtists() {
+  const ids = options.artists.split(",").map((id) => id.trim());
+  const plays = await popularity("artists", ids);
+  for (const id of ids) {
+    try {
+      await prepareArtist(id, plays.get(id) ?? null, "artist");
+    } catch (problem) {
+      log(`  ${id} failed: ${problem.message}`);
+    }
+  }
+}
+
+async function fillGenres() {
+  const genres =
+    options.genres === "true" ? GENRES : options.genres.split(",").map((g) => g.trim());
+  const perGenre = Number(options["per-genre"] ?? 25);
+  let failed = 0;
+
+  for (const genre of genres) {
+    const candidates = await artistsTagged(genre);
+    const plays = await popularity("artists", candidates);
+    const chosen = [...plays.entries()].sort((a, b) => b[1] - a[1]).slice(0, perGenre);
+    log(`${genre}: ${candidates.length} artists tagged, preparing the top ${chosen.length}`);
+
+    for (const [id, listens] of chosen) {
+      try {
+        await prepareArtist(id, listens, genre);
+      } catch (problem) {
+        failed++;
+        log(`  ${genre}: ${id} failed: ${problem.message}`);
+      }
+    }
+  }
+
+  log(`Genres finished with ${failed} failures.${failed ? " Run again to retry them." : ""}`);
+}
+
 async function main() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Run with: node --env-file=.env.local scripts/seed-catalog.mjs");
   }
 
   if (options.tracklists) return fillTracklists();
+  if (options.genres) return fillGenres();
+  if (options.artists) return fillArtists();
 
   log(`Preparing up to ${ALBUM_LIMIT} of the most-listened-to studio albums`);
 

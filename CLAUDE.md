@@ -157,7 +157,9 @@ in plain language, and give them links and exact steps when they need to act.
   and friends) and every animation is switched off under
   `prefers-reduced-motion`. `Celebrate.tsx` has the crown and sparks.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
-  rerun; `scripts/copy-covers.mjs` copies covers into storage;
+  rerun; `--genres` tops up genres the popularity run misses (house, techno,
+  country, reggae…) by their most-played artists, and `--artists=<mbids>`
+  adds artists MusicBrainz hasn't tagged at all; `scripts/copy-covers.mjs` copies covers into storage;
   `scripts/seed-scores.mjs` backfills starting scores for records cached
   before 0014, which never go back to MusicBrainz on their own.
 
