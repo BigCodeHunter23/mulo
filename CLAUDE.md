@@ -81,7 +81,7 @@ in plain language, and give them links and exact steps when they need to act.
   `ratings.ts`). It rides along on `inc=ratings` on calls `catalog.ts` already
   makes. Pages that lean on one say so. Writes drop the seed and retry if the
   columns aren't there yet, so code and migration can land in either order. An album
-  with no rating of its own falls back to its artist.s, pulled towards the
+  with no rating of its own falls back to its artist's, pulled towards the
   middle of the scale (`FROM_ARTIST` in `ratings.ts`), which covers the nine in
   ten empty albums whose artist does have one.
 - Badges (`src/lib/badge-catalog.ts` for the list, `src/lib/badges.ts` for who
@@ -95,8 +95,7 @@ in plain language, and give them links and exact steps when they need to act.
   another. `rate` sends back every badge the person now holds and the browser
   compares it with the last list it saw in `localStorage`, so nothing has to
   be stored server-side; an empty store is written down quietly rather than
-  celebrated, so a new device never replays old badges.
-  a shortcut to your own. Each badge has its own glyph, shown dimmed while
+  celebrated, so a new device never replays old badges. Each badge has its own glyph, shown dimmed while
   locked so the board reads as a collection to fill; what a locked badge took
   to earn stays hidden, which was always the part worth keeping back. Genre
   families match whole words against MusicBrainz genre tags, so "rap" catches
