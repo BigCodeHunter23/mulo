@@ -46,6 +46,12 @@ export default function AlbumCard({
   const src = coverSrc(coverUrl, 250);
   const detail = [artist, year].filter(Boolean).join(" · ");
   const [yours, setYours] = useState(mine);
+  // A fresh score from the server (after a refresh, say) replaces the local one.
+  const [given, setGiven] = useState(mine);
+  if (given !== mine) {
+    setGiven(mine);
+    setYours(mine);
+  }
   const [open, setOpen] = useState(false);
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   const held = useRef(false);

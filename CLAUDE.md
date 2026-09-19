@@ -164,6 +164,22 @@ in plain language, and give them links and exact steps when they need to act.
   which 404s for a count not yet reached.
 - Album covers carry your own score in a red chip (`AlbumCard`'s `mine`,
   filled by `getMyAlbumScores`) on artist pages and Discover grids.
+- Quick-rate: pressing and holding an `AlbumCard` cover opens `QuickRate`, a
+  score sheet, instead of the album; `HoldTip` on Discover says so once.
+- Haptics (`src/lib/haptics.ts`): `haptic("tap" | "select" | ...)` from click
+  handlers. Android uses `navigator.vibrate`; iPhones get a tick from a hidden
+  iOS 18 switch checkbox, which only works straight from a tap (not after an
+  await).
+- Story images (`src/lib/story.tsx`): 1080x1920 routes at
+  `/u/[username]/milestone/[count]/story`, `/lists/[id]/story` and
+  `/u/[username]/goat/story?kind=`; `StoryButton` pre-fetches the image so the
+  share sheet can open straight from the tap (iOS requires that).
+- Recently viewed on search: `TrackView` on album and artist pages writes to
+  localStorage (`src/lib/recently-viewed.ts`).
+- Artist main genres for Stack filters and genre Charts come from
+  `getArtistGenres()` (`src/lib/artist-genres.ts`), read a page at a time over
+  the whole catalogue: PostgREST caps any single request at 1,000 rows, whatever
+  `.limit()` says.
 - Search runs the wider MusicBrainz search automatically once typing pauses
   (`/api/search/wider`, `WiderResults`), rather than needing Enter.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool

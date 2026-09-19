@@ -18,6 +18,7 @@ import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
 import ListCard from "@/components/ListCard";
+import HoldTip from "@/components/HoldTip";
 import { getRecentLists } from "@/lib/lists";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
 import {
@@ -42,6 +43,7 @@ export default function DiscoverSections() {
           <DropBanner />
         </Suspense>
         <GuessBanner />
+        <HoldTip />
       </div>
       <Suspense fallback={<TodaysVersusPlaceholder />}>
         <TodaysVersus />
