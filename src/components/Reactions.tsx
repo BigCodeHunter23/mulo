@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setReaction } from "@/app/reactions/actions";
+import { haptic } from "@/lib/haptics";
 
 type Kind = "album" | "artist" | "take" | "pick";
 
@@ -69,6 +70,7 @@ export default function Reactions({
   const [, startTransition] = useTransition();
 
   function pick(value: 1 | -1) {
+    haptic("tap");
     const previous = state;
     const mine = state.mine === value ? 0 : value;
 

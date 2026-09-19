@@ -10,6 +10,7 @@ import {
 } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { buttonClass, fieldClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 type Status =
   | { tone: "saved"; text: string }
@@ -102,6 +103,7 @@ export default function RatingForm({
   }
 
   function pick(value: number) {
+    haptic("select");
     if (value === score) return;
     const previous = score;
     setScore(value);
@@ -131,6 +133,7 @@ export default function RatingForm({
   }
 
   function remove() {
+    haptic("tap");
     const previous = { score, draft, savedReview };
     setScore(null);
     setDraft("");

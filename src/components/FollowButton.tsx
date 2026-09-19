@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setFollowing } from "@/app/u/[username]/actions";
 import { buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 /**
  * Switches the moment it's tapped, then confirms in the background. If the
@@ -45,6 +46,7 @@ export default function FollowButton({
   }
 
   function toggle() {
+    haptic("tap");
     const next = !following;
     setFollowingState(next);
     setError(null);

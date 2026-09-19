@@ -6,6 +6,7 @@ import type { GuessAlbum } from "@/lib/guess";
 import { coverSrc } from "@/lib/cover-url";
 import { Sparks } from "@/components/Celebrate";
 import { ButtonLink, buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 /**
  * Ten records, one slider each. Guess what everyone on MULO gave it, lock it
@@ -110,11 +111,7 @@ export default function GuessGame({
     setLocked(true);
     setTotal((sum) => sum + pointsFor(guess, album.score));
     if (Math.abs(guess - album.score) <= BULLSEYE) setBullseyes((n) => n + 1);
-    try {
-      navigator.vibrate?.(15);
-    } catch {
-      // Not supported.
-    }
+    haptic("select");
   }
 
   function next() {

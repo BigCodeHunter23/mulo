@@ -8,6 +8,7 @@ import { Sparks } from "@/components/Celebrate";
 import Portal from "@/components/Portal";
 import ShareButton from "@/components/ShareButton";
 import { buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 /**
  * The moment a badge is earned.
@@ -149,6 +150,12 @@ export default function BadgeUnlock({
 }) {
   const [at, setAt] = useState(0);
   const badge = badges[at];
+
+  // Each one lands with a buzz. It arrives after the save rather than on the
+  // tap itself, so iPhones stay quiet here; Android feels it.
+  useEffect(() => {
+    haptic("celebrate");
+  }, [at]);
 
   const next = useCallback(() => {
     if (at + 1 < badges.length) setAt(at + 1);

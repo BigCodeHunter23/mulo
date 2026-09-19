@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { rate } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 export type QuickRateItem = {
   mbid: string;
@@ -47,6 +48,7 @@ export default function QuickRateGrid({
   const { celebrate, overlay } = useBadgeUnlock();
 
   function save(kind: Kind, mbid: string, value: number) {
+    haptic("select");
     const key = `${kind}:${mbid}`;
     const previous = scores[key];
     setScores((current) => ({ ...current, [key]: value }));

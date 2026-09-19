@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { findPreview, type Preview } from "@/lib/preview";
+import { haptic } from "@/lib/haptics";
 
 /**
  * Play buttons for thirty-second previews, and the credit Apple asks for
@@ -41,6 +42,7 @@ function stop() {
 }
 
 async function toggle(key: string, artist: string, title: string) {
+  haptic("tap");
   if (state.key === key && (state.phase === "playing" || state.phase === "loading")) {
     stop();
     return;

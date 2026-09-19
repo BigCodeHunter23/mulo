@@ -8,6 +8,7 @@ import type { ListItem } from "@/lib/lists";
 import { coverSrc } from "@/lib/cover-url";
 import { buttonClass, fieldClass } from "@/components/ui";
 import ListForm from "../ListForm";
+import { haptic } from "@/lib/haptics";
 
 type Found = { mbid: string; title: string; artist: string | null; cover_art_url: string | null; year: string | null };
 
@@ -37,6 +38,7 @@ export default function ListItems({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
+    haptic("tap");
     setError(null);
     startTransition(async () => {
       const result = await action();

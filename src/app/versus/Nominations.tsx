@@ -7,6 +7,7 @@ import { backNomination, nominateMatchup } from "./actions";
 import type { Nomination } from "@/lib/nominations";
 import { artistPhotoSrc } from "@/lib/cover-url";
 import { buttonClass, fieldClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 type Artist = { mbid: string; name: string; image_url: string | null };
 
@@ -35,6 +36,7 @@ export default function Nominations({
   }
 
   function toggle(nomination: Nomination) {
+    haptic("tap");
     if (!signedIn) {
       router.push("/login");
       return;
@@ -136,6 +138,7 @@ function NominateForm({ signedIn, onDone }: { signedIn: boolean; onDone: () => v
   }
 
   function submit() {
+    haptic("select");
     if (!left || !right) return;
     setError(null);
     startTransition(async () => {

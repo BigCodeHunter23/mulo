@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addToList, removeFromList } from "@/app/lists/actions";
 import { buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 type MyList = { id: number; title: string; has: boolean; full: boolean };
 
@@ -52,6 +53,7 @@ export default function AddToList({
   }
 
   function toggle(list: MyList) {
+    haptic("tap");
     const next = !list.has;
     setError(null);
     setLists((current) => current.map((l) => (l.id === list.id ? { ...l, has: next } : l)));

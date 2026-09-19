@@ -17,6 +17,7 @@ import {
 import Avatar from "@/components/Avatar";
 import Countdown from "@/components/Countdown";
 import { buttonClass } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 
 function VsMark({ className = "" }: { className?: string }) {
   return (
@@ -178,6 +179,7 @@ export default function VersusCard({
   const ahead = tally ? leader(tally) : null;
 
   function pick(side: VersusSideKey) {
+    haptic("select");
     if (!canPick || pending) return;
     setChoosing(side);
     setError(null);

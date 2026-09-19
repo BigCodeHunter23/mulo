@@ -6,6 +6,7 @@ import { rate, removeRating } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 import { Star } from "@/components/StarScore";
+import { haptic } from "@/lib/haptics";
 
 type Song = {
   position: number;
@@ -52,6 +53,7 @@ export default function SongList({
 
   /** A score to save, or null to remove this person's score. */
   function save(songMbid: string, value: number | null) {
+    haptic("select");
     const previous = own[songMbid];
     const put = (next: number | undefined) =>
       setOwn((current) => {

@@ -8,6 +8,7 @@ import { coverSrc } from "@/lib/cover-url";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { ButtonLink, buttonClass } from "@/components/ui";
 import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
+import { haptic } from "@/lib/haptics";
 
 /**
  * One record at a time, ten buttons, and a way past anything you haven't
@@ -38,15 +39,6 @@ type Move = {
 };
 
 type Ghost = { album: StackAlbum; score: number | null; key: number };
-
-/** A short tap from the phone. iPhones don't allow it, so they just skip it. */
-function buzz(ms = 12) {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    // Not supported: nothing to do.
-  }
-}
 
 /** Three bars bouncing, like a record playing. */
 function Equaliser() {
@@ -110,7 +102,7 @@ export default function StackDeck({
       const target = deck[at];
       if (!target) return;
 
-      buzz();
+      haptic("select");
       setGhost({ album: target, score, key: Date.now() });
       setLastMove({ index: at, album: target, score, key: Date.now() });
       setRated((count) => count + 1);
@@ -133,7 +125,7 @@ export default function StackDeck({
     const target = deck[at];
     if (!target) return;
 
-    buzz(6);
+    haptic("tap");
     setGhost({ album: target, score: null, key: Date.now() });
     setLastMove({ index: at, album: target, score: null, key: Date.now() });
     setSkipped((count) => count + 1);
@@ -144,7 +136,7 @@ export default function StackDeck({
     const move = lastMove;
     if (!move) return;
 
-    buzz(20);
+    haptic("tap");
     setLastMove(null);
     setGhost(null);
     setAt(move.index);

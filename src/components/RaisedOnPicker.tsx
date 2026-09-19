@@ -11,6 +11,7 @@ import type { SearchAlbum } from "@/lib/search";
 import RecordDisc from "@/components/RecordDisc";
 import { buttonClass, fieldClass } from "@/components/ui";
 import Portal from "@/components/Portal";
+import { haptic } from "@/lib/haptics";
 
 export type RaisedOnPick = {
   mbid: string;
@@ -305,6 +306,7 @@ export default function RaisedOnPicker({
   }
 
   function save() {
+    haptic("success");
     if (!pick) return;
     setError(null);
 
