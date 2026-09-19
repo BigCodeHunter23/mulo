@@ -66,11 +66,14 @@ function Equaliser() {
 export default function StackDeck({
   albums,
   runId = 0,
+  filters = "",
   finish,
 }: {
   albums: StackAlbum[];
   /** Which run this is, so "Another run" can ask for the next one. */
   runId?: number;
+  /** The run's decade and genre, as "&decade=1990&genre=rock", kept for "Another run". */
+  filters?: string;
   /** Where a run that isn't The Stack goes when it's done, like a Gauntlet's ranking. */
   finish?: { href: string; label: string };
 }) {
@@ -256,7 +259,7 @@ export default function StackDeck({
             <ButtonLink href={finish.href}>{finish.label}</ButtonLink>
           ) : (
             <>
-              <ButtonLink href={`/stack?run=${runId + 1}`}>Another run</ButtonLink>
+              <ButtonLink href={`/stack?run=${runId + 1}${filters}`}>Another run</ButtonLink>
               <ButtonLink href="/charts" variant="secondary">
                 See the charts
               </ButtonLink>

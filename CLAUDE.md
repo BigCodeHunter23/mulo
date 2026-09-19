@@ -109,6 +109,9 @@ in plain language, and give them links and exact steps when they need to act.
   already rate, then the decade and scene from Raised On, then genres they
   rate in, then popularity as the floor, with no more than three in a row by
   one artist. Nothing is stored; the run is worked out fresh each time.
+  `/stack?decade=1990&genre=hip-hop` narrows a run (chips on the page; a
+  filtered run reads deeper into the catalogue, and "Another run" keeps the
+  filters).
   Onboarding's rate step draws its albums from here too, so a new account sees
   its own decade rather than one generic popularity list.
 - The Drop (`src/lib/drop.ts`, `src/lib/drop-lineup.ts`, `/drop`): one album a
@@ -159,6 +162,8 @@ in plain language, and give them links and exact steps when they need to act.
   `updated_at`); `BadgeUnlock` celebrates it first in the queue (not during
   `/welcome`) and links the share page `/u/[username]/milestone/[count]`,
   which 404s for a count not yet reached.
+- Album covers carry your own score in a red chip (`AlbumCard`'s `mine`,
+  filled by `getMyAlbumScores`) on artist pages and Discover grids.
 - Search runs the wider MusicBrainz search automatically once typing pauses
   (`/api/search/wider`, `WiderResults`), rather than needing Enter.
 - Discovery (`src/lib/discover.ts`): `artistsToExplore` shuffles a wide pool

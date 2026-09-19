@@ -11,6 +11,7 @@ export default function AlbumCard({
   coverUrl,
   score,
   scoreKind = "overall",
+  mine,
   eager = false,
 }: {
   mbid: string;
@@ -22,6 +23,8 @@ export default function AlbumCard({
   score?: number | null;
   /** Whose score it is: the crowd's by default, or one person's. */
   scoreKind?: ScoreKind;
+  /** The signed-in person's own score, stamped on the cover so rated albums stand out. */
+  mine?: number;
   /** For the first row of a page, so it isn't held back by lazy loading. */
   eager?: boolean;
 }) {
@@ -30,7 +33,7 @@ export default function AlbumCard({
 
   return (
     <Link href={`/album/${mbid}`} className="group block">
-      <div className="artwork aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
+      <div className="artwork relative aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
         {src && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -39,6 +42,14 @@ export default function AlbumCard({
             loading={eager ? "eager" : "lazy"}
             className="h-full w-full object-cover"
           />
+        )}
+        {mine !== undefined && (
+          <span
+            title={`You rated it ${mine}`}
+            className="absolute right-1.5 top-1.5 min-w-7 rounded-md bg-score-you px-1.5 py-0.5 text-center text-xs font-bold tabular-nums text-[#0b0b0e] shadow-md"
+          >
+            {mine}
+          </span>
         )}
       </div>
       <p className="display-sm mt-2.5 line-clamp-1 text-sm text-text transition-colors group-hover:text-accent">

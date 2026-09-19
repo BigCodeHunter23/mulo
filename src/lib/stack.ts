@@ -104,7 +104,12 @@ function decadeFromEra(eraId: string | null | undefined): number | null {
  * A run of albums for somebody to rate, best guesses first and never anything
  * they have already scored.
  */
-export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]> {
+export async function getStack(
+  userId: string,
+  limit = 40,
+  /** Narrow the run to one decade (1990) and/or one genre family ("hip-hop"). */
+  filter: { decade?: number | null; genre?: string | null } = {},
+): Promise<StackAlbum[]> {
   const supabase = await createClient();
 
   const [raised, { data: mine }, { data: myArtists }] = await Promise.all([
@@ -152,17 +157,37 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
     ),
   );
 
-  const { data } = await supabase
-    .from("releases")
-    .select(
-      "mbid, title, artist_mbid, artist_credit, cover_art_url, release_date, genres, popularity, tracks_cached_at",
-    )
-    .not("cover_art_url", "is", null)
-    .order("popularity", { ascending: false, nullsFirst: false })
-    .limit(POOL);
+  // A filtered run reads deeper into the catalogue, since most of the
+  // most-played pool won't match; the database hands over a thousand at most
+  // per request, so it's read a page at a time.
+  const depth = filter.genre ? POOL * 4 : filter.decade ? POOL * 2 : POOL;
+  const pool: Row[] = [];
+  for (let from = 0; from < depth; from += 1000) {
+    const columns =
+      "mbid, title, artist_mbid, artist_credit, cover_art_url, release_date, genres, popularity, tracks_cached_at";
+    const to = Math.min(from + 1000, depth) - 1;
+    const { data } = filter.decade
+      ? await supabase
+          .from("releases")
+          .select(columns)
+          .not("cover_art_url", "is", null)
+          .gte("release_date", `${filter.decade}-01-01`)
+          .lt("release_date", `${filter.decade + 10}-01-01`)
+          .order("popularity", { ascending: false, nullsFirst: false })
+          .range(from, to)
+      : await supabase
+          .from("releases")
+          .select(columns)
+          .not("cover_art_url", "is", null)
+          .order("popularity", { ascending: false, nullsFirst: false })
+          .range(from, to);
+    pool.push(...((data ?? []) as Row[]));
+    if ((data ?? []).length < 1000) break;
+  }
 
-  const scored = ((data ?? []) as Row[])
+  const scored = pool
     .filter((row) => !rated.has(row.mbid))
+    .filter((row) => !filter.genre || familiesFor(row.genres ?? []).includes(filter.genre))
 
     .map((row, index) => {
       let score = 0;
@@ -197,7 +222,7 @@ export async function getStack(userId: string, limit = 40): Promise<StackAlbum[]
       // Popularity is the tie-breaker and the floor. The pool already arrives
       // most-played first, so its position stands in for the listen count and
       // keeps one enormous artist from swamping the run.
-      score += (POOL - index) / POOL;
+      score += (pool.length - index) / pool.length;
 
       return { row, score, reason };
     })

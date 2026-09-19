@@ -533,3 +533,21 @@ export async function getHighestRatedAlbums(
     },
   }));
 }
+
+/**
+ * The signed-in person's own scores for a set of albums, so a grid can mark
+ * what they've already rated. Empty when nobody is signed in.
+ */
+export async function getMyAlbumScores(mbids: string[]): Promise<Map<string, number>> {
+  const user = await getCurrentUser();
+  if (!user || mbids.length === 0) return new Map();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ratings")
+    .select("release_mbid, score")
+    .eq("user_id", user.id)
+    .in("release_mbid", mbids.slice(0, 500));
+  return new Map(
+    ((data ?? []) as { release_mbid: string; score: number }[]).map((r) => [r.release_mbid, r.score]),
+  );
+}

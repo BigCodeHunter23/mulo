@@ -9,6 +9,7 @@ import {
 import { getGlobalFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { getMyAlbumScores } from "@/lib/ratings";
 import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import DropBanner from "@/components/DropBanner";
@@ -105,6 +106,7 @@ async function Rotation() {
 export async function NewReleases() {
   const fresh = await newReleases(10);
   if (fresh.length < 4) return null;
+  const mine = await getMyAlbumScores(fresh.map((album) => album.mbid));
 
   return (
     <section>
@@ -122,6 +124,7 @@ export async function NewReleases() {
               artist={album.artist}
               year={album.year}
               coverUrl={album.cover_art_url}
+              mine={mine.get(album.mbid)}
               eager={i < 5}
             />
           </li>
@@ -135,6 +138,7 @@ async function TopRated() {
   const topRated = await topRatedOnMulo(10);
   // Only worth showing once enough albums have been rated to rank.
   if (topRated.length < 4) return null;
+  const mine = await getMyAlbumScores(topRated.map((album) => album.mbid));
 
   return (
     <section>
@@ -159,6 +163,7 @@ async function TopRated() {
               artist={album.artist}
               coverUrl={album.cover_art_url}
               score={album.average}
+              mine={mine.get(album.mbid)}
               eager={i < 5}
             />
           </li>
@@ -171,6 +176,7 @@ async function TopRated() {
 async function MostPlayed() {
   const mostPlayed = await mostPlayedAlbums(15);
   if (mostPlayed.length === 0) return null;
+  const mine = await getMyAlbumScores(mostPlayed.map((album) => album.mbid));
 
   return (
     <section>
@@ -188,6 +194,7 @@ async function MostPlayed() {
               artist={album.artist}
               year={album.year}
               coverUrl={album.cover_art_url}
+              mine={mine.get(album.mbid)}
               eager={i < 5}
             />
           </li>

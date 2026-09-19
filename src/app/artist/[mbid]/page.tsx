@@ -6,6 +6,7 @@ import {
   getOwnRating,
   getScores,
   getScoresForReleases,
+  getMyAlbumScores,
   getTopSongs,
 } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
@@ -73,8 +74,9 @@ export default async function ArtistPage({
     getReviews("artist", mbid),
     getTopSongs(mbid),
   ]);
-  const [albumScores, reactions] = await Promise.all([
+  const [albumScores, myScores, reactions] = await Promise.all([
     getScoresForReleases(albums.map((a) => a.mbid)),
+    getMyAlbumScores(albums.map((a) => a.mbid)),
     getReactions(
       "artist",
       reviews.map((review) => review.id),
@@ -209,6 +211,7 @@ export default async function ArtistPage({
                   year={album.release_date?.slice(0, 4) ?? null}
                   coverUrl={album.cover_art_url}
                   score={albumScores.get(album.mbid) ?? null}
+                  mine={myScores.get(album.mbid)}
                   eager={i < 5}
                 />
               </li>
