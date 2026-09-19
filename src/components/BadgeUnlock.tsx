@@ -7,6 +7,7 @@ import BadgeIcon from "@/components/BadgeIcon";
 import { Sparks } from "@/components/Celebrate";
 import Portal from "@/components/Portal";
 import ShareButton from "@/components/ShareButton";
+import StoryButton from "@/components/StoryButton";
 import { buttonClass } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 
@@ -213,6 +214,7 @@ export default function BadgeUnlock({
                 title={`${badge.milestone} albums rated on MULO`}
                 text={`${badge.milestone} albums rated on MULO.`}
               />
+              <StoryButton src={`${badge.url}/story`} filename={`mulo-${badge.milestone}-albums`} />
               <Link href={badge.url} className={buttonClass({ variant: "secondary" })} onClick={onDone}>
                 See the card
               </Link>

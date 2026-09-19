@@ -7,6 +7,7 @@ import { coverSrc } from "@/lib/cover-url";
 import { getCurrentUser } from "@/lib/supabase/server";
 import Avatar from "@/components/Avatar";
 import ShareButton from "@/components/ShareButton";
+import StoryButton from "@/components/StoryButton";
 import { ButtonLink } from "@/components/ui";
 
 type Params = Promise<{ username: string; count: string }>;
@@ -63,6 +64,10 @@ export default async function MilestonePage({ params }: { params: Params }) {
             url={milestonePath(card.profile.username, card.count)}
             title={`${card.profile.name} has rated ${card.count} albums on MULO`}
             text={own ? `${card.count} albums rated on MULO.` : undefined}
+          />
+          <StoryButton
+            src={`${milestonePath(card.profile.username, card.count)}/story`}
+            filename={`mulo-${card.count}-albums`}
           />
           {!user && <ButtonLink href="/login?mode=signup" variant="secondary">Join MULO</ButtonLink>}
         </div>

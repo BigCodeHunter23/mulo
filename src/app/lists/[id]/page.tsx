@@ -6,6 +6,7 @@ import { getList, LIST_LIMIT } from "@/lib/lists";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
 import ShareButton from "@/components/ShareButton";
+import StoryButton from "@/components/StoryButton";
 import ListItems from "./ListItems";
 
 type Params = Promise<{ id: string }>;
@@ -45,6 +46,12 @@ export default async function ListPage({ params }: { params: Params }) {
             title={`${list.title}, a list by ${list.owner.name}`}
             text={`${list.title}: ${list.items.length} albums on MULO`}
           />
+          {list.items.length > 0 && (
+            <StoryButton
+              src={`/lists/${list.id}/story?v=${Date.parse(list.updatedAt) || 0}`}
+              filename="mulo-list"
+            />
+          )}
           {!own && <ReportButton listId={list.id} signedIn={Boolean(user)} />}
         </div>
       </header>

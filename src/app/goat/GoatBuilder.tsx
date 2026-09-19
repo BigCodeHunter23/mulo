@@ -6,6 +6,7 @@ import { saveTopPicks } from "./actions";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { Crown, Sparks } from "@/components/Celebrate";
 import ShareButton from "@/components/ShareButton";
+import StoryButton from "@/components/StoryButton";
 import { buttonClass, fieldClass } from "@/components/ui";
 import Portal from "@/components/Portal";
 
@@ -401,6 +402,7 @@ export default function GoatBuilder({
                   text={`My number one: ${crowned[0].title}.`}
                   label="Share it"
                 />
+                <StoryButton src={`/u/${username}/goat/story?kind=${kind}&v=${crowned.slice(0, 5).map((pick) => pick.mbid.slice(0, 6)).join("")}`} filename="my-goat" />
                 <button type="button" onClick={() => setCrowned(null)} className={buttonClass({ size: "sm" })}>
                   Done
                 </button>
@@ -507,6 +509,7 @@ export default function GoatBuilder({
             label="Share your GOAT"
           />
         )}
+        {items.length > 0 && <StoryButton src={`/u/${username}/goat/story?kind=${kind}&v=${items.slice(0, 5).map((pick) => pick.mbid.slice(0, 6)).join("")}`} filename="my-goat" />}
         <Link
           href={`/u/${username}`}
           className="text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
