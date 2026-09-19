@@ -2,7 +2,7 @@ import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
-import { mainFamiliesByArtist } from "@/lib/main-genre";
+import { getArtistGenres } from "@/lib/artist-genres";
 
 /**
  * The Charts: MULO's all-time rankings, for albums, songs and artists, over
@@ -140,29 +140,10 @@ type ArtistRef = { mbid: string; name: string } | null;
 type Client = ReturnType<typeof createPublicClient>;
 
 /**
- * Each artist's one main genre, from every tag on every album of theirs.
  * Genre charts are strict: an album or song appears under its artist's main
  * genre and no other, so Kendrick Lamar isn't in pop because one of his
- * albums is tagged "pop rap". See main-genre.ts for how it's worked out.
+ * albums is tagged "pop rap". See main-genre.ts and artist-genres.ts.
  */
-async function artistFamilies(
-  supabase: Client,
-  artistMbids: (string | null | undefined)[],
-): Promise<Map<string, string | null>> {
-  const ids = [...new Set(artistMbids.filter((id): id is string => Boolean(id)))];
-  if (ids.length === 0) return new Map();
-
-  const { data } = await supabase
-    .from("releases")
-    .select("artist_mbid, genres")
-    .in("artist_mbid", ids)
-    .limit(20_000);
-
-  return mainFamiliesByArtist(
-    (data ?? []) as { artist_mbid: string | null; genres: string[] | null }[],
-  );
-}
-
 function inGenre(
   main: Map<string, string | null>,
   artistMbid: string | null | undefined,
@@ -225,10 +206,7 @@ async function albumChart(
 
   const rows = (releases ?? []) as unknown as Row[];
   const main = genre
-    ? await artistFamilies(
-        supabase,
-        rows.map((row) => row.artists?.mbid),
-      )
+    ? await getArtistGenres()
     : new Map<string, string | null>();
 
   const scored = rows
@@ -298,10 +276,7 @@ async function songChart(
     ((releases ?? []) as unknown as ReleaseRow[]).map((row) => [row.mbid, row]),
   );
   const main = genre
-    ? await artistFamilies(
-        supabase,
-        [...album.values()].map((row) => row.artists?.mbid),
-      )
+    ? await getArtistGenres()
     : new Map<string, string | null>();
 
   const scored = ((songs ?? []) as { mbid: string; title: string }[])
@@ -349,16 +324,10 @@ async function artistChart(
 
   // An artist carries no genre tags of their own: their main genre is worked
   // out from whatever their records are tagged with.
-  const [{ data: artists }, { data: theirReleases }] = await Promise.all([
+  const [{ data: artists }, main] = await Promise.all([
     supabase.from("artists").select("mbid, name, image_url").in("mbid", ids),
-    genre
-      ? supabase.from("releases").select("artist_mbid, genres").in("artist_mbid", ids)
-      : Promise.resolve({ data: [] as { artist_mbid: string; genres: string[] }[] }),
+    genre ? getArtistGenres() : Promise.resolve(new Map<string, string | null>()),
   ]);
-
-  const main = mainFamiliesByArtist(
-    (theirReleases ?? []) as { artist_mbid: string | null; genres: string[] | null }[],
-  );
 
   const scored = (
     (artists ?? []) as { mbid: string; name: string; image_url: string | null }[]

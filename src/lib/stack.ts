@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getRaisedOn } from "@/lib/raised-on";
 import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
+import { getArtistGenres } from "@/lib/artist-genres";
 import { playCounts } from "@/lib/hits";
 
 /**
@@ -185,9 +186,17 @@ export async function getStack(
     if ((data ?? []).length < 1000) break;
   }
 
+  // A genre run follows the Charts' strict rule: an artist belongs to the one
+  // genre their albums point at most, and all their albums come with them.
+  // Matching an album's own tags let one stray "hip hop" tag put a rock
+  // record in a hip hop run.
+  const artistGenre = filter.genre ? await getArtistGenres() : new Map<string, string | null>();
+
   const scored = pool
     .filter((row) => !rated.has(row.mbid))
-    .filter((row) => !filter.genre || familiesFor(row.genres ?? []).includes(filter.genre))
+    .filter(
+      (row) => !filter.genre || (row.artist_mbid !== null && artistGenre.get(row.artist_mbid) === filter.genre),
+    )
 
     .map((row, index) => {
       let score = 0;
