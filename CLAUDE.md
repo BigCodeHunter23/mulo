@@ -179,7 +179,8 @@ in plain language, and give them links and exact steps when they need to act.
 - `scripts/seed-catalog.mjs` pre-loads popular albums and is safe to stop and
   rerun; `--genres` tops up genres the popularity run misses (house, techno,
   country, reggae…) by their most-played artists, and `--artists=<mbids>`
-  adds artists MusicBrainz hasn't tagged at all; `scripts/copy-covers.mjs` copies covers into storage;
+  adds artists MusicBrainz hasn't tagged at all; `--top-artists` adds
+  ListenBrainz's top ~1,000 artists that are missing (its published limit); `scripts/copy-covers.mjs` copies covers into storage;
   `scripts/seed-scores.mjs` backfills starting scores for records cached
   before 0014, which never go back to MusicBrainz on their own.
 

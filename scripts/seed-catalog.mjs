@@ -524,7 +524,7 @@ async function artistsTagged(genre) {
 }
 
 /** An artist, their album list, and details and songs for their three biggest albums. */
-async function prepareArtist(id, listens, label) {
+async function prepareArtist(id, listens, label, albumCount = 3) {
   log(`  ${label}: ${await seedArtist(id, listens, new Map())}`);
 
   const { data: albums } = await supabase
@@ -542,7 +542,7 @@ async function prepareArtist(id, listens, label) {
   // With no play counts at all, any three albums beat none.
   const biggest = [...(albums ?? [])]
     .sort((a, b) => (albumPlays.get(b.mbid) ?? 0) - (albumPlays.get(a.mbid) ?? 0))
-    .slice(0, 3);
+    .slice(0, albumCount);
   for (const album of biggest) {
     const result = await seedAlbumDetails({ id: album.mbid }, albumPlays.get(album.mbid) ?? null);
     log(`    ${album.title}: ${result}`);
@@ -565,6 +565,50 @@ async function fillArtists() {
       log(`  ${id} failed: ${problem.message}`);
     }
   }
+}
+
+/**
+ * The most-played artists on ListenBrainz that MULO doesn't have yet, so a
+ * search for anybody well known (The Game, say) finds them in MULO's own
+ * catalogue instead of depending on MusicBrainz answering in time. Each gets
+ * their album list and songs for their biggest album; the --tracklists run
+ * fills in the rest over time. Safe to stop and rerun: artists already
+ * prepared are skipped without asking MusicBrainz anything.
+ *
+ * ListenBrainz only publishes its top thousand or so artists; for reach
+ * beyond that, run --genres with a long list and a bigger --per-genre.
+ *
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --top-artists
+ */
+async function fillTopArtists() {
+  const wanted = Number(options["top-artists"] === "true" ? 1000 : options["top-artists"]);
+  const plays = await listenCounts("artists", wanted);
+  const ids = [...plays.keys()].slice(0, wanted);
+
+  const have = new Set();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase
+      .from("artists")
+      .select("mbid")
+      .in("mbid", ids.slice(i, i + 200))
+      .not("albums_cached_at", "is", null);
+    for (const row of data ?? []) have.add(row.mbid);
+  }
+  const todo = ids.filter((id) => !have.has(id));
+  log(`ListenBrainz top ${ids.length} artists: ${have.size} already in MULO, preparing ${todo.length}`);
+
+  let failed = 0;
+  let n = 0;
+  for (const id of todo) {
+    n++;
+    try {
+      await prepareArtist(id, plays.get(id) ?? null, `${n}/${todo.length}`, 1);
+    } catch (problem) {
+      failed++;
+      log(`  ${n}/${todo.length} ${id} failed: ${problem.message}`);
+    }
+  }
+  log(`Top artists finished with ${failed} failures.${failed ? " Run again to retry them." : ""}`);
 }
 
 async function fillGenres() {
@@ -600,6 +644,7 @@ async function main() {
   if (options.tracklists) return fillTracklists();
   if (options.genres) return fillGenres();
   if (options.artists) return fillArtists();
+  if (options["top-artists"]) return fillTopArtists();
 
   log(`Preparing up to ${ALBUM_LIMIT} of the most-listened-to studio albums`);
 

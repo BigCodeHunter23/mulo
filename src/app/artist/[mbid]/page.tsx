@@ -151,6 +151,16 @@ export default async function ArtistPage({
       </div>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6">
+        {/* First thing under the scores: the way into The Gauntlet. */}
+        {setProgress && (
+          <FinishTheSet
+            artistMbid={mbid}
+            artistName={artist.name}
+            progress={setProgress}
+            rankingHref={me ? `/u/${me}/ranks/${mbid}` : null}
+          />
+        )}
+
         <div className="mb-12">
           <RatingForm
             key={mbid}
@@ -181,15 +191,6 @@ export default async function ArtistPage({
               </section>
             )}
           </div>
-        )}
-
-        {setProgress && (
-          <FinishTheSet
-            artistMbid={mbid}
-            artistName={artist.name}
-            progress={setProgress}
-            rankingHref={me ? `/u/${me}/ranks/${mbid}` : null}
-          />
         )}
 
         <SectionHeading>Albums</SectionHeading>
