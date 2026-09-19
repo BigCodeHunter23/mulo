@@ -636,12 +636,80 @@ async function fillGenres() {
   log(`Genres finished with ${failed} failures.${failed ? " Run again to retry them." : ""}`);
 }
 
+/**
+ * Genre tags for albums that never had them fetched: albums reached through
+ * an artist's album list arrive with a title and a cover only, so Stack genre
+ * runs, genre charts and "more like" rows can't see them. One quick lookup
+ * each, most-played first; tracklists are left to --tracklists. Safe to stop
+ * and rerun.
+ *
+ *   node --env-file=.env.local scripts/seed-catalog.mjs --details
+ */
+/** As in seed-scores.mjs: fewer votes than this isn't a score worth borrowing. */
+const SEED_MIN_VOTES = 3;
+
+async function fillDetails() {
+  let done = 0;
+  let tagged = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from("releases")
+      .select("mbid, title")
+      .is("details_cached_at", null)
+      .order("popularity", { ascending: false, nullsFirst: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+
+    for (const release of data) {
+      done++;
+      // The same fields the app fills when an album page is first opened
+      // (src/lib/catalog.ts), so marking it done never leaves anything out:
+      // genres, the credit, the date, and the starting score.
+      let full = null;
+      try {
+        full = await musicbrainz(`/release-group/${release.mbid}?inc=genres+artist-credits+ratings&fmt=json`);
+      } catch (problem) {
+        log(`Details ${done} ${release.title} failed: ${problem.message}`);
+        continue;
+      }
+      const genres = (full?.genres ?? []).map((g) => g.name);
+      const credit = creditText(full?.["artist-credit"] ?? []);
+      const value = full?.rating?.value;
+      const votes = full?.rating?.["votes-count"] ?? 0;
+      const seed =
+        typeof value === "number" && value > 0 && votes >= SEED_MIN_VOTES
+          ? {
+              seed_score: Math.min(10, Math.max(1, Math.round(value * 2 * 10) / 10)),
+              seed_votes: votes,
+              seed_source: "musicbrainz",
+            }
+          : {};
+      // Marked either way, so an album with no tags isn't asked about again.
+      await supabase
+        .from("releases")
+        .update({
+          genres,
+          ...(credit ? { artist_credit: credit } : {}),
+          ...(full?.["first-release-date"] ? { release_date: full["first-release-date"] } : {}),
+          ...seed,
+          details_cached_at: new Date().toISOString(),
+        })
+        .eq("mbid", release.mbid);
+      if (genres.length) tagged++;
+      if (done % 50 === 0) log(`Details: ${done} albums checked, ${tagged} given genres`);
+    }
+  }
+  log(`Details finished: ${done} albums checked, ${tagged} given genres.`);
+}
+
 async function main() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Run with: node --env-file=.env.local scripts/seed-catalog.mjs");
   }
 
   if (options.tracklists) return fillTracklists();
+  if (options.details) return fillDetails();
   if (options.genres) return fillGenres();
   if (options.artists) return fillArtists();
   if (options["top-artists"]) return fillTopArtists();
