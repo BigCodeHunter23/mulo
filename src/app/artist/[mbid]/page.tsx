@@ -22,6 +22,7 @@ import TopSongs from "@/components/TopSongs";
 import WhereNext from "@/components/WhereNext";
 import { SectionHeading } from "@/components/ui";
 import FinishTheSet from "@/components/FinishTheSet";
+import TrackView from "@/components/TrackView";
 import { getSetProgress } from "@/lib/gauntlet";
 import { getUsername } from "@/lib/social";
 
@@ -100,6 +101,7 @@ export default async function ArtistPage({
 
   return (
     <>
+      <TrackView kind="artist" mbid={mbid} title={artist.name} subtitle={null} image={artist.image_url || null} />
       <div className="relative">
         <div className="backdrop h-[360px]">
           {artist.image_url && (

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { SearchAlbum, SearchArtist, SearchResults } from "@/lib/search";
-import { coverSrc } from "@/lib/cover-url";
+import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import { clearViewed, useRecentlyViewed } from "@/lib/recently-viewed";
 import AlbumCard from "@/components/AlbumCard";
 import ArtistCard from "@/components/ArtistCard";
 import { fieldClass, SectionHeading } from "@/components/ui";
@@ -97,6 +98,7 @@ export default function SearchClient({
   const input = useRef<HTMLInputElement>(null);
   const recentRaw = useSyncExternalStore(subscribeRecent, readRecent, () => "[]");
   const recent = useMemo(() => parseRecent(recentRaw), [recentRaw]);
+  const viewed = useRecentlyViewed();
 
   useEffect(() => {
     const q = query.trim();
@@ -265,6 +267,53 @@ export default function SearchClient({
 
       {q.length < 2 && (
         <div className="step-in flex flex-col gap-10">
+          {viewed.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                  Recently viewed
+                </h2>
+                <button
+                  type="button"
+                  onClick={clearViewed}
+                  className="text-xs text-text-muted transition-colors hover:text-text"
+                >
+                  Clear
+                </button>
+              </div>
+              <ul className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+                {viewed.map((item) => {
+                  const src =
+                    item.kind === "artist" ? artistPhotoSrc(item.image, 200) : coverSrc(item.image, 250);
+                  return (
+                    <li key={`${item.kind}-${item.mbid}`} className="w-20 shrink-0">
+                      <Link href={`/${item.kind}/${item.mbid}`} className="group block">
+                        <span
+                          className={`artwork block h-20 w-20 overflow-hidden bg-surface-raised ${
+                            item.kind === "artist" ? "rounded-full" : "rounded-lg"
+                          }`}
+                        >
+                          {src && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={src}
+                              alt=""
+                              loading="lazy"
+                              className={`h-full w-full object-cover ${item.kind === "artist" ? "object-top" : ""}`}
+                            />
+                          )}
+                        </span>
+                        <span className="mt-1.5 line-clamp-2 block text-center text-[11px] leading-tight text-text-secondary group-hover:text-text">
+                          {item.title}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           {recent.length > 0 && (
             <section>
               <div className="mb-3 flex items-center justify-between">

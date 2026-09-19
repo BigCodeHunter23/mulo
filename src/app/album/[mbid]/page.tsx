@@ -17,6 +17,7 @@ import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
 import ListenOn from "@/components/ListenOn";
 import AddToList from "@/components/AddToList";
+import TrackView from "@/components/TrackView";
 import ListCard from "@/components/ListCard";
 import { getListsWithAlbum, getMyListsFor } from "@/lib/lists";
 import ReviewList from "@/components/ReviewList";
@@ -95,6 +96,13 @@ export default async function AlbumPage({
 
   return (
     <>
+      <TrackView
+        kind="album"
+        mbid={mbid}
+        title={release.title}
+        subtitle={artist?.name ?? null}
+        image={release.cover_art_url}
+      />
       {/* The artwork, blurred and blown up, bleeding out behind the header. */}
       <div className="relative">
         <div className="backdrop h-[420px]">
