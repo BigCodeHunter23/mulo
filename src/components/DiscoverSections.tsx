@@ -44,6 +44,7 @@ export default function DiscoverSections() {
         </Suspense>
         <GuessBanner />
         <HoldTip />
+        <Shortcuts />
       </div>
       <Suspense fallback={<TodaysVersusPlaceholder />}>
         <TodaysVersus />
@@ -133,6 +134,37 @@ export async function NewReleases() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * The places the header carries on a wide screen but the phone's tab bar has
+ * no room for. Phones only: on anything wider these already sit in the header.
+ */
+function Shortcuts() {
+  const links = [
+    { href: "/charts", label: "The Charts" },
+    { href: "/lists", label: "Lists" },
+    { href: "/goat", label: "Your GOAT" },
+    { href: "/ratings", label: "My Ratings" },
+    { href: "/guess", label: "Guess the score" },
+  ];
+
+  return (
+    <nav aria-label="More on MULO" className="-mx-4 overflow-x-auto px-4 sm:hidden">
+      <ul className="flex w-max gap-2">
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              className="block rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs font-medium text-text-secondary transition-colors active:border-accent active:text-accent"
+            >
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 

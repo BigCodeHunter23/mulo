@@ -41,6 +41,15 @@ function normalise(text: string) {
     .trim();
 }
 
+/**
+ * The form used both to ask Apple and to compare what comes back. Cleaning
+ * leaves nothing at all for a title written in another script, so fall back to
+ * the plain text there: an empty string would otherwise match every result.
+ */
+function plain(text: string) {
+  return normalise(text) || text.toLowerCase().trim();
+}
+
 type Result = {
   trackName?: string;
   artistName?: string;
@@ -49,17 +58,17 @@ type Result = {
 };
 
 function pick(results: Result[], artist: string, title: string): Preview | null {
-  const wantArtist = normalise(artist);
-  const wantTitle = normalise(title);
+  const wantArtist = plain(artist);
+  const wantTitle = plain(title);
   const wantsAlternate = ALTERNATE.test(wantTitle);
 
   let best: { preview: Preview; rank: number } | null = null;
   for (const result of results) {
     if (!result.previewUrl || !result.trackViewUrl || !result.trackName) continue;
-    const theirArtist = normalise(result.artistName ?? "");
+    const theirArtist = plain(result.artistName ?? "");
     if (!theirArtist.includes(wantArtist) && !wantArtist.includes(theirArtist)) continue;
 
-    const theirTitle = normalise(result.trackName);
+    const theirTitle = plain(result.trackName);
     if (!wantsAlternate && ALTERNATE.test(result.trackName.toLowerCase())) continue;
     const rank = theirTitle === wantTitle ? 0 : theirTitle.startsWith(wantTitle) ? 1 : -1;
     if (rank < 0) continue;
@@ -73,7 +82,11 @@ function pick(results: Result[], artist: string, title: string): Preview | null 
 
 async function search(artist: string, title: string): Promise<Preview | null> {
   const url = new URL(SEARCH);
-  url.searchParams.set("term", `${artist} ${title}`);
+  // Ask in the cleaned form. A cached edition can carry a title Apple has
+  // never heard of — "On Time (ChoppedNotSlopped)" finds nothing at all,
+  // where "on time" finds the song — and the comparison below is the
+  // safeguard against the looser search that produces.
+  url.searchParams.set("term", `${plain(artist)} ${plain(title)}`.trim());
   url.searchParams.set("entity", "song");
   url.searchParams.set("limit", "15");
   const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -84,7 +97,7 @@ async function search(artist: string, title: string): Promise<Preview | null> {
 
 /** The preview for one song, or null when Apple has no clear match. */
 export function findPreview(artist: string, title: string): Promise<Preview | null> {
-  const key = `${normalise(artist)}|${normalise(title)}`;
+  const key = `${plain(artist)}|${plain(title)}`;
   let pending = found.get(key);
   if (!pending) {
     pending = search(artist, title).catch(() => {

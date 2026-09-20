@@ -24,6 +24,15 @@ function DiscoverIcon({ active }: { active: boolean }) {
   );
 }
 
+function StackIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+      <rect x="6.5" y="3" width="11" height="6" rx="1.5" />
+      <rect x="4" y="9.5" width="16" height="11.5" rx="1.5" fill={active ? "currentColor" : "none"} />
+    </svg>
+  );
+}
+
 function VersusIcon({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
@@ -72,6 +81,7 @@ export default function MobileNav({
 
   const home = isActive(pathname, "/");
   const discover = isActive(pathname, "/discover");
+  const stack = isActive(pathname, "/stack");
   const versus = isActive(pathname, "/versus");
   const search = isActive(pathname, "/search");
   const me = profile
@@ -91,6 +101,10 @@ export default function MobileNav({
         <Link href="/discover" aria-current={discover ? "page" : undefined} className={tab(discover)}>
           <DiscoverIcon active={discover} />
           Discover
+        </Link>
+        <Link href="/stack" aria-current={stack ? "page" : undefined} className={tab(stack)}>
+          <StackIcon active={stack} />
+          Stack
         </Link>
         <Link href="/versus" aria-current={versus ? "page" : undefined} className={tab(versus)}>
           <VersusIcon active={versus} />
