@@ -338,26 +338,47 @@ type Scored = { row: Row; score: number; reason: string | null };
  * few hundred good candidates keeps every run recognisably theirs while making
  * each one different from the last.
  */
-const CANDIDATES = 250;
+const CANDIDATES = 400;
+
+/**
+ * How hard the draw leans on the front of the pool. Squaring was too harsh:
+ * half of every run came out of the top quarter of the candidates, and since
+ * the run was then sorted best-first, the same record opened nine loads in
+ * ten. A gentler curve still favours the strong picks without making them
+ * inevitable.
+ */
+const BIAS = 1.5;
+
+/**
+ * How many of the leading records to shuffle among themselves. They are all
+ * strong picks, so their order carries no real information — and leaving them
+ * in score order is what made the first card the same one every time.
+ */
+const SHUFFLE_LEAD = 10;
 
 /**
  * A run drawn from the best candidates, favouring the top without being stuck
- * to it. Squaring a random number bends the draw towards the front of the
- * list, so the strongest picks still lead most of the time and a record that
- * was skipped last time isn't guaranteed to reappear.
+ * to it, so a record skipped last time isn't handed straight back.
  */
 function pickVaried(scored: Scored[], limit: number): Scored[] {
   const pool = scored.slice(0, Math.max(CANDIDATES, limit));
   const picked: Scored[] = [];
 
   while (pool.length > 0 && picked.length < limit) {
-    const at = Math.floor(Math.random() ** 2 * pool.length);
+    const at = Math.floor(Math.random() ** BIAS * pool.length);
     picked.push(pool.splice(at, 1)[0]);
   }
 
-  // Ordering within the run should still be best-first, so the strongest
-  // records are the ones somebody definitely reaches.
-  return picked.sort((a, b) => b.score - a.score);
+  // Best-first, so the strongest records are the ones somebody definitely
+  // reaches — then the leaders are shuffled among themselves, because opening
+  // on the same album every time is what makes a fresh run feel like the last.
+  picked.sort((a, b) => b.score - a.score);
+  const lead = picked.slice(0, SHUFFLE_LEAD);
+  for (let i = lead.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [lead[i], lead[j]] = [lead[j], lead[i]];
+  }
+  return [...lead, ...picked.slice(SHUFFLE_LEAD)];
 }
 
 /**

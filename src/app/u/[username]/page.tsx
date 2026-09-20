@@ -382,7 +382,27 @@ async function ProfileBadges({
 
 async function ProfileTaste({ userId, username }: { userId: string; username: string }) {
   const taste = await getTasteMatch(userId);
-  if (!taste) return null;
+
+  // No match yet means too little in common to put a number on — but the way
+  // in has to stay, or the one page that tells you how much more you need is
+  // the one page you can't reach.
+  if (!taste) {
+    return (
+      <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-sm text-text-secondary">
+            Not enough rated in common yet
+          </span>
+          <Link
+            href={`/u/${username}/vs`}
+            className="ml-auto text-xs font-medium text-text-secondary underline-offset-4 transition-colors hover:text-accent hover:underline"
+          >
+            Head to head →
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">

@@ -32,6 +32,8 @@ const found = new Map<string, Promise<Preview | null>>();
 const missing = new Set<string>();
 /** One album's songs, keyed by cleaned title, looked up once per album. */
 const albums = new Map<string, Promise<Map<string, Preview>>>();
+/** One artist's records on Apple, so a second album by them is free. */
+const discographies = new Map<string, Promise<AlbumResult[]>>();
 
 /** Lowercase, no accents, no "(feat. …)" or "[Remastered]", letters and digits only. */
 function normalise(text: string) {
@@ -42,8 +44,40 @@ function normalise(text: string) {
     .replace(/[([].*?[)\]]/g, " ")
     .replace(/\s(feat|ft)\.?\s.*$/, " ")
     .replace(/&/g, "and")
+    // Apple stars out explicit words. Dropping the stars rather than turning
+    // them into spaces keeps "F**kin'" one word, so it can still be lined up
+    // against "Fuckin'" below.
+    .replace(/\*/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+/**
+ * Whether two words are the same word with one of them censored: same ends,
+ * and the censored one shorter by the handful of letters that got starred.
+ */
+function censoredPair(a: string, b: string) {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (short.length < 2 || long.length - short.length > 4) return false;
+  return short[0] === long[0] && short[short.length - 1] === long[long.length - 1];
+}
+
+/** The same title with a word starred out, as Apple writes explicit songs. */
+function sameSong(theirs: string, ours: string) {
+  const mine = ours.split(" ");
+  const yours = theirs.split(" ");
+  if (mine.length !== yours.length || mine.length === 0) return false;
+
+  let exact = 0;
+  for (let i = 0; i < mine.length; i++) {
+    if (mine[i] === yours[i]) {
+      exact++;
+      continue;
+    }
+    if (!censoredPair(mine[i], yours[i])) return false;
+  }
+  // At least half has to line up exactly, so two short near-misses can't pass.
+  return exact * 2 >= mine.length;
 }
 
 /**
@@ -66,6 +100,7 @@ type AlbumResult = {
   collectionId?: number;
   collectionName?: string;
   artistName?: string;
+  trackCount?: number;
 };
 
 type SongResult = Result & {
@@ -126,9 +161,85 @@ async function search(artist: string, title: string): Promise<Preview | null> {
  * such problem, and it costs two requests for a whole record instead of one
  * per song, which matters against Apple's limit of about twenty a minute.
  */
+/**
+ * Every record an artist has on Apple, by their id.
+ *
+ * Apple's album search is unreliable in a way that bites hard: searching
+ * A$AP Rocky and LONG.LIVE.A$AP never returns LONG.LIVE.A$AP, though Apple
+ * plainly has it. Their discography does return it, along with Don't Be Dumb
+ * and LIVE.LOVE.A$AP, which the search also misses. One lookup covers every
+ * record by that artist, so browsing several of them costs nothing more.
+ */
+async function discography(artist: string): Promise<AlbumResult[]> {
+  const wantArtist = plain(artist);
+
+  const search = new URL(SEARCH);
+  search.searchParams.set("term", wantArtist);
+  search.searchParams.set("entity", "musicArtist");
+  search.searchParams.set("limit", "10");
+  const response = await fetch(search, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!response.ok) return [];
+  const body = (await response.json()) as { results?: { artistId?: number; artistName?: string }[] };
+
+  const people = body.results ?? [];
+  // Exact first: "drake" would otherwise settle for "drake bell".
+  const person =
+    people.find((p) => p.artistId && plain(p.artistName ?? "") === wantArtist) ??
+    people.find((p) => p.artistId && sameName(plain(p.artistName ?? ""), wantArtist));
+  if (!person?.artistId) return [];
+
+  const listing = new URL(LOOKUP);
+  listing.searchParams.set("id", String(person.artistId));
+  listing.searchParams.set("entity", "album");
+  listing.searchParams.set("limit", "200");
+  const second = await fetch(listing, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!second.ok) return [];
+  const albums = (await second.json()) as { results?: AlbumResult[] };
+  return (albums.results ?? []).filter((a) => a.collectionId && a.collectionName);
+}
+
+function artistAlbums(artist: string) {
+  const key = plain(artist);
+  let pending = discographies.get(key);
+  if (!pending) {
+    pending = discography(artist).catch(() => {
+      discographies.delete(key);
+      return [] as AlbumResult[];
+    });
+    discographies.set(key, pending);
+  }
+  return pending;
+}
+
+/**
+ * The best entry for one record: the fullest edition of it.
+ *
+ * Apple lists the same album several times — standard, deluxe, explicit and
+ * clean, one per region. The longest tracklist is the one to take: MULO's
+ * LONG.LIVE.A$AP has sixteen songs and Apple's standard edition has twelve,
+ * so the deluxe is the only one that can answer for Jodye or Angels. Extra
+ * songs on it cost nothing, since only the ones being asked for get used.
+ */
+function pickEdition(albums: AlbumResult[], wantAlbum: string) {
+  const matching = albums.filter((a) => sameName(plain(a.collectionName ?? ""), wantAlbum));
+  if (matching.length === 0) return null;
+
+  return matching.sort((a, b) => {
+    const size = (b.trackCount ?? 0) - (a.trackCount ?? 0);
+    if (size !== 0) return size;
+    // A tie goes to the one actually called what we asked for.
+    const exactA = plain(a.collectionName ?? "") === wantAlbum ? 0 : 1;
+    const exactB = plain(b.collectionName ?? "") === wantAlbum ? 0 : 1;
+    return exactA - exactB;
+  })[0];
+}
+
 async function albumId(artist: string, album: string, anchor?: string) {
   const wantArtist = plain(artist);
   const wantAlbum = plain(album);
+
+  const mine = pickEdition(await artistAlbums(artist), wantAlbum);
+  if (mine?.collectionId) return mine.collectionId;
 
   const url = new URL(SEARCH);
   url.searchParams.set("term", `${wantArtist} ${wantAlbum}`.trim());
@@ -215,8 +326,22 @@ function fromAlbum(songs: Map<string, Preview>, title: string) {
   const want = plain(title);
   const exact = songs.get(want);
   if (exact) return exact;
+
+  // Spacing disagrees more often than you'd think: "1 Train" and "1Train".
+  const tight = want.replace(/ /g, "");
   for (const [theirs, preview] of songs) {
-    if (theirs.startsWith(want)) return preview;
+    if (theirs.replace(/ /g, "") === tight) return preview;
+  }
+
+  // A trailing credit Apple kept and MusicBrainz didn't. The space matters:
+  // without it "Angel" would happily answer for "Angels".
+  for (const [theirs, preview] of songs) {
+    if (theirs.startsWith(`${want} `)) return preview;
+  }
+
+  // Last, the same song with an explicit word starred out.
+  for (const [theirs, preview] of songs) {
+    if (sameSong(theirs, want)) return preview;
   }
   return null;
 }
