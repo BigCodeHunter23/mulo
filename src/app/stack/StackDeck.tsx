@@ -387,7 +387,14 @@ export default function StackDeck({
                   </span>
                 )}
                 {album.artist && (
-                  <PlayButton artist={album.artist} title={hit.title} scope={album.mbid} className="h-6 w-6 bg-bg/60" />
+                  <PlayButton
+                    artist={album.artist}
+                    title={hit.title}
+                    album={album.title}
+                    anchor={album.hits[0]?.title}
+                    scope={album.mbid}
+                    className="h-6 w-6 bg-bg/60"
+                  />
                 )}
               </li>
             ))}

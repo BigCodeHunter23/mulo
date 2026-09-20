@@ -207,7 +207,12 @@ export default async function AlbumPage({
             {/* The first visit to an album fetches its tracklist from
                 MusicBrainz, so it streams in rather than holding up the page. */}
             <Suspense fallback={<TracklistPlaceholder />}>
-              <Tracklist releaseMbid={mbid} artist={artist?.name ?? null} signedIn={signedIn} />
+              <Tracklist
+                releaseMbid={mbid}
+                artist={artist?.name ?? null}
+                albumTitle={release.title}
+                signedIn={signedIn}
+              />
             </Suspense>
           </section>
 
@@ -246,10 +251,12 @@ export default async function AlbumPage({
 async function Tracklist({
   releaseMbid,
   artist,
+  albumTitle,
   signedIn,
 }: {
   releaseMbid: string;
   artist: string | null;
+  albumTitle: string;
   signedIn: boolean;
 }) {
   const tracks = await getCachedTracks(releaseMbid);
@@ -281,6 +288,7 @@ async function Tracklist({
           key={releaseMbid}
           releaseMbid={releaseMbid}
           artist={artist}
+          albumTitle={albumTitle}
           tracks={tracks}
           community={scores.community}
           initialOwn={scores.own}

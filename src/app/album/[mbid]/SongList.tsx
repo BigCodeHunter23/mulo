@@ -30,6 +30,7 @@ function formatDuration(ms: number | null) {
 export default function SongList({
   releaseMbid,
   artist,
+  albumTitle,
   tracks,
   community,
   initialOwn,
@@ -38,6 +39,8 @@ export default function SongList({
   releaseMbid: string;
   /** For finding each song's preview; without it there are no play buttons. */
   artist: string | null;
+  /** The record's own title, so previews come from its tracklist. */
+  albumTitle: string;
   tracks: Song[];
   community: Record<string, { average: number; count: number }>;
   initialOwn: Record<string, number>;
@@ -155,7 +158,14 @@ export default function SongList({
             >
               <div className="flex items-center">
                 {artist && (
-                  <PlayButton artist={artist} title={track.title} scope={releaseMbid} className="ml-3" />
+                  <PlayButton
+                    artist={artist}
+                    title={track.title}
+                    album={albumTitle}
+                    anchor={tracks[0]?.title}
+                    scope={releaseMbid}
+                    className="ml-3"
+                  />
                 )}
                 {signedIn && songMbid ? (
                   <button

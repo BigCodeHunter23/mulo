@@ -41,7 +41,7 @@ function stop() {
   set(IDLE);
 }
 
-async function toggle(key: string, artist: string, title: string) {
+async function toggle(key: string, artist: string, title: string, album?: string, anchor?: string) {
   haptic("tap");
   if (state.key === key && (state.phase === "playing" || state.phase === "loading")) {
     stop();
@@ -50,7 +50,7 @@ async function toggle(key: string, artist: string, title: string) {
 
   audio?.pause();
   set({ key, phase: "loading", preview: null });
-  const preview = await findPreview(artist, title);
+  const preview = await findPreview(artist, title, album, anchor);
   // Somebody tapped something else while this was looking.
   if (state.key !== key) return;
   if (!preview) {
@@ -78,11 +78,18 @@ function usePreviewState() {
 export function PlayButton({
   artist,
   title,
+  album,
+  anchor,
   scope,
   className = "",
 }: {
   artist: string;
   title: string;
+  /** The record it comes from, so one lookup covers every song on it. */
+  album?: string;
+  /** A song known to be on that record — the first track — for when Apple's
+   *  album search can't find it. */
+  anchor?: string;
   /** Tells two buttons for the same song apart, such as one per card. */
   scope: string;
   className?: string;
@@ -116,7 +123,7 @@ export function PlayButton({
       type="button"
       onClick={(event) => {
         event.stopPropagation();
-        void toggle(key, artist, title);
+        void toggle(key, artist, title, album, anchor);
       }}
       disabled={mine === "missing"}
       aria-label={label}
