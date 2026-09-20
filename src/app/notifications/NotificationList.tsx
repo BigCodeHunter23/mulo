@@ -92,6 +92,27 @@ function Text({ item }: { item: Notification }) {
           </Link>
         </p>
       );
+    case "also-rated": {
+      const gap = Math.abs(item.yours - item.theirs);
+      return (
+        <p>
+          <Name person={item.person} /> gave{" "}
+          <Link href={item.subject.href} className={strong}>
+            {item.subject.title}
+          </Link>{" "}
+          a <span className="font-semibold text-score-friends">{item.theirs}</span>. You said{" "}
+          <span className="font-semibold text-score-you">{item.yours}</span>.
+          {gap >= 3 && (
+            <span className="text-text-muted">
+              {" "}
+              {item.yours > item.theirs
+                ? "What are they missing?"
+                : "What are they hearing that you're not?"}
+            </span>
+          )}
+        </p>
+      );
+    }
     case "versus-live":
       return (
         <p>

@@ -37,6 +37,20 @@ export type Notification =
       /** For a pick, the artist they picked. */
       picked?: string;
     }
+  /**
+   * Somebody they follow rated a record they have rated too. Both scores ride
+   * along so the line can put the two numbers side by side, which is the whole
+   * reason to tap it.
+   */
+  | {
+      kind: "also-rated";
+      key: string;
+      at: string;
+      person: Person;
+      subject: { title: string; href: string };
+      yours: number;
+      theirs: number;
+    }
   /** Today's Daily Versus is up and they haven't picked yet. */
   | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
   /** A Versus they picked in has closed. */
@@ -54,6 +68,82 @@ type ReactionRow = {
 };
 
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
+
+/**
+ * Records somebody you follow has rated that you have rated too.
+ *
+ * Start from their newest ratings rather than your whole library: it is a
+ * bounded query however much either of you has rated, and old news is not
+ * worth a notification anyway.
+ */
+async function alsoRated(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  limit: number,
+): Promise<Notification[]> {
+  const { data: follows } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", userId);
+  const following = ((follows ?? []) as { following_id: string }[]).map((f) => f.following_id);
+  if (following.length === 0) return [];
+
+  const { data: theirs } = await supabase
+    .from("ratings")
+    .select("user_id, release_mbid, score, updated_at")
+    .in("user_id", following)
+    .order("updated_at", { ascending: false })
+    .limit(limit * 2);
+  const rows = (theirs ?? []) as {
+    user_id: string;
+    release_mbid: string;
+    score: number;
+    updated_at: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const [{ data: mine }, { data: releases }, { data: people }] = await Promise.all([
+    supabase
+      .from("ratings")
+      .select("release_mbid, score")
+      .eq("user_id", userId)
+      .in("release_mbid", [...new Set(rows.map((r) => r.release_mbid))]),
+    supabase
+      .from("releases")
+      .select("mbid, title")
+      .in("mbid", [...new Set(rows.map((r) => r.release_mbid))]),
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_url")
+      .in("id", [...new Set(rows.map((r) => r.user_id))]),
+  ]);
+
+  const myScores = new Map(
+    ((mine ?? []) as { release_mbid: string; score: number }[]).map((r) => [r.release_mbid, r.score]),
+  );
+  const titles = new Map(
+    ((releases ?? []) as { mbid: string; title: string }[]).map((r) => [r.mbid, r.title]),
+  );
+  const persons = new Map(((people ?? []) as Person[]).map((p) => [p.id, p]));
+
+  return rows.flatMap((row): Notification[] => {
+    const yours = myScores.get(row.release_mbid);
+    const person = persons.get(row.user_id);
+    const title = titles.get(row.release_mbid);
+    if (yours === undefined || !person || !title) return [];
+    return [
+      {
+        kind: "also-rated",
+        key: `also-${row.user_id}-${row.release_mbid}`,
+        at: row.updated_at,
+        person,
+        subject: { title, href: `/album/${row.release_mbid}` },
+        yours,
+        theirs: row.score,
+      },
+    ];
+  });
+}
 
 /**
  * What's happened to somebody lately: new followers, loves and nahs on their
@@ -76,6 +166,7 @@ export async function getNotifications(
     pickedToday,
     today,
     results,
+    shared,
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -121,6 +212,7 @@ export async function getNotifications(
     hasPickedToday(userId),
     getTodaysMatchup(),
     getRecentResults(userId),
+    alsoRated(supabase, userId, limit),
   ]);
 
   // Follows point at accounts rather than profiles, so their names come separately.
@@ -138,6 +230,7 @@ export async function getNotifications(
   const people = new Map(((followers ?? []) as Person[]).map((p) => [p.id, p]));
 
   const notifications: Notification[] = [
+    ...shared,
     ...followRows.flatMap((row): Notification[] => {
       const person = people.get(row.follower_id);
       return person
