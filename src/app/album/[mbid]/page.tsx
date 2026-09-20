@@ -10,6 +10,7 @@ import {
 import { getOwnRating, getScores, getSongScores } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
 import { getReactions } from "@/lib/reactions";
+import { promptFor } from "@/lib/review-prompts";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
@@ -219,8 +220,11 @@ export default async function AlbumPage({
           <section>
             <SectionHeading>Reviews</SectionHeading>
             {reviews.length === 0 ? (
+              // An invitation rather than a verdict: "no reviews yet" teaches
+              // people that nobody writes here, where the question gets answers.
               <p className="text-sm text-text-secondary">
-                No written reviews yet. Be the first.
+                Nobody has said anything about this one yet.{" "}
+                <span className="text-text">{promptFor("album", mbid)}</span>
               </p>
             ) : (
               <ReviewList

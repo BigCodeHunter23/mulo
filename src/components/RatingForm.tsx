@@ -11,6 +11,7 @@ import {
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { buttonClass, fieldClass } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
+import { promptFor, REVIEW_COMFORTABLE, REVIEW_MAX } from "@/lib/review-prompts";
 
 type Status =
   | { tone: "saved"; text: string }
@@ -18,8 +19,8 @@ type Status =
   | null;
 
 const COPY = {
-  album: { noun: "album", prompt: "What did you make of it?" },
-  artist: { noun: "artist", prompt: "What do you make of their music?" },
+  album: { noun: "album" },
+  artist: { noun: "artist" },
 } as const;
 
 /**
@@ -70,7 +71,8 @@ export default function RatingForm({
     return () => clearTimeout(timer);
   }, [status]);
 
-  const { noun, prompt } = COPY[kind];
+  const { noun } = COPY[kind];
+  const prompt = promptFor(kind, mbid);
 
   if (!signedIn) {
     return (
@@ -254,18 +256,23 @@ export default function RatingForm({
             htmlFor={`review-${mbid}`}
             className="text-xs font-medium uppercase tracking-wider text-text-secondary"
           >
-            Review <span className="normal-case text-text-muted">optional</span>
+            {prompt} <span className="normal-case text-text-muted">optional</span>
           </label>
           <textarea
             ref={reviewBox}
             id={`review-${mbid}`}
-            rows={3}
-            maxLength={1000}
+            rows={2}
+            maxLength={REVIEW_MAX}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={prompt}
+            placeholder="A line is plenty."
             className={`${fieldClass} resize-y`}
           />
+          {draft.length > REVIEW_COMFORTABLE && (
+            <p className="text-right text-[11px] tabular-nums text-text-muted">
+              {draft.length} / {REVIEW_MAX}
+            </p>
+          )}
           {reviewChanged && (
             <div>
               <button
