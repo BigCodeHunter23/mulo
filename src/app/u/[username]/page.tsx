@@ -262,7 +262,7 @@ export default async function ProfilePage({
 
         {!followState.isSelf && (
           <Suspense fallback={null}>
-            <ProfileTaste userId={profile.id} />
+            <ProfileTaste userId={profile.id} username={profile.username} />
           </Suspense>
         )}
 
@@ -380,17 +380,23 @@ async function ProfileBadges({
   );
 }
 
-async function ProfileTaste({ userId }: { userId: string }) {
+async function ProfileTaste({ userId, username }: { userId: string; username: string }) {
   const taste = await getTasteMatch(userId);
   if (!taste) return null;
 
   return (
     <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
-      <p className="flex items-baseline gap-2">
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="display text-xl text-accent">{taste.percent}%</span>
         <span className="text-sm text-text-secondary">
           taste match · {taste.shared} in common
         </span>
+        <Link
+          href={`/u/${username}/vs`}
+          className="ml-auto text-xs font-medium text-text-secondary underline-offset-4 transition-colors hover:text-accent hover:underline"
+        >
+          Head to head →
+        </Link>
       </p>
       {taste.clash && (
         <p className="mt-1.5 text-xs text-text-muted">
