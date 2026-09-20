@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import { findPreview, type Preview } from "@/lib/preview";
+import { findPreview, noPreviewFor, type Preview } from "@/lib/preview";
 import { haptic } from "@/lib/haptics";
 
 /**
@@ -89,7 +89,12 @@ export function PlayButton({
 }) {
   const key = `${scope}|${artist}|${title}`;
   const current = usePreviewState();
-  const mine = current.key === key ? current.phase : "idle";
+  // A song Apple had nothing for stays dimmed for the rest of the visit, rather
+  // than springing back to a play arrow the moment another song is tapped: on an
+  // album that isn't on Apple Music at all, every button would otherwise keep
+  // offering a play that can never happen.
+  const mine =
+    current.key === key ? current.phase : noPreviewFor(artist, title) ? "missing" : "idle";
 
   // A clip shouldn't outlive its button, as when a Stack card flies off.
   useEffect(

@@ -27,6 +27,8 @@ const TIMEOUT_MS = 5000;
 const ALTERNATE = /\b(instrumental|karaoke|acapella|a cappella|live|remix|demo|cover|lullaby)\b/;
 
 const found = new Map<string, Promise<Preview | null>>();
+/** Songs Apple had nothing for. Not every record is on Apple Music. */
+const missing = new Set<string>();
 
 /** Lowercase, no accents, no "(feat. …)" or "[Remastered]", letters and digits only. */
 function normalise(text: string) {
@@ -95,16 +97,32 @@ async function search(artist: string, title: string): Promise<Preview | null> {
   return pick(body.results ?? [], artist, title);
 }
 
+/**
+ * Whether this song is already known to have nothing on Apple Music, so a
+ * button can stay dimmed rather than offering a play it can't honour. Read
+ * during render: it never starts a lookup of its own.
+ */
+export function noPreviewFor(artist: string, title: string) {
+  return missing.has(`${plain(artist)}|${plain(title)}`);
+}
+
 /** The preview for one song, or null when Apple has no clear match. */
 export function findPreview(artist: string, title: string): Promise<Preview | null> {
   const key = `${plain(artist)}|${plain(title)}`;
   let pending = found.get(key);
   if (!pending) {
-    pending = search(artist, title).catch(() => {
-      // A failed lookup is worth trying again later; a clean "no match" isn't.
-      found.delete(key);
-      return null;
-    });
+    pending = search(artist, title).then(
+      (preview) => {
+        // Apple looked and had nothing: worth remembering for the visit.
+        if (!preview) missing.add(key);
+        return preview;
+      },
+      () => {
+        // A failed lookup is worth trying again later; a clean "no match" isn't.
+        found.delete(key);
+        return null;
+      },
+    );
     found.set(key, pending);
   }
   return pending;
