@@ -260,7 +260,7 @@ export default async function ProfilePage({
           <ProfileBadges userId={profile.id} username={profile.username} />
         </Suspense>
 
-        {!followState.isSelf && (
+        {!followState.isSelf && followState.signedIn && (
           <Suspense fallback={null}>
             <ProfileTaste userId={profile.id} username={profile.username} />
           </Suspense>
