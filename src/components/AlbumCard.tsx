@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { coverSrc } from "@/lib/cover-url";
+import CoverImage from "@/components/CoverImage";
 import { Score, type ScoreKind } from "@/components/StarScore";
 import QuickRate from "@/components/QuickRate";
 import { haptic } from "@/lib/haptics";
@@ -99,16 +100,14 @@ export default function AlbumCard({
         }}
       >
         <div className="artwork relative aspect-square overflow-hidden rounded-lg transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
-          {src && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt={title}
-              loading={eager ? "eager" : "lazy"}
-              draggable={false}
-              className="h-full w-full object-cover"
-            />
-          )}
+          <CoverImage
+            key={src ?? "none"}
+            src={src}
+            alt={title}
+            eager={eager}
+            draggable={false}
+            className="h-full w-full object-cover"
+          />
           {yours !== undefined && (
             <span
               title={`You rated it ${yours}`}

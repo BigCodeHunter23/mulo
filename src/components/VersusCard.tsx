@@ -382,7 +382,17 @@ export default function VersusCard({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-4 sm:p-5">
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-border bg-surface p-4 sm:p-5 ${
+        // The backdrop below splits the card down the middle, so each artist's
+        // glow sits in the centre of their half — while the contenders sit in
+        // a 36rem column in the middle of it. Let the card run the full width
+        // of a desktop page and the two stop lining up: on a wide screen the
+        // face ends up more than a hundred pixels inboard of its own glow.
+        // Holding the card to the width its contents use keeps them together.
+        compact ? "mx-auto max-w-2xl" : ""
+      }`}
+    >
       {/* Each artist's photo, blurred into their half of the card. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid grid-cols-2">
         {SIDES.map((side) => {
