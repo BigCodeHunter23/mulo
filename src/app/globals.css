@@ -105,6 +105,27 @@ main {
   scroll-snap-align: start;
 }
 
+/* A list that scrolls inside a card: a hairline scrollbar, not the browser's
+   grey slab sitting on top of the artwork. */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-quiet::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+.scroll-quiet::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 @media (min-width: 640px) {
   .rail {
     scroll-snap-type: none;

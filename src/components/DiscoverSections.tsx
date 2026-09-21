@@ -40,14 +40,14 @@ export default function DiscoverSections({ search = false }: { search?: boolean 
   return (
     <div className="flex flex-col gap-14">
       <div className="flex flex-col gap-3">
+        {/* First thing on the page. Anybody who came to look one record up is
+            here for this, and below the week's banners it read as a footnote
+            to them rather than the way in. */}
+        {search && <DiscoverSearch />}
         <Suspense fallback={null}>
           <DropBanner />
         </Suspense>
         <GuessBanner />
-        {/* After the two things that change each week, before the browsing:
-            somebody who came to look one record up shouldn't have to go
-            somewhere else to do it. */}
-        {search && <DiscoverSearch />}
         <HoldTip />
         <Shortcuts />
       </div>

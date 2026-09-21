@@ -25,6 +25,23 @@ function PeopleIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
 export default async function Header() {
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -77,6 +94,15 @@ export default async function Header() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {/* The tab bar has room for five and search isn't one of them, so
+                on a phone this is the way to it from anywhere. */}
+            <Link
+              href="/search"
+              aria-label="Search"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-raised hover:text-text sm:hidden"
+            >
+              <SearchIcon />
+            </Link>
             <Link
               href="/people"
               aria-label="People"

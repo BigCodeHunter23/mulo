@@ -290,8 +290,10 @@ export default function StackDeck({
         </p>
       )}
 
-      {/* The cover, with the previous one flying off over the top of it */}
-      <div className="relative mt-3 aspect-square w-full max-w-[12rem] sm:mt-5 sm:max-w-[16rem]">
+      {/* The cover, with the previous one flying off over the top of it. A
+          notch smaller on phones than it used to be: the tracklist below does
+          more of the recognising now, and the scores have to stay in reach. */}
+      <div className="relative mt-3 aspect-square w-full max-w-[10.5rem] sm:mt-5 sm:max-w-[16rem]">
         <div
           key={album.mbid}
           className="stack-cover artwork h-full w-full overflow-hidden rounded-xl shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]"
@@ -351,8 +353,8 @@ export default function StackDeck({
           enough to place a record; one song you know and you can score it
           honestly rather than guessing or waving it off. */}
       {album.hits.length > 0 && (
-        <div key={`${album.mbid}-hits`} className="mt-4 w-full">
-          <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+        <div key={`${album.mbid}-hits`} className="mt-5 w-full">
+          <div className="mb-2 flex items-center justify-between px-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
             <span className="flex items-center gap-2">
               {album.hitsByPlays && <Equaliser />}
               Tracklist
@@ -363,48 +365,65 @@ export default function StackDeck({
           </div>
           {/* The whole record, which is how anybody recognises one — but a
               double album shouldn't push the rating buttons off the screen,
-              so a long one scrolls inside the card. */}
-          <ol className="flex max-h-56 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
-            {album.hits.map((hit, i) => (
-              <li
-                key={`${hit.title}-${i}`}
-                className="stack-hit relative flex items-center gap-2.5 overflow-hidden rounded-lg border border-border/60 bg-surface/40 px-2.5 py-1.5"
-                style={{ "--at": `${0.15 + i * 0.08}s` } as React.CSSProperties}
-              >
-                {album.hitsByPlays && (
-                  <span
-                    aria-hidden="true"
-                    className={`stack-hit-bar absolute inset-y-0 left-0 origin-left ${
-                      hit.biggest ? "bg-score-overall/20" : "bg-score-overall/[0.09]"
-                    }`}
-                    style={{ width: `${Math.max(hit.share * 100, 8)}%` }}
-                  />
-                )}
-                <span className="relative w-3 text-center text-[11px] font-bold tabular-nums text-score-overall">
-                  {i + 1}
-                </span>
-                <span className="relative min-w-0 flex-1 truncate text-[13px] text-text">
-                  {hit.title}
-                </span>
-                {hit.biggest && (
-                  <span className="relative shrink-0 text-[9px] font-semibold uppercase tracking-wider text-score-overall">
-                    Biggest
+              so a long one scrolls inside the card, under a fade that says as
+              much. One frame with hairlines between the songs, rather than a
+              row of little boxes: the eye runs down a list far quicker. */}
+          <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
+            <ol className="scroll-quiet flex max-h-[15.5rem] flex-col divide-y divide-border/70 overflow-y-auto overscroll-contain sm:max-h-[19rem]">
+              {album.hits.map((hit, i) => (
+                <li
+                  key={`${hit.title}-${i}`}
+                  className="stack-hit relative flex items-center gap-3 px-3 py-2.5"
+                  // The deal-in caps out, so the last song of a double album
+                  // isn't still arriving when the first score is tapped.
+                  style={
+                    { "--at": `${0.15 + Math.min(i, 8) * 0.06}s` } as React.CSSProperties
+                  }
+                >
+                  {/* How much it's played, as a hairline along the foot of
+                      the row. Filling the whole row behind the words turned a
+                      long tracklist into a staircase of grey blocks. */}
+                  {album.hitsByPlays && (
+                    <span
+                      aria-hidden="true"
+                      className={`stack-hit-bar absolute bottom-0 left-0 h-[2px] origin-left rounded-r-full ${
+                        hit.biggest ? "bg-score-overall/70" : "bg-score-overall/25"
+                      }`}
+                      style={{ width: `${Math.max(hit.share * 100, 8)}%` }}
+                    />
+                  )}
+                  <span className="relative w-4 shrink-0 text-right text-[11px] tabular-nums text-text-muted">
+                    {i + 1}
                   </span>
-                )}
-                {album.artist && (
-                  <PlayButton
-                    artist={album.artist}
-                    title={hit.title}
-                    album={album.title}
-                    anchor={album.hits[0]?.title}
-                    scope={album.mbid}
-                    className="h-6 w-6 bg-bg/60"
-                  />
-                )}
-              </li>
-            ))}
-          </ol>
-          {album.artist && <PreviewCredit scope={album.mbid} className="mt-1.5 justify-center" />}
+                  <span className="relative min-w-0 flex-1 truncate text-sm text-text">
+                    {hit.title}
+                  </span>
+                  {hit.biggest && (
+                    <span className="relative shrink-0 text-[9px] font-semibold uppercase tracking-wider text-score-overall">
+                      Biggest
+                    </span>
+                  )}
+                  {album.artist && (
+                    <PlayButton
+                      artist={album.artist}
+                      title={hit.title}
+                      album={album.title}
+                      anchor={album.hits[0]?.title}
+                      scope={album.mbid}
+                      className="h-7 w-7 shrink-0 bg-bg/60"
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+            {album.hits.length > 7 && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-surface to-transparent"
+              />
+            )}
+          </div>
+          {album.artist && <PreviewCredit scope={album.mbid} className="mt-2 justify-center" />}
         </div>
       )}
 
