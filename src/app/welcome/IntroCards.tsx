@@ -27,14 +27,15 @@ function ScoresArt() {
   );
 }
 
-function CrownArt() {
+/** A card off the top of the deck, mid-score: the Stack in one picture. */
+function StackArt() {
   return (
-    <div className="flex flex-col items-center">
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className="h-8 w-8 text-score-overall">
-        <path d="M3 18h18l1.2-10.2-5.1 3.4L12 3.6 6.9 11.2 1.8 7.8 3 18zm0 2v1.2h18V20H3z" />
-      </svg>
-      <div className="goat-crown mt-2 flex h-24 w-24 items-center justify-center rounded-full bg-surface ring-2 ring-score-overall">
-        <span className="display text-4xl text-score-overall">1</span>
+    <div className="relative flex h-28 w-32 items-center justify-center">
+      <div className="absolute h-24 w-24 -rotate-6 rounded-xl border border-border bg-surface-raised" />
+      <div className="absolute h-24 w-24 rotate-3 rounded-xl border border-border bg-surface" />
+      <div className="relative flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-xl border border-border-strong bg-surface shadow-lg">
+        <Star className="h-7 w-7 text-score-you" />
+        <span className="display-sm text-lg tabular-nums text-text">9</span>
       </div>
     </div>
   );
@@ -79,25 +80,34 @@ function DebateArt() {
   );
 }
 
+/**
+ * Four cards, in the order somebody actually needs them: what this is, how
+ * you use it, what other people add, and why you'd open it again tomorrow.
+ * One idea each.
+ *
+ * The old opening card explained that every score shows three ways —
+ * machinery nobody needs before they have rated a single thing, and the part
+ * people said was confusing. It earns its place on an album page, not here.
+ */
 const CARDS = [
   {
-    title: "Rate everything",
-    body: "Albums, artists, even single songs, out of ten. Every score shows three ways: everyone's, yours, and your friends'.",
+    title: "Every record, out of ten",
+    body: "Albums, artists, songs — score anything. Yours sits next to everyone else's, so you can see who's with you and who has lost it.",
     art: <ScoresArt />,
   },
   {
-    title: "Crown your GOAT",
-    body: "Rank your top ten artists and albums. Number one wears the crown, right at the top of your profile.",
-    art: <CrownArt />,
+    title: "Ten albums, two minutes",
+    body: "The Stack deals you records you'll know, one at a time, with the tracklist and a thirty-second preview to jog your memory. Tap a score, next.",
+    art: <StackArt />,
   },
   {
-    title: "Bring your people",
-    body: "Follow friends, see their scores next to yours, and find out exactly where you disagree.",
+    title: "Argue with your friends",
+    body: "Follow people and go head to head: how close your taste really is, and the record you gave a 9 that they gave a 3.",
     art: <PeopleArt />,
   },
   {
-    title: "Settle the debate",
-    body: "Which album is actually the best? Every rating counts towards the answer, and there's a new Versus to pick every day.",
+    title: "Something new every day",
+    body: "One album everybody rates together each week, one matchup to settle every day. There's always something waiting when you come back.",
     art: <DebateArt />,
   },
 ];

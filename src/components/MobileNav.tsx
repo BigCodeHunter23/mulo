@@ -41,15 +41,6 @@ function VersusIcon({ active }: { active: boolean }) {
   );
 }
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
 function PersonIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -83,7 +74,6 @@ export default function MobileNav({
   const discover = isActive(pathname, "/discover");
   const stack = isActive(pathname, "/stack");
   const versus = isActive(pathname, "/versus");
-  const search = isActive(pathname, "/search");
   const me = profile
     ? isActive(pathname, profile.href) || isActive(pathname, "/profile")
     : isActive(pathname, "/login");
@@ -109,10 +99,6 @@ export default function MobileNav({
         <Link href="/versus" aria-current={versus ? "page" : undefined} className={tab(versus)}>
           <VersusIcon active={versus} />
           Versus
-        </Link>
-        <Link href="/search" aria-current={search ? "page" : undefined} className={tab(search)}>
-          <SearchIcon />
-          Search
         </Link>
         {profile ? (
           <Link href={profile.href} aria-current={me ? "page" : undefined} className={tab(me)}>

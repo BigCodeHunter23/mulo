@@ -355,11 +355,16 @@ export default function StackDeck({
           <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
             <span className="flex items-center gap-2">
               {album.hitsByPlays && <Equaliser />}
-              {album.hitsByPlays ? "Hits from this album" : "Opening tracks"}
+              Tracklist
             </span>
-            {album.hitsByPlays && <span className="font-medium normal-case tracking-normal">by plays</span>}
+            <span className="font-medium normal-case tracking-normal">
+              {album.hits.length} songs
+            </span>
           </div>
-          <ol className="flex flex-col gap-1">
+          {/* The whole record, which is how anybody recognises one — but a
+              double album shouldn't push the rating buttons off the screen,
+              so a long one scrolls inside the card. */}
+          <ol className="flex max-h-56 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
             {album.hits.map((hit, i) => (
               <li
                 key={`${hit.title}-${i}`}
@@ -370,7 +375,7 @@ export default function StackDeck({
                   <span
                     aria-hidden="true"
                     className={`stack-hit-bar absolute inset-y-0 left-0 origin-left ${
-                      i === 0 ? "bg-score-overall/20" : "bg-score-overall/[0.09]"
+                      hit.biggest ? "bg-score-overall/20" : "bg-score-overall/[0.09]"
                     }`}
                     style={{ width: `${Math.max(hit.share * 100, 8)}%` }}
                   />
@@ -381,7 +386,7 @@ export default function StackDeck({
                 <span className="relative min-w-0 flex-1 truncate text-[13px] text-text">
                   {hit.title}
                 </span>
-                {i === 0 && album.hitsByPlays && (
+                {hit.biggest && (
                   <span className="relative shrink-0 text-[9px] font-semibold uppercase tracking-wider text-score-overall">
                     Biggest
                   </span>

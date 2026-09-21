@@ -14,15 +14,22 @@ export const metadata: Metadata = {
   description: "A quick run of records to rate, picked for you.",
 };
 
-/** Long enough to be worth opening, short enough to finish. */
-const RUN = 40;
+/**
+ * Long enough to be worth opening, short enough to finish in a sitting.
+ *
+ * Forty was a slog. A run nobody reaches the end of always feels like
+ * homework, and the end of a run — where the ranking sits and another run is
+ * one tap away — is the part that makes somebody go again. Ten takes a couple
+ * of minutes and ends on that.
+ */
+const RUN = 10;
 
 const DECADES = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
 /**
  * A run is never reused. `getStack` leaves out anything already rated, and
- * draws a different forty each time, so a cached page would hand somebody the
- * run they just finished.
+ * draws a different handful each time, so a cached page would hand somebody
+ * the run they just finished.
  */
 export const dynamic = "force-dynamic";
 

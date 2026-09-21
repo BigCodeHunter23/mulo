@@ -39,12 +39,12 @@ export type StackAlbum = {
   /** Why it's in the run, shown as a quiet line under the cover. */
   reason: string | null;
   /**
-   * The album's biggest songs, to jog a memory. A cover and a title often
-   * aren't enough to place a record — the moment somebody reads a song they
-   * know, they can score it honestly instead of guessing or skipping.
+   * The record's tracklist, to jog a memory. A cover and a title often aren't
+   * enough to place an album — the moment somebody reads a song they know,
+   * they can score it honestly instead of guessing or skipping.
    */
   hits: StackHit[];
-  /** True when the order is by plays; false when it fell back to track order. */
+  /** True when play counts are known, so the bars and "biggest" mean something. */
   hitsByPlays: boolean;
 };
 
@@ -52,10 +52,9 @@ export type StackHit = {
   title: string;
   /** Plays relative to the album's biggest song, 0 to 1, for the bar. */
   share: number;
+  /** The most-played song on the record, worth calling out. */
+  biggest: boolean;
 };
-
-/** Enough to recognise a record by, without turning a card into a list. */
-const HITS_SHOWN = 4;
 
 /** Points for each reason a record might be one somebody knows. */
 const WEIGHT = {
@@ -107,7 +106,7 @@ function decadeFromEra(eraId: string | null | undefined): number | null {
  */
 export async function getStack(
   userId: string,
-  limit = 40,
+  limit = 10,
   /** Narrow the run to one decade (1990) and/or one genre family ("hip-hop"). */
   filter: { decade?: number | null; genre?: string | null } = {},
 ): Promise<StackAlbum[]> {
@@ -301,30 +300,29 @@ export async function hitsForAlbums(
       plays: track.song_mbid ? (plays.get(track.song_mbid) ?? 0) : 0,
     }));
 
-    const top = Math.max(0, ...counted.map((track) => track.plays));
-    // No play counts to go on: the opening tracks are the next best thing.
-    if (top === 0) {
-      result.set(mbid, {
-        hits: counted.slice(0, HITS_SHOWN).map((track) => ({ title: track.title, share: 0 })),
-        byPlays: false,
-      });
-      continue;
-    }
-
-    // The same song can sit on a record twice (a remix, a reprise); show it once.
+    // The same song can sit on a record twice (a remix, a reprise); once is
+    // enough on a card.
     const seen = new Set<string>();
-    const hits = counted
-      .sort((a, b) => b.plays - a.plays)
-      .filter((track) => {
-        const key = track.title.toLowerCase().replace(/\s*[([].*$/, "");
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, HITS_SHOWN)
-      .map((track) => ({ title: track.title, share: track.plays / top }));
+    const songs = counted.filter((track) => {
+      const key = track.title.toLowerCase().replace(/\s*[([].*$/, "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    result.set(mbid, { hits, byPlays: true });
+    const top = Math.max(0, ...songs.map((track) => track.plays));
+    // The whole record in its own order, not the four biggest songs: a
+    // tracklist is how anybody actually recognises an album, and it is the
+    // difference between scoring it and guessing. The play counts stay on as
+    // the bars behind each row, so the big ones still stand out.
+    result.set(mbid, {
+      hits: songs.map((track) => ({
+        title: track.title,
+        share: top > 0 ? track.plays / top : 0,
+        biggest: top > 0 && track.plays === top,
+      })),
+      byPlays: top > 0,
+    });
   }
 
   return result;

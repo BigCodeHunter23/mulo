@@ -19,6 +19,7 @@ import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
 import ListCard from "@/components/ListCard";
 import HoldTip from "@/components/HoldTip";
+import DiscoverSearch from "@/components/DiscoverSearch";
 import { getRecentLists } from "@/lib/lists";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
 import {
@@ -35,7 +36,7 @@ import {
  * The two that only appear once there's enough activity show nothing while
  * they load, rather than a placeholder that might vanish.
  */
-export default function DiscoverSections() {
+export default function DiscoverSections({ search = false }: { search?: boolean }) {
   return (
     <div className="flex flex-col gap-14">
       <div className="flex flex-col gap-3">
@@ -43,6 +44,10 @@ export default function DiscoverSections() {
           <DropBanner />
         </Suspense>
         <GuessBanner />
+        {/* After the two things that change each week, before the browsing:
+            somebody who came to look one record up shouldn't have to go
+            somewhere else to do it. */}
+        {search && <DiscoverSearch />}
         <HoldTip />
         <Shortcuts />
       </div>
@@ -143,6 +148,7 @@ export async function NewReleases() {
  */
 function Shortcuts() {
   const links = [
+    { href: "/search", label: "Search" },
     { href: "/charts", label: "The Charts" },
     { href: "/lists", label: "Lists" },
     { href: "/goat", label: "Your GOAT" },

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function DiscoverPage() {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-8 sm:px-6">
-      <DiscoverSections />
+      <DiscoverSections search />
     </main>
   );
 }

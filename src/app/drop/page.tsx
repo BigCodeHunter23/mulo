@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCachedRelease } from "@/lib/catalog";
+import { Suspense } from "react";
+import { getCachedRelease, getCachedTracks } from "@/lib/catalog";
 import { currentDrop, getDropResults } from "@/lib/drop";
 import { getOwnRating } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
@@ -10,6 +11,7 @@ import { coverSrc } from "@/lib/cover-url";
 import Countdown from "@/components/Countdown";
 import RatingForm from "@/components/RatingForm";
 import RecordDisc from "@/components/RecordDisc";
+import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 import ReviewList from "@/components/ReviewList";
 import { SectionHeading } from "@/components/ui";
 
@@ -137,6 +139,13 @@ export default async function DropPage() {
 
         <RatingForm key={mbid} kind="album" mbid={mbid} signedIn={Boolean(user)} existing={ownRating} />
 
+        {/* The record itself, so nobody has to leave the page to remember how
+            it goes. The first visit of a week fetches the tracklist from
+            MusicBrainz, so it streams in rather than holding up the score. */}
+        <Suspense fallback={null}>
+          <DropTracklist mbid={mbid} artist={drop.album.artist} title={drop.album.title} />
+        </Suspense>
+
         <section className="mt-12">
           <SectionHeading
             action={
@@ -186,5 +195,62 @@ export default async function DropPage() {
         )}
       </main>
     </>
+  );
+}
+
+/**
+ * The week's record, track by track, with Apple's thirty-second previews.
+ *
+ * The Drop asks everybody to rate the same album, which only works if people
+ * can actually hear it — a cover and a title is not enough to score something
+ * honestly.
+ */
+async function DropTracklist({
+  mbid,
+  artist,
+  title,
+}: {
+  mbid: string;
+  artist: string | null;
+  title: string;
+}) {
+  const tracks = await getCachedTracks(mbid);
+  if (tracks.length === 0) return null;
+
+  return (
+    <section className="mt-12">
+      <SectionHeading
+        action={
+          <span className="text-xs tabular-nums text-text-muted">{tracks.length} songs</span>
+        }
+      >
+        Tracklist
+      </SectionHeading>
+
+      <ol className="flex flex-col gap-1">
+        {tracks.map((track) => (
+          <li
+            key={`${track.position}-${track.title}`}
+            className="flex items-center gap-3 rounded-lg border border-border/60 bg-surface/40 px-3 py-2"
+          >
+            <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-text-muted">
+              {track.position}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm text-text">{track.title}</span>
+            {artist && (
+              <PlayButton
+                artist={artist}
+                title={track.title}
+                album={title}
+                anchor={tracks[0]?.title}
+                scope={`drop-${mbid}`}
+              />
+            )}
+          </li>
+        ))}
+      </ol>
+
+      <PreviewCredit scope={`drop-${mbid}`} className="mt-3" />
+    </section>
   );
 }
