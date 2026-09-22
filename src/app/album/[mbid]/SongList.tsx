@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { rate, removeRating } from "@/app/ratings/actions";
+import type { FriendSongScore } from "@/lib/ratings";
+import Avatar from "@/components/Avatar";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 import { Star } from "@/components/StarScore";
@@ -15,10 +17,76 @@ type Song = {
   song_mbid: string | null;
 };
 
+/** Up to this many people you follow on a song, and you see their faces. */
+const FACES = 3;
+
+/** A song needs this many of them before it can be called a pick or a clash. */
+const ENOUGH = 2;
+
+/** How far apart you and them have to be before it's worth pointing out. */
+const CLASH = 3;
+
 function formatDuration(ms: number | null) {
   if (!ms) return "";
   const totalSeconds = Math.round(ms / 1000);
   return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
+}
+
+const mean = (scores: FriendSongScore[]) =>
+  scores.reduce((sum, friend) => sum + friend.score, 0) / scores.length;
+
+/** One person's score is a whole number, so don't dress it up as an average. */
+const score = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(1);
+
+/** Two heads: says "the people you follow" where there's no room for faces. */
+function CrewIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+    >
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5" />
+      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.8 3 2.6 3.5 5.2" />
+    </svg>
+  );
+}
+
+/**
+ * What the people you follow gave a song, at the end of its row: their faces
+ * while there are few enough to know by sight, their average and how many
+ * once there are more. Either way it's one chip wide, so a record where
+ * fifty people have an opinion reads the same as one where two do.
+ */
+function FriendsChip({ scores }: { scores: FriendSongScore[] }) {
+  const average = mean(scores);
+  const names = scores.map((friend) => `${friend.name} ${friend.score}`).join(", ");
+
+  return (
+    <span
+      title={names}
+      className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-score-friends"
+    >
+      {scores.length <= FACES ? (
+        <span className="flex -space-x-1.5">
+          {scores.map((friend) => (
+            <span key={friend.username} className="block rounded-full ring-1 ring-bg">
+              <Avatar url={friend.avatar_url} name={friend.name} size="xs" />
+            </span>
+          ))}
+        </span>
+      ) : (
+        <CrewIcon />
+      )}
+      {score(average)}
+    </span>
+  );
 }
 
 /**
@@ -34,6 +102,7 @@ export default function SongList({
   tracks,
   community,
   initialOwn,
+  friends,
   signedIn,
 }: {
   releaseMbid: string;
@@ -44,6 +113,8 @@ export default function SongList({
   tracks: Song[];
   community: Record<string, { average: number; count: number }>;
   initialOwn: Record<string, number>;
+  /** How the people you follow scored each song, their best first. */
+  friends: Record<string, FriendSongScore[]>;
   signedIn: boolean;
 }) {
   const [own, setOwn] = useState(initialOwn);
@@ -85,6 +156,53 @@ export default function SongList({
     });
   }
 
+  /** Opens a song's scores and brings the row to the middle of the screen. */
+  function reveal(songMbid: string) {
+    setOpen(songMbid);
+    document
+      .getElementById(`song-${songMbid}`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  /**
+   * The two songs worth saying out loud: the one the people you follow rate
+   * highest, and the one you're furthest from them on. Everything else they
+   * think is on its own row — this is the line that makes somebody read them.
+   */
+  const highlights = useMemo(() => {
+    const rated = tracks.flatMap((track) => {
+      const scores = track.song_mbid ? friends[track.song_mbid] : undefined;
+      return scores?.length ? [{ track, scores, mbid: track.song_mbid as string }] : [];
+    });
+    if (rated.length === 0) return null;
+
+    const crew = new Set(
+      rated.flatMap((song) => song.scores.map((friend) => friend.username)),
+    );
+
+    let pick: { title: string; mbid: string; average: number } | null = null;
+    let clash: { title: string; mbid: string; gap: number; mine: number; theirs: number } | null =
+      null;
+
+    for (const song of rated) {
+      if (song.scores.length < ENOUGH) continue;
+      const average = mean(song.scores);
+
+      if (!pick || average > pick.average) {
+        pick = { title: song.track.title, mbid: song.mbid, average };
+      }
+
+      const mine = own[song.mbid];
+      if (mine === undefined) continue;
+      const gap = Math.abs(mine - average);
+      if (gap >= CLASH && (!clash || gap > clash.gap)) {
+        clash = { title: song.track.title, mbid: song.mbid, gap, mine, theirs: average };
+      }
+    }
+
+    return { people: crew.size, songs: rated.length, pick, clash };
+  }, [tracks, friends, own]);
+
   // Tracklists saved before songs existed can't be rated until refreshed.
   const hasSongs = tracks.some((t) => t.song_mbid);
 
@@ -103,6 +221,55 @@ export default function SongList({
       )}
       {hasSongs && signedIn && Object.keys(own).length === 0 && (
         <p className="-mt-2 mb-4 text-xs text-text-muted">Tap a song to rate it.</p>
+      )}
+
+      {highlights && (
+        <div className="mb-4 rounded-xl border border-border bg-surface/40 px-3.5 py-2.5 text-xs leading-relaxed text-text-secondary">
+          <span className="font-medium text-score-friends">
+            {highlights.people} {highlights.people === 1 ? "person" : "people"} you follow
+          </span>{" "}
+          {highlights.people === 1 ? "has" : "have"} scored{" "}
+          {highlights.songs === tracks.length
+            ? "the whole record"
+            : `${highlights.songs} of these`}
+          .
+          {highlights.pick && (
+            <>
+              {" "}
+              Their pick is{" "}
+              <button
+                type="button"
+                onClick={() => reveal(highlights.pick!.mbid)}
+                className="font-medium text-text underline-offset-4 hover:underline"
+              >
+                {highlights.pick.title}
+              </button>{" "}
+              <span className="tabular-nums text-score-friends">
+                {score(highlights.pick.average)}
+              </span>
+              .
+            </>
+          )}
+          {highlights.clash && (
+            <>
+              {" "}
+              You&rsquo;re furthest apart on{" "}
+              <button
+                type="button"
+                onClick={() => reveal(highlights.clash!.mbid)}
+                className="font-medium text-text underline-offset-4 hover:underline"
+              >
+                {highlights.clash.title}
+              </button>{" "}
+              &mdash; you{" "}
+              <span className="tabular-nums text-score-you">{highlights.clash.mine}</span>, them{" "}
+              <span className="tabular-nums text-score-friends">
+                {score(highlights.clash.theirs)}
+              </span>
+              .
+            </>
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="mb-4 text-sm text-score-you">
@@ -123,6 +290,7 @@ export default function SongList({
           const songMbid = track.song_mbid;
           const mine = songMbid ? own[songMbid] : undefined;
           const crowd = songMbid ? community[songMbid] : undefined;
+          const theirs = (songMbid ? friends[songMbid] : undefined) ?? [];
           const isOpen = songMbid !== null && open === songMbid;
 
           const row = (
@@ -140,6 +308,7 @@ export default function SongList({
                   {crowd.average.toFixed(1)}
                 </span>
               )}
+              {theirs.length > 0 && <FriendsChip scores={theirs} />}
               {mine !== undefined && (
                 <span className="w-7 shrink-0 rounded-md bg-score-you py-0.5 text-center text-xs font-bold tabular-nums text-[#0b0b0e]">
                   {mine}
@@ -154,6 +323,7 @@ export default function SongList({
           return (
             <li
               key={track.position}
+              id={songMbid ? `song-${songMbid}` : undefined}
               className={isOpen ? "bg-surface-raised" : i % 2 ? "bg-surface/40" : ""}
             >
               <div className="flex items-center">
@@ -214,6 +384,36 @@ export default function SongList({
                     >
                       Remove my score
                     </button>
+                  )}
+
+                  {/* Who gave what. Fifty people is fine in a list somebody
+                      opened on purpose; it's only too much on the row. */}
+                  {theirs.length > 0 && (
+                    <div className="mt-4 border-t border-border pt-3">
+                      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+                        What they gave it
+                      </p>
+                      <ul className="scroll-quiet flex max-h-48 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1">
+                        {theirs.map((friend) => (
+                          <li key={friend.username}>
+                            <Link
+                              href={`/u/${friend.username}`}
+                              className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text"
+                            >
+                              <Avatar
+                                url={friend.avatar_url}
+                                name={friend.name}
+                                size="sm"
+                              />
+                              <span className="min-w-0 flex-1 truncate">{friend.name}</span>
+                              <span className="w-7 shrink-0 rounded-md bg-score-friends/15 py-0.5 text-center text-xs font-bold tabular-nums text-score-friends">
+                                {friend.score}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

@@ -239,16 +239,32 @@ export async function getOwnRating(
   return data ?? null;
 }
 
+/** One person you follow, and what they gave a song. */
+export type FriendSongScore = {
+  username: string;
+  name: string;
+  avatar_url: string | null;
+  score: number;
+};
+
 export type SongScores = {
   /** Everyone's average for each rated song. */
   community: Record<string, { average: number; count: number }>;
   /** The signed-in person's own score for each song they've rated. */
   own: Record<string, number>;
+  /** How the people you follow scored each song, their best first. */
+  friends: Record<string, FriendSongScore[]>;
 };
 
-/** Scores for every song in a tracklist, from one query. */
+/**
+ * Scores for every song in a tracklist.
+ *
+ * The one query already brings back who gave what, so the people you follow
+ * cost nothing more than their names and faces: a record's tracklist is where
+ * you find out your mate rated the interlude higher than the single.
+ */
 export async function getSongScores(songMbids: string[]): Promise<SongScores> {
-  const result: SongScores = { community: {}, own: {} };
+  const result: SongScores = { community: {}, own: {}, friends: {} };
   if (songMbids.length === 0) return result;
 
   const supabase = await createClient();
@@ -259,12 +275,10 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
     .select("user_id, song_mbid, score")
     .in("song_mbid", songMbids);
 
+  const rows = (data ?? []) as { user_id: string; song_mbid: string; score: number }[];
+
   const totals = new Map<string, { sum: number; count: number }>();
-  for (const row of (data ?? []) as {
-    user_id: string;
-    song_mbid: string;
-    score: number;
-  }[]) {
+  for (const row of rows) {
     const total = totals.get(row.song_mbid) ?? { sum: 0, count: 0 };
     total.sum += row.score;
     total.count += 1;
@@ -274,6 +288,46 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
 
   for (const [mbid, total] of totals) {
     result.community[mbid] = { average: total.sum / total.count, count: total.count };
+  }
+
+  if (user) {
+    const following = new Set(await getFollowingIds(user.id));
+    const theirs = rows.filter((row) => following.has(row.user_id));
+
+    if (theirs.length > 0) {
+      const { data: people } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", [...new Set(theirs.map((row) => row.user_id))]);
+
+      const byId = new Map(
+        ((people ?? []) as {
+          id: string;
+          username: string;
+          display_name: string | null;
+          avatar_url: string | null;
+        }[]).map((person) => [person.id, person]),
+      );
+
+      for (const row of theirs) {
+        const person = byId.get(row.user_id);
+        // Somebody who hasn't picked a username yet has no page to link to.
+        if (!person?.username) continue;
+        result.friends[row.song_mbid] = [
+          ...(result.friends[row.song_mbid] ?? []),
+          {
+            username: person.username,
+            name: person.display_name || person.username,
+            avatar_url: person.avatar_url,
+            score: row.score,
+          },
+        ];
+      }
+
+      for (const list of Object.values(result.friends)) {
+        list.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+      }
+    }
   }
 
   return result;

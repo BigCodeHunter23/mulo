@@ -1,6 +1,8 @@
 import { sizedAvatar } from "@/lib/record-avatar";
 
 const SIZES = {
+  /** Small enough to sit in a tracklist row without growing it. */
+  xs: { box: "h-5 w-5", text: "text-[9px]", record: 96 },
   sm: { box: "h-8 w-8", text: "text-xs", record: 96 },
   md: { box: "h-10 w-10", text: "text-sm", record: 128 },
   lg: { box: "h-16 w-16", text: "text-xl", record: 128 },

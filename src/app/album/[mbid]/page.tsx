@@ -296,6 +296,7 @@ async function Tracklist({
           tracks={tracks}
           community={scores.community}
           initialOwn={scores.own}
+          friends={scores.friends}
           signedIn={signedIn}
         />
       )}
