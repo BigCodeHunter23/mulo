@@ -290,7 +290,12 @@ export default function VersusCard({
         onClick={() => pick(side)}
         disabled={pending}
         aria-label={`Pick ${artist.name}`}
-        className={`group ${layout} rounded-2xl disabled:cursor-wait`}
+        // w-full because a button doesn't fill its column the way a div does:
+        // it shrink-wraps its widest child, which left the photo — and the
+        // name and the Pick under it — against the left edge of its half of
+        // the card while the artist's glow stayed in the middle of it. Only
+        // somebody who could still pick ever saw it.
+        className={`group ${layout} w-full rounded-2xl disabled:cursor-wait`}
       >
         {body}
       </button>
