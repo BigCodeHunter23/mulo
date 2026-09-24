@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { coverSrc } from "@/lib/cover-url";
+import type { FriendScore } from "@/lib/friend-scores";
 import CoverImage from "@/components/CoverImage";
+import FriendFaces from "@/components/FriendFaces";
 import { Score, type ScoreKind } from "@/components/StarScore";
 import QuickRate from "@/components/QuickRate";
 import { haptic } from "@/lib/haptics";
@@ -28,6 +30,7 @@ export default function AlbumCard({
   score,
   scoreKind = "overall",
   mine,
+  friends = [],
   eager = false,
 }: {
   mbid: string;
@@ -41,6 +44,8 @@ export default function AlbumCard({
   scoreKind?: ScoreKind;
   /** The signed-in person's own score, stamped on the cover so rated albums stand out. */
   mine?: number;
+  /** People you follow who have rated it, shown as faces under the card. */
+  friends?: FriendScore[];
   /** For the first row of a page, so it isn't held back by lazy loading. */
   eager?: boolean;
 }) {
@@ -126,6 +131,10 @@ export default function AlbumCard({
             <Score kind={scoreKind} value={score} size="sm" showLabel={false} />
           )}
         </div>
+        {/* Under the card rather than on the artwork: the cover already
+            carries your own score, and two things on one picture is one too
+            many. */}
+        {friends.length > 0 && <FriendFaces friends={friends} className="mt-1.5" />}
       </Link>
       {open && (
         <QuickRate

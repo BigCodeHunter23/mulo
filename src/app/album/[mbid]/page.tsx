@@ -14,6 +14,7 @@ import { promptFor } from "@/lib/review-prompts";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
+import FriendScores from "@/components/FriendScores";
 import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
 import ListenOn from "@/components/ListenOn";
@@ -186,6 +187,7 @@ export default async function AlbumPage({
                   friendsCount={scores.friendsCount}
                   seeded={scores.seeded}
                 />
+                <FriendScores friends={scores.friendList} what="this record" />
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   getScoresForReleases,
   getMyAlbumScores,
   getTopSongs,
+  getFriendRaters,
 } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
 import { getReactions } from "@/lib/reactions";
@@ -17,6 +18,7 @@ import AlbumCard from "@/components/AlbumCard";
 import RatingForm from "@/components/RatingForm";
 import ReviewList from "@/components/ReviewList";
 import StarScore from "@/components/StarScore";
+import FriendScores from "@/components/FriendScores";
 import ReadMore from "@/components/ReadMore";
 import TopSongs from "@/components/TopSongs";
 import WhereNext from "@/components/WhereNext";
@@ -75,9 +77,10 @@ export default async function ArtistPage({
     getReviews("artist", mbid),
     getTopSongs(mbid),
   ]);
-  const [albumScores, myScores, reactions] = await Promise.all([
+  const [albumScores, myScores, albumFriends, reactions] = await Promise.all([
     getScoresForReleases(albums.map((a) => a.mbid)),
     getMyAlbumScores(albums.map((a) => a.mbid)),
+    getFriendRaters("album", albums.map((a) => a.mbid)),
     getReactions(
       "artist",
       reviews.map((review) => review.id),
@@ -146,6 +149,7 @@ export default async function ArtistPage({
                   friendsCount={scores.friendsCount}
                   seeded={scores.seeded}
                 />
+                <FriendScores friends={scores.friendList} what={artist.name} />
               </div>
             </div>
           </div>
@@ -214,6 +218,7 @@ export default async function ArtistPage({
                   coverUrl={album.cover_art_url}
                   score={albumScores.get(album.mbid) ?? null}
                   mine={myScores.get(album.mbid)}
+                  friends={albumFriends[album.mbid]}
                   eager={i < 5}
                 />
               </li>

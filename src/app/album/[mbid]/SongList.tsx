@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { rate, removeRating } from "@/app/ratings/actions";
-import type { FriendSongScore } from "@/lib/ratings";
+import type { FriendScore } from "@/lib/friend-scores";
 import Avatar from "@/components/Avatar";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
@@ -32,7 +32,7 @@ function formatDuration(ms: number | null) {
   return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
 }
 
-const mean = (scores: FriendSongScore[]) =>
+const mean = (scores: FriendScore[]) =>
   scores.reduce((sum, friend) => sum + friend.score, 0) / scores.length;
 
 /** One person's score is a whole number, so don't dress it up as an average. */
@@ -64,7 +64,7 @@ function CrewIcon() {
  * once there are more. Either way it's one chip wide, so a record where
  * fifty people have an opinion reads the same as one where two do.
  */
-function FriendsChip({ scores }: { scores: FriendSongScore[] }) {
+function FriendsChip({ scores }: { scores: FriendScore[] }) {
   const average = mean(scores);
   const names = scores.map((friend) => `${friend.name} ${friend.score}`).join(", ");
 
@@ -114,7 +114,7 @@ export default function SongList({
   community: Record<string, { average: number; count: number }>;
   initialOwn: Record<string, number>;
   /** How the people you follow scored each song, their best first. */
-  friends: Record<string, FriendSongScore[]>;
+  friends: Record<string, FriendScore[]>;
   signedIn: boolean;
 }) {
   const [own, setOwn] = useState(initialOwn);

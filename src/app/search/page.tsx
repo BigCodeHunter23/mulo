@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
 import { searchCatalog } from "@/lib/search";
+import { friendsForResults } from "@/lib/ratings";
 import { artistsToExplore, mostPlayedAlbums } from "@/lib/discover";
 import SearchClient from "./SearchClient";
 import WiderResults from "./WiderResults";
@@ -29,6 +30,12 @@ export default async function SearchPage({
     artistsToExplore(12),
     mostPlayedAlbums(10),
   ]);
+  // What the people you follow have already rated, for both the results and
+  // the shelves shown before anything is typed.
+  const friends = await friendsForResults({
+    artists: [...results.artists, ...artists],
+    albums: [...results.albums, ...albums],
+  });
 
   const known = [
     ...results.artists.map((a) => a.mbid),
@@ -41,6 +48,7 @@ export default async function SearchPage({
         key={query}
         initialQuery={query}
         initialResults={results}
+        initialFriends={friends}
         browse={{
           artists: artists.map((artist) => ({
             mbid: artist.mbid,

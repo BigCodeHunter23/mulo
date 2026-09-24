@@ -2,6 +2,10 @@ import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
+import { bestFirst, NO_FRIENDS, type FriendScore, type SearchFriends } from "@/lib/friend-scores";
+
+export { NO_FRIENDS };
+export type { FriendScore, SearchFriends };
 
 /** Named to match the mockups: Ovr / You / Friends. */
 export type Scores = {
@@ -10,6 +14,8 @@ export type Scores = {
   you: number | null;
   friends: number | null;
   friendsCount: number;
+  /** Which of them it was, and what each gave, their best first. */
+  friendList: FriendScore[];
   /**
    * True while the overall score still leans on the starting score borrowed
    * from MusicBrainz, so a page can say so rather than passing an outside
@@ -133,6 +139,78 @@ export async function getCrowd(
     : undefined;
 }
 
+type Person = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+/** The people behind a set of ratings, by id. */
+async function peopleById(userIds: string[]): Promise<Map<string, Person>> {
+  if (userIds.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, avatar_url")
+    .in("id", [...new Set(userIds)]);
+
+  return new Map(((data ?? []) as Person[]).map((person) => [person.id, person]));
+}
+
+/** A rating row as somebody with a name and a face, or nothing if they have neither. */
+function asFriend(
+  row: { user_id: string; score: number },
+  people: Map<string, Person>,
+): FriendScore[] {
+  const person = people.get(row.user_id);
+  // Somebody who hasn't picked a username yet has no page to link to.
+  if (!person?.username) return [];
+  return [
+    {
+      username: person.username,
+      name: person.display_name || person.username,
+      avatar_url: person.avatar_url,
+      score: row.score,
+    },
+  ];
+}
+
+/**
+ * Puts names and faces to rating rows: a score from somebody you follow is
+ * worth more when you can see who it came from.
+ */
+async function nameThem(
+  rows: { user_id: string; score: number }[],
+): Promise<FriendScore[]> {
+  if (rows.length === 0) return [];
+  const people = await peopleById(rows.map((row) => row.user_id));
+  return rows.flatMap((row) => asFriend(row, people)).sort(bestFirst);
+}
+
+/**
+ * The people you follow behind a set of search results, so browsing shows
+ * whose opinion is already waiting behind a cover.
+ */
+export async function friendsForResults(results: {
+  artists: { mbid: string }[];
+  albums: { mbid: string }[];
+}): Promise<SearchFriends> {
+  const [artists, albums] = await Promise.all([
+    getFriendRaters(
+      "artist",
+      results.artists.map((artist) => artist.mbid),
+    ),
+    getFriendRaters(
+      "album",
+      results.albums.map((album) => album.mbid),
+    ),
+  ]);
+
+  return { artists, albums };
+}
+
 /** The three scores shown at the top of an album or artist page. */
 export async function getScores(
   kind: "album" | "artist",
@@ -150,9 +228,7 @@ export async function getScores(
 
   const all = (data ?? []) as { user_id: string; score: number }[];
   const followed = new Set(followingIds);
-  const friendScores = all
-    .filter((r) => followed.has(r.user_id))
-    .map((r) => r.score);
+  const theirs = all.filter((r) => followed.has(r.user_id));
 
   const everyone = withSeed(
     all.map((r) => r.score),
@@ -163,10 +239,56 @@ export async function getScores(
     overall: everyone.count === 0 ? null : everyone.sum / everyone.count,
     overallCount: everyone.count,
     you: user ? (all.find((r) => r.user_id === user.id)?.score ?? null) : null,
-    friends: average(friendScores),
-    friendsCount: friendScores.length,
+    friends: average(theirs.map((r) => r.score)),
+    friendsCount: theirs.length,
+    friendList: await nameThem(theirs),
     seeded: everyone.seeded,
   };
+}
+
+/**
+ * Who among the people you follow has rated each of these albums or artists,
+ * for a grid of cards. One query for the lot, so a page of covers can say
+ * whose opinion is waiting behind each one.
+ */
+export async function getFriendRaters(
+  kind: "album" | "artist",
+  mbids: string[],
+): Promise<Record<string, FriendScore[]>> {
+  const result: Record<string, FriendScore[]> = {};
+  if (mbids.length === 0) return result;
+
+  const user = await getCurrentUser();
+  if (!user) return result;
+
+  const following = await getFollowingIds(user.id);
+  if (following.length === 0) return result;
+
+  const supabase = await createClient();
+  const { table, column } = RATING_TABLES[kind];
+  const { data } = await supabase
+    .from(table)
+    .select(`user_id, score, ${column}`)
+    .in(column, mbids)
+    .in("user_id", following);
+
+  const rows = (data ?? []) as unknown as Record<string, string | number>[];
+  if (rows.length === 0) return result;
+
+  const people = await peopleById(rows.map((row) => row.user_id as string));
+
+  for (const row of rows) {
+    const mbid = row[column] as string;
+    const friend = asFriend(
+      { user_id: row.user_id as string, score: row.score as number },
+      people,
+    );
+    if (friend.length > 0) result[mbid] = [...(result[mbid] ?? []), ...friend];
+  }
+
+  for (const list of Object.values(result)) list.sort(bestFirst);
+
+  return result;
 }
 
 /**
@@ -239,21 +361,13 @@ export async function getOwnRating(
   return data ?? null;
 }
 
-/** One person you follow, and what they gave a song. */
-export type FriendSongScore = {
-  username: string;
-  name: string;
-  avatar_url: string | null;
-  score: number;
-};
-
 export type SongScores = {
   /** Everyone's average for each rated song. */
   community: Record<string, { average: number; count: number }>;
   /** The signed-in person's own score for each song they've rated. */
   own: Record<string, number>;
   /** How the people you follow scored each song, their best first. */
-  friends: Record<string, FriendSongScore[]>;
+  friends: Record<string, FriendScore[]>;
 };
 
 /**
@@ -295,38 +409,19 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
     const theirs = rows.filter((row) => following.has(row.user_id));
 
     if (theirs.length > 0) {
-      const { data: people } = await supabase
-        .from("profiles")
-        .select("id, username, display_name, avatar_url")
-        .in("id", [...new Set(theirs.map((row) => row.user_id))]);
-
-      const byId = new Map(
-        ((people ?? []) as {
-          id: string;
-          username: string;
-          display_name: string | null;
-          avatar_url: string | null;
-        }[]).map((person) => [person.id, person]),
-      );
+      const people = await peopleById(theirs.map((row) => row.user_id));
 
       for (const row of theirs) {
-        const person = byId.get(row.user_id);
-        // Somebody who hasn't picked a username yet has no page to link to.
-        if (!person?.username) continue;
-        result.friends[row.song_mbid] = [
-          ...(result.friends[row.song_mbid] ?? []),
-          {
-            username: person.username,
-            name: person.display_name || person.username,
-            avatar_url: person.avatar_url,
-            score: row.score,
-          },
-        ];
+        const friend = asFriend(row, people);
+        if (friend.length > 0) {
+          result.friends[row.song_mbid] = [
+            ...(result.friends[row.song_mbid] ?? []),
+            ...friend,
+          ];
+        }
       }
 
-      for (const list of Object.values(result.friends)) {
-        list.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-      }
+      for (const list of Object.values(result.friends)) list.sort(bestFirst);
     }
   }
 

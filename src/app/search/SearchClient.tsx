@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { SearchAlbum, SearchArtist, SearchResults } from "@/lib/search";
+import { NO_FRIENDS, type SearchFriends } from "@/lib/friend-scores";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { clearViewed, useRecentlyViewed } from "@/lib/recently-viewed";
 import AlbumCard from "@/components/AlbumCard";
@@ -81,11 +82,14 @@ const RAIL =
 export default function SearchClient({
   initialQuery,
   initialResults,
+  initialFriends,
   browse,
   children,
 }: {
   initialQuery: string;
   initialResults: SearchResults;
+  /** Who you follow has rated what, for the faces under each card. */
+  initialFriends: SearchFriends;
   /** Shown before anything is typed. */
   browse: { artists: SearchArtist[]; albums: SearchAlbum[] };
   children?: React.ReactNode;
@@ -93,6 +97,7 @@ export default function SearchClient({
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState(initialResults);
+  const [friends, setFriends] = useState(initialFriends);
   const [loading, setLoading] = useState(false);
   const lastSearched = useRef(initialQuery.trim());
   const input = useRef<HTMLInputElement>(null);
@@ -126,7 +131,13 @@ export default function SearchClient({
         const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
           signal: controller.signal,
         });
-        if (response.ok) setResults(await response.json());
+        if (response.ok) {
+          const answer = (await response.json()) as SearchResults & {
+            friends?: SearchFriends;
+          };
+          setResults(answer);
+          setFriends(answer.friends ?? NO_FRIENDS);
+        }
       } catch {
         // Superseded by a newer search; nothing to do.
       } finally {
@@ -353,6 +364,7 @@ export default function SearchClient({
                       mbid={artist.mbid}
                       name={artist.name}
                       imageUrl={artist.image_url}
+                      friends={friends.artists[artist.mbid]}
                       eager={i < 4}
                     />
                   </li>
@@ -373,6 +385,7 @@ export default function SearchClient({
                       artist={album.artist}
                       year={album.year}
                       coverUrl={album.cover_art_url}
+                      friends={friends.albums[album.mbid]}
                     />
                   </li>
                 ))}
@@ -398,6 +411,7 @@ export default function SearchClient({
                   mbid={artist.mbid}
                   name={artist.name}
                   imageUrl={artist.image_url}
+                  friends={friends.artists[artist.mbid]}
                   eager={i < 4}
                 />
               </li>
@@ -418,6 +432,7 @@ export default function SearchClient({
                   artist={album.artist}
                   year={album.year}
                   coverUrl={album.cover_art_url}
+                  friends={friends.albums[album.mbid]}
                   eager={i < 4}
                 />
               </li>

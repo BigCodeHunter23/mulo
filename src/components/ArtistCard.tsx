@@ -1,17 +1,22 @@
 import Link from "next/link";
 import { artistPhotoSrc } from "@/lib/cover-url";
+import type { FriendScore } from "@/lib/friend-scores";
 import CoverImage from "@/components/CoverImage";
+import FriendFaces from "@/components/FriendFaces";
 
 /** A round artist photo with the name beneath, for artist grids. */
 export default function ArtistCard({
   mbid,
   name,
   imageUrl,
+  friends = [],
   eager = false,
 }: {
   mbid: string;
   name: string;
   imageUrl: string | null;
+  /** People you follow who have rated them, shown as faces under the name. */
+  friends?: FriendScore[];
   /** For photos near the top of a page, so they aren't held back by lazy loading. */
   eager?: boolean;
 }) {
@@ -38,6 +43,7 @@ export default function ArtistCard({
       <span className="line-clamp-2 text-sm font-medium text-text transition-colors group-hover:text-accent">
         {name}
       </span>
+      {friends.length > 0 && <FriendFaces friends={friends} className="-mt-1" />}
     </Link>
   );
 }
