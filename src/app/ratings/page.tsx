@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
 import {
   getOwnAlbumRatings,
   getOwnArtistRatings,
@@ -95,8 +95,9 @@ export default async function MyRatingsPage({
   const band = Number(score);
   const openBand = Number.isInteger(band) && band >= 1 && band <= 10 ? band : null;
 
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  await requireUser(
+    withQuery("/ratings", { type, view, score, decade: decadeParam, genre: genreParam }),
+  );
 
   const counts = await getOwnRatingCounts();
   const total = counts.album + counts.artist + counts.song;

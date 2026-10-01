@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
 import { getFollowingIds, getProfileByUsername, listFollows } from "@/lib/social";
 import PersonRow from "@/components/PersonRow";
 import { EmptyState } from "@/components/ui";
@@ -51,13 +52,17 @@ export default async function FollowsPage({
   const [{ username }, { show }] = await Promise.all([params, searchParams]);
   const direction = directionOf(show);
 
+  // Who follows whom is for people with an account, like the People page.
+  const viewer = await requireUser(
+    withQuery(`/u/${encodeURIComponent(username)}/follows`, { show }),
+  );
+
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const viewer = await getCurrentUser();
   const [people, followingIds] = await Promise.all([
     listFollows(profile.id, direction),
-    viewer ? getFollowingIds(viewer.id) : Promise.resolve<string[]>([]),
+    getFollowingIds(viewer.id),
   ]);
 
   const following = new Set(followingIds);
@@ -108,8 +113,8 @@ export default async function FollowsPage({
               <PersonRow
                 key={person.id}
                 profile={person}
-                signedIn={Boolean(viewer)}
-                isSelf={viewer?.id === person.id}
+                signedIn
+                isSelf={viewer.id === person.id}
                 isFollowing={following.has(person.id)}
               />
             ))}

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
 import { getPickSuggestions, getTopPicks, type PickKind } from "@/lib/top-picks";
 import GoatBuilder from "./GoatBuilder";
 
@@ -21,8 +23,7 @@ export default async function GoatPage({
   const tab = TABS.find((t) => t.param === kind) ?? TABS[0];
   const pickKind: PickKind = tab.kind;
 
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(withQuery("/goat", { kind }));
 
   const supabase = await createClient();
   const { data: profile } = await supabase

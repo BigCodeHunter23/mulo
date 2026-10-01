@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
 import { popularArtists } from "@/lib/discover";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import { getFollowingIds, listProfiles } from "@/lib/social";
@@ -39,8 +40,8 @@ export default async function WelcomePage({
 }: {
   searchParams: Promise<{ step?: string; intro?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const { step: requested, intro } = await searchParams;
+  const user = await requireUser(withQuery("/welcome", { step: requested, intro }));
 
   const supabase = await createClient();
   const { data: profile } = await supabase
@@ -49,7 +50,6 @@ export default async function WelcomePage({
     .eq("id", user.id)
     .maybeSingle();
 
-  const { step: requested, intro } = await searchParams;
   // Ratings and follows hang off a profile, so a username always comes first.
   const step: Step = !profile
     ? "profile"

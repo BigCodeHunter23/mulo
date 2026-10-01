@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getProfileByUsername } from "@/lib/social";
 import { getHeadToHead, MINIMUM, type BlindSpot, type Clash } from "@/lib/head-to-head";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { coverSrc } from "@/lib/cover-url";
 import Avatar from "@/components/Avatar";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
@@ -97,12 +97,10 @@ export default async function HeadToHeadPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
+  const user = await requireUser(`/u/${encodeURIComponent(username)}/vs`);
 
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
-
-  const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=/u/${username}/vs`);
   if (user.id === profile.id) redirect(`/u/${username}`);
 
   const them = profile.display_name || profile.username;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
 import Avatar from "@/components/Avatar";
+import LoginLink from "@/components/LoginLink";
 import MobileNav from "@/components/MobileNav";
 import NavLink from "@/components/NavLink";
 import NotificationBell from "@/components/NotificationBell";
@@ -74,7 +75,8 @@ export default async function Header() {
               Lists
             </NavLink>
             <NavLink href="/search">Search</NavLink>
-            <NavLink href="/people">People</NavLink>
+            {/* The directory of everyone is for people with an account. */}
+            {user && <NavLink href="/people">People</NavLink>}
             <NavLink href="/versus">Versus</NavLink>
             {/* The rest appear as the screen has room; Log out is also on Edit profile. */}
             {user && (
@@ -103,13 +105,15 @@ export default async function Header() {
             >
               <SearchIcon />
             </Link>
-            <Link
-              href="/people"
-              aria-label="People"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-raised hover:text-text sm:hidden"
-            >
-              <PeopleIcon />
-            </Link>
+            {user && (
+              <Link
+                href="/people"
+                aria-label="People"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-raised hover:text-text sm:hidden"
+              >
+                <PeopleIcon />
+              </Link>
+            )}
             {user ? (
               <>
                 <form action={logout} className="hidden lg:block">
@@ -131,9 +135,7 @@ export default async function Header() {
               </>
             ) : (
               <span className="hidden sm:block">
-                <Link href="/login" className={buttonClass({ size: "sm" })}>
-                  Log in
-                </Link>
+                <LoginLink className={buttonClass({ size: "sm" })}>Log in</LoginLink>
               </span>
             )}
           </div>

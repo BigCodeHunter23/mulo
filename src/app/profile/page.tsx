@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { getRaisedOn } from "@/lib/raised-on";
 import { logout } from "@/app/login/actions";
 import { buttonClass } from "@/components/ui";
@@ -10,8 +10,7 @@ import ProfileForm from "./ProfileForm";
 export const metadata: Metadata = { title: "Edit profile" };
 
 export default async function ProfileSettingsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser("/profile");
 
   const supabase = await createClient();
   const [{ data: profile }, raisedOn] = await Promise.all([

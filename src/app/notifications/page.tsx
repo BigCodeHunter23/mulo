@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { getNotifications, SEEN_COOKIE } from "@/lib/notifications";
 import { getFollowingIds } from "@/lib/social";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
@@ -11,8 +10,7 @@ import NotificationList from "./NotificationList";
 export const metadata: Metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser("/notifications");
 
   const [notifications, followingIds, store] = await Promise.all([
     getNotifications(user.id),

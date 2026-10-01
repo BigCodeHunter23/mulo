@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
 import Link from "next/link";
 import { getStack } from "@/lib/stack";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
@@ -38,13 +38,11 @@ export default async function StackPage({
 }: {
   searchParams: Promise<{ run?: string; decade?: string; genre?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-
   // "Another run" points at a new ?run= value. The address has to change for
   // the deck to be built again rather than left sitting on its finished
   // screen, and the value keys the deck so its state starts over.
   const { run, decade: decadeParam, genre: genreParam } = await searchParams;
+  const user = await requireUser(withQuery("/stack", { decade: decadeParam, genre: genreParam }));
   const decade = DECADES.includes(Number(decadeParam)) ? Number(decadeParam) : null;
   const genre = GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
   const [albums, streak] = await Promise.all([

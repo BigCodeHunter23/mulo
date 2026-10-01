@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 
 /** A bare /badges means your own board. */
 export default async function BadgesRedirect() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser("/badges");
 
   const supabase = await createClient();
   const { data } = await supabase

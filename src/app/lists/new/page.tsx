@@ -1,24 +1,23 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { withQuery } from "@/lib/redirects";
+import { mbidSchema } from "@/lib/validation";
 import { coverSrc } from "@/lib/cover-url";
 import ListForm from "../ListForm";
 
 export const metadata: Metadata = { title: "New list" };
-
-const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function NewListPage({
   searchParams,
 }: {
   searchParams: Promise<{ add?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-
   const { add } = await searchParams;
+  await requireUser(withQuery("/lists/new", { add }));
+
   let album: { mbid: string; title: string; cover: string | null } | null = null;
-  if (add && MBID.test(add)) {
+  if (add && mbidSchema.safeParse(add).success) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("releases")

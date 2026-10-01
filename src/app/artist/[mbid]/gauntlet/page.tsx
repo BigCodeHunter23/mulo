@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { getCachedArtist } from "@/lib/catalog";
 import { getGauntletRun } from "@/lib/gauntlet";
 import StackDeck from "@/app/stack/StackDeck";
@@ -28,8 +29,7 @@ export default async function GauntletPage({
   params: Promise<{ mbid: string }>;
 }) {
   const { mbid } = await params;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(`/artist/${mbid}/gauntlet`);
 
   const artist = await getCachedArtist(mbid);
   if (!artist) notFound();

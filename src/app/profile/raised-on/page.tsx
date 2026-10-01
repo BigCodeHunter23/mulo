@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getRaisedOn } from "@/lib/raised-on";
 import { isRecordAvatar } from "@/lib/record-avatar";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import RaisedOnPicker from "@/components/RaisedOnPicker";
 
 export const metadata: Metadata = { title: "Raised on" };
 
 export default async function RaisedOnPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireUser("/profile/raised-on");
 
   const supabase = await createClient();
   const [{ data: profile }, raisedOn] = await Promise.all([
