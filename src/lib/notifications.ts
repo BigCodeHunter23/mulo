@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { getFollowingIds } from "@/lib/social";
 import {
   getLatestVersusAt,
   getRecentResults,
@@ -81,11 +82,7 @@ async function alsoRated(
   userId: string,
   limit: number,
 ): Promise<Notification[]> {
-  const { data: follows } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", userId);
-  const following = ((follows ?? []) as { following_id: string }[]).map((f) => f.following_id);
+  const following = await getFollowingIds(userId);
   if (following.length === 0) return [];
 
   const { data: theirs } = await supabase

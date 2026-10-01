@@ -2,27 +2,41 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * The bell in the header, with a dot when something's new. It checks after
- * every page change, since the header doesn't re-render as you move around,
- * and treats the notifications page itself as read.
+ * Each check costs several database reads, so moving quickly between pages
+ * asks at most this often.
+ */
+const RECHECK_MS = 60_000;
+
+/**
+ * The bell in the header, with a dot when something's new. It checks as you
+ * change pages, since the header doesn't re-render as you move around, and
+ * treats the notifications page itself as read.
  */
 export default function NotificationBell() {
   const pathname = usePathname();
   const [unread, setUnread] = useState(false);
+  const lastChecked = useRef(0);
   const onPage = pathname === "/notifications";
 
   useEffect(() => {
-    if (onPage) return;
+    if (onPage) {
+      // Leaving the page checks straight away, so the dot doesn't come back.
+      lastChecked.current = 0;
+      return;
+    }
+    if (Date.now() - lastChecked.current < RECHECK_MS) return;
+    lastChecked.current = Date.now();
 
     const controller = new AbortController();
     fetch("/api/notifications/unread", { signal: controller.signal, cache: "no-store" })
       .then((response) => (response.ok ? response.json() : { unread: false }))
       .then((data: { unread?: boolean }) => setUnread(Boolean(data.unread)))
       .catch(() => {
-        // Left alone: a missed check just means no dot until the next page.
+        // Left alone: a missed check just means no dot until the next one.
+        lastChecked.current = 0;
       });
 
     return () => controller.abort();

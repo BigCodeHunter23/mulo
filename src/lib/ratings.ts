@@ -158,32 +158,20 @@ export async function getCrowd(
     : undefined;
 }
 
-type Person = {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
+/**
+ * Who gave a score, joined onto the rating through its author's profile, so
+ * names and faces come back in the same query as the scores.
+ */
+const BY = "profiles ( username, display_name, avatar_url )";
+
+type ByRow = {
+  score: number;
+  profiles: { username: string | null; display_name: string | null; avatar_url: string | null } | null;
 };
 
-/** The people behind a set of ratings, by id. */
-async function peopleById(userIds: string[]): Promise<Map<string, Person>> {
-  if (userIds.length === 0) return new Map();
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, avatar_url")
-    .in("id", [...new Set(userIds)]);
-
-  return new Map(((data ?? []) as Person[]).map((person) => [person.id, person]));
-}
-
 /** A rating row as somebody with a name and a face, or nothing if they have neither. */
-function asFriend(
-  row: { user_id: string; score: number },
-  people: Map<string, Person>,
-): FriendScore[] {
-  const person = people.get(row.user_id);
+function asFriend(row: ByRow): FriendScore[] {
+  const person = row.profiles;
   // Somebody who hasn't picked a username yet has no page to link to.
   if (!person?.username) return [];
   return [
@@ -194,18 +182,6 @@ function asFriend(
       score: row.score,
     },
   ];
-}
-
-/**
- * Puts names and faces to rating rows: a score from somebody you follow is
- * worth more when you can see who it came from.
- */
-async function nameThem(
-  rows: { user_id: string; score: number }[],
-): Promise<FriendScore[]> {
-  if (rows.length === 0) return [];
-  const people = await peopleById(rows.map((row) => row.user_id));
-  return rows.flatMap((row) => asFriend(row, people)).sort(bestFirst);
 }
 
 /**
@@ -247,7 +223,7 @@ export async function getScores(
     const followingIds = await getFollowingIds(user.id);
     const { data } = await supabase
       .from(table)
-      .select("user_id, score")
+      .select(`user_id, score, ${BY}`)
       .eq(column, mbid)
       .in("user_id", [user.id, ...followingIds]);
     return { followed: new Set(followingIds), rows: data ?? [] };
@@ -268,7 +244,7 @@ export async function getScores(
     you: user ? (rows.find((r) => r.user_id === user.id)?.score ?? null) : null,
     friends: average(theirs.map((r) => r.score)),
     friendsCount: theirs.length,
-    friendList: await nameThem(theirs),
+    friendList: theirs.flatMap(asFriend).sort(bestFirst),
     seeded: everyone.seeded,
   };
 }
@@ -295,21 +271,15 @@ export async function getFriendRaters(
   const { table, column } = RATING_TABLES[kind];
   const { data } = await supabase
     .from(table)
-    .select(`user_id, score, ${column}`)
+    .select(`score, ${column}, ${BY}`)
     .in(column, mbids)
     .in("user_id", following);
 
-  const rows = (data ?? []) as unknown as Record<string, string | number>[];
-  if (rows.length === 0) return result;
-
-  const people = await peopleById(rows.map((row) => row.user_id as string));
-
-  for (const row of rows) {
-    const mbid = row[column] as string;
-    const friend = asFriend(
-      { user_id: row.user_id as string, score: row.score as number },
-      people,
-    );
+  // The column naming what was rated changes with the kind, which the typed
+  // query builder can't follow, so the row's shape is spelled out here.
+  for (const row of (data ?? []) as unknown as (ByRow & Record<string, unknown>)[]) {
+    const mbid = String(row[column]);
+    const friend = asFriend(row);
     if (friend.length > 0) result[mbid] = [...(result[mbid] ?? []), ...friend];
   }
 
@@ -410,7 +380,7 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
     const followingIds = await getFollowingIds(user.id);
     const { data } = await supabase
       .from("song_ratings")
-      .select("user_id, song_mbid, score")
+      .select(`user_id, song_mbid, score, ${BY}`)
       .in("song_mbid", songMbids)
       .in("user_id", [user.id, ...followingIds]);
     return { following: new Set(followingIds), rows: data ?? [] };
@@ -433,21 +403,17 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
     }
     const theirs = rows.filter((row) => following.has(row.user_id));
 
-    if (theirs.length > 0) {
-      const people = await peopleById(theirs.map((row) => row.user_id));
-
-      for (const row of theirs) {
-        const friend = asFriend(row, people);
-        if (friend.length > 0) {
-          result.friends[row.song_mbid] = [
-            ...(result.friends[row.song_mbid] ?? []),
-            ...friend,
-          ];
-        }
+    for (const row of theirs) {
+      const friend = asFriend(row);
+      if (friend.length > 0) {
+        result.friends[row.song_mbid] = [
+          ...(result.friends[row.song_mbid] ?? []),
+          ...friend,
+        ];
       }
-
-      for (const list of Object.values(result.friends)) list.sort(bestFirst);
     }
+
+    for (const list of Object.values(result.friends)) list.sort(bestFirst);
   }
 
   return result;
