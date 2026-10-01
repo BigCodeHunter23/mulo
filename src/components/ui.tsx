@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withQuery } from "@/lib/redirects";
 
 /** Section title with a hairline rule, used to break up long pages. */
 export function SectionHeading({
@@ -125,6 +126,46 @@ export function EmptyState({
       )}
       {action && <div className="mt-5">{action}</div>}
     </div>
+  );
+}
+
+/**
+ * Previous and Next links under a list too long for one page. The page lives
+ * in the address bar (`?page=2`), so links can be shared and Back works.
+ */
+export function Pager({
+  page,
+  hasMore,
+  path,
+  query = {},
+}: {
+  page: number;
+  hasMore: boolean;
+  path: string;
+  /** The rest of the address bar, kept as it is from page to page. */
+  query?: Record<string, string | undefined>;
+}) {
+  if (page <= 1 && !hasMore) return null;
+  const to = (n: number) => withQuery(path, { ...query, page: n > 1 ? String(n) : undefined });
+
+  return (
+    <nav aria-label="Pages" className="mt-6 flex items-center justify-between gap-3">
+      {page > 1 ? (
+        <ButtonLink href={to(page - 1)} variant="secondary" size="sm">
+          Previous
+        </ButtonLink>
+      ) : (
+        <span />
+      )}
+      <span className="text-sm text-text-muted">Page {page}</span>
+      {hasMore ? (
+        <ButtonLink href={to(page + 1)} variant="secondary" size="sm">
+          Next
+        </ButtonLink>
+      ) : (
+        <span />
+      )}
+    </nav>
   );
 }
 

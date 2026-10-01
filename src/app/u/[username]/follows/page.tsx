@@ -5,9 +5,12 @@ import { requireUser } from "@/lib/auth";
 import { withQuery } from "@/lib/redirects";
 import { getFollowingIds, getProfileByUsername, listFollows } from "@/lib/social";
 import PersonRow from "@/components/PersonRow";
-import { EmptyState } from "@/components/ui";
+import { ButtonLink, EmptyState, Pager } from "@/components/ui";
+import { pageNumber } from "@/lib/validation";
 
 type Direction = "followers" | "following";
+
+const PAGE_SIZE = 50;
 
 function directionOf(value: string | undefined): Direction {
   return value === "following" ? "following" : "followers";
@@ -47,23 +50,30 @@ export default async function FollowsPage({
   searchParams,
 }: {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; page?: string }>;
 }) {
-  const [{ username }, { show }] = await Promise.all([params, searchParams]);
+  const [{ username }, query] = await Promise.all([params, searchParams]);
+  const { show } = query;
   const direction = directionOf(show);
+  const page = pageNumber(query.page);
 
   // Who follows whom is for people with an account, like the People page.
   const viewer = await requireUser(
-    withQuery(`/u/${encodeURIComponent(username)}/follows`, { show }),
+    withQuery(`/u/${encodeURIComponent(username)}/follows`, {
+      show,
+      page: page > 1 ? String(page) : undefined,
+    }),
   );
 
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
-  const [people, followingIds] = await Promise.all([
-    listFollows(profile.id, direction),
+  const [found, followingIds] = await Promise.all([
+    listFollows(profile.id, direction, { offset: (page - 1) * PAGE_SIZE, size: PAGE_SIZE + 1 }),
     getFollowingIds(viewer.id),
   ]);
+
+  const people = found.slice(0, PAGE_SIZE);
 
   const following = new Set(followingIds);
   const name = profile.display_name || profile.username;
@@ -100,13 +110,24 @@ export default async function FollowsPage({
 
       <div className="mt-7">
         {people.length === 0 ? (
-          <EmptyState
-            title={
-              direction === "following"
-                ? `${name} isn't following anyone yet.`
-                : `Nobody follows ${name} yet.`
-            }
-          />
+          page > 1 ? (
+            <EmptyState
+              title="That's everyone."
+              action={
+                <ButtonLink href={`/u/${profile.username}/follows?show=${direction}`}>
+                  Back to the first page
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={
+                direction === "following"
+                  ? `${name} isn't following anyone yet.`
+                  : `Nobody follows ${name} yet.`
+              }
+            />
+          )
         ) : (
           <ul className="flex flex-col gap-2">
             {people.map((person) => (
@@ -120,6 +141,12 @@ export default async function FollowsPage({
             ))}
           </ul>
         )}
+        <Pager
+          page={page}
+          hasMore={found.length > PAGE_SIZE}
+          path={`/u/${profile.username}/follows`}
+          query={{ show: direction }}
+        />
       </div>
     </main>
   );

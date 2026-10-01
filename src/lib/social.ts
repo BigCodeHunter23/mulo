@@ -82,18 +82,22 @@ export async function getFollowState(
   return { signedIn: true, isSelf: false, isFollowing: Boolean(data) };
 }
 
+/** A slice of a long list: where it starts, and how many to show. */
+export type Slice = { offset?: number; size?: number };
+
 /**
- * Everyone with a profile, newest first. Fine at soft-launch scale; this
- * would need proper search and paging before it grew much past a few hundred.
+ * Everyone with a profile, newest first, a slice at a time. Asking for one
+ * more than `size` is how a page knows whether there's another after it.
  */
-export async function listProfiles(): Promise<PublicProfile[]> {
+export async function listProfiles({ offset = 0, size = 200 }: Slice = {}): Promise<PublicProfile[]> {
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("profiles")
     .select("id, username, display_name, avatar_url, bio, created_at")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .order("id")
+    .range(offset, offset + size - 1);
 
   return data ?? [];
 }
@@ -108,6 +112,7 @@ export async function listProfiles(): Promise<PublicProfile[]> {
 export async function listFollows(
   userId: string,
   direction: "followers" | "following",
+  { offset = 0, size = 500 }: Slice = {},
 ): Promise<PublicProfile[]> {
   const supabase = await createClient();
 
@@ -123,7 +128,8 @@ export async function listFollows(
     .select(wanted)
     .eq(match, userId)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .order(wanted)
+    .range(offset, offset + size - 1);
 
   const ids = ((links ?? []) as unknown as Record<string, string>[]).map(
     (row) => row[wanted],

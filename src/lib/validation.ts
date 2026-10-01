@@ -38,6 +38,17 @@ export const usernameSchema = z
     "Usernames must be 3–20 characters, using only letters, numbers and underscores.",
   );
 
+const pageSchema = z
+  .string()
+  .regex(/^[1-9][0-9]{0,4}$/)
+  .transform(Number);
+
+/** A page number from the address bar ("?page=2"), counted from 1. Anything else is page 1. */
+export function pageNumber(value: string | undefined): number {
+  const parsed = pageSchema.safeParse(value);
+  return parsed.success ? parsed.data : 1;
+}
+
 /** "2026-10", the month a Mixtape covers. */
 export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
