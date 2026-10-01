@@ -1,4 +1,4 @@
-﻿# MULO hardening audit (Phase 0)
+# MULO hardening audit (Phase 0)
 
 Audit date: 2026-10-01, at commit `3cac95e` on `master`. This phase was
 read-only: no application code was changed.
