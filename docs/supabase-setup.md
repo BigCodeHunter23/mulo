@@ -56,6 +56,8 @@ Dashboard → **SQL Editor**. Paste each file's contents and run it.
    stay right past a thousand ratings. Safe to run twice. **Run this before
    the Phase 2 code goes live**: until it runs, scores show as dashes, the
    charts are empty, and the logs say "run migration 0018".
+5. `supabase/migrations/0019_search_indexes.sql`: makes search fast as the
+   catalogue grows. Safe to run twice, and any time; nothing depends on it.
 
 Check: in the Table Editor, `profiles` now shows the new constraints, and a
 `rate_limits` table exists (it fills as people log in and rate things). In

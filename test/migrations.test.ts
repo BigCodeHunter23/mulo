@@ -228,3 +228,32 @@ describe("0018 score totals", () => {
     expect(month).toEqual([{ release_mbid: ALBUM, people: 1500 }]);
   });
 });
+
+describe("0019 search indexes", () => {
+  let db: PGlite;
+  beforeAll(async () => {
+    db = await localDatabase();
+  });
+  afterAll(() => db?.close());
+
+  it("index every column search matches inside", async () => {
+    const { rows } = await db.query<{ indexname: string }>(
+      "select indexname from pg_indexes where indexname like '%_trgm_idx' order by indexname",
+    );
+    expect(rows.map((row) => row.indexname)).toEqual([
+      "artists_name_trgm_idx",
+      "artists_search_names_trgm_idx",
+      "releases_artist_credit_trgm_idx",
+      "releases_title_trgm_idx",
+      "tracks_title_trgm_idx",
+    ]);
+  });
+
+  it("are used for a match anywhere in a name", async () => {
+    await db.exec("set enable_seqscan = off");
+    const { rows } = await db.query<{ "QUERY PLAN": string }>(
+      "explain select mbid from public.artists where name ilike '%kendrick%'",
+    );
+    expect(rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("artists_name_trgm_idx");
+  });
+});
