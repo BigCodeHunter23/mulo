@@ -3,6 +3,8 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kinds";
 import { bestFirst, NO_FRIENDS, type FriendScore, type SearchFriends } from "@/lib/friend-scores";
+import { logQueryError } from "@/lib/supabase/errors";
+import { readAll } from "@/lib/supabase/read-all";
 
 export { NO_FRIENDS };
 export type { FriendScore, SearchFriends };
@@ -65,12 +67,38 @@ function fromArtist(artistSeed: number | null): number | null {
 type Seeded = { sum: number; count: number; seeded: boolean };
 
 /** Everyone's ratings, plus the starting score while it still counts. */
-function withSeed(scores: number[], seed: number | null): Seeded {
-  const sum = scores.reduce((total, score) => total + score, 0);
-  if (seed === null || scores.length >= SEED_RETIRES_AT) {
-    return { sum, count: scores.length, seeded: false };
+function withSeed(
+  totals: { total: number | null; votes: number | null } | null | undefined,
+  seed: number | null,
+): Seeded {
+  const sum = totals?.total ?? 0;
+  const count = totals?.votes ?? 0;
+  if (seed === null || count >= SEED_RETIRES_AT) {
+    return { sum, count, seeded: false };
   }
-  return { sum: sum + seed, count: scores.length + 1, seeded: true };
+  return { sum: sum + seed, count: count + 1, seeded: true };
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Everyone's total and count for each of these, counted by the database
+ * (migration 0018) rather than by fetching every rating, which the API would
+ * cut off at a thousand rows.
+ */
+async function scoreTotals(
+  supabase: Supabase,
+  kind: RatingKind,
+  mbids: string[],
+  skipUser?: string,
+) {
+  const { data, error } = await supabase.rpc("score_totals", {
+    p_kind: kind,
+    p_mbids: mbids,
+    ...(skipUser ? { p_skip_user: skipUser } : {}),
+  });
+  if (error) logQueryError("ratings", error, "0018");
+  return new Map((data ?? []).flatMap((row) => (row.mbid ? [[row.mbid, row] as const] : [])));
 }
 
 export type OwnRating = {
@@ -120,20 +148,11 @@ export async function getCrowd(
   excludeUserId: string,
 ): Promise<{ average: number; count: number } | undefined> {
   const supabase = await createClient();
-  const { table, column } = RATING_TABLES[kind];
-  const [{ data }, seed] = await Promise.all([
-    supabase
-      .from(table)
-      .select("score")
-      .eq(column, mbid)
-      .neq("user_id", excludeUserId)
-      .limit(2000),
+  const [totals, seed] = await Promise.all([
+    scoreTotals(supabase, kind, [mbid], excludeUserId),
     kind === "song" ? Promise.resolve(null) : getSeed(kind, mbid),
   ]);
-  const crowd = withSeed(
-    (data ?? []).map((row) => row.score as number),
-    seed,
-  );
+  const crowd = withSeed(totals.get(mbid), seed);
   return crowd.count
     ? { average: crowd.sum / crowd.count, count: crowd.count }
     : undefined;
@@ -218,27 +237,35 @@ export async function getScores(
 ): Promise<Scores> {
   const supabase = await createClient();
   const user = await getCurrentUser();
-  const { table, column } = RATING_TABLES[kind];
+  const { column } = RATING_TABLES[kind];
+  const table = reviewedTable(kind);
 
-  const [{ data }, seed, followingIds] = await Promise.all([
-    supabase.from(table).select("user_id, score").eq(column, mbid),
+  // Everyone as a total; yourself and the people you follow as rows, since
+  // those are the ones shown by name.
+  const nearby = async () => {
+    if (!user) return { followed: new Set<string>(), rows: [] };
+    const followingIds = await getFollowingIds(user.id);
+    const { data } = await supabase
+      .from(table)
+      .select("user_id, score")
+      .eq(column, mbid)
+      .in("user_id", [user.id, ...followingIds]);
+    return { followed: new Set(followingIds), rows: data ?? [] };
+  };
+
+  const [totals, seed, { followed, rows }] = await Promise.all([
+    scoreTotals(supabase, kind, [mbid]),
     getSeed(kind, mbid),
-    user ? getFollowingIds(user.id) : Promise.resolve<string[]>([]),
+    nearby(),
   ]);
 
-  const all = (data ?? []) as { user_id: string; score: number }[];
-  const followed = new Set(followingIds);
-  const theirs = all.filter((r) => followed.has(r.user_id));
-
-  const everyone = withSeed(
-    all.map((r) => r.score),
-    seed,
-  );
+  const theirs = rows.filter((r) => followed.has(r.user_id));
+  const everyone = withSeed(totals.get(mbid), seed);
 
   return {
     overall: everyone.count === 0 ? null : everyone.sum / everyone.count,
     overallCount: everyone.count,
-    you: user ? (all.find((r) => r.user_id === user.id)?.score ?? null) : null,
+    you: user ? (rows.find((r) => r.user_id === user.id)?.score ?? null) : null,
     friends: average(theirs.map((r) => r.score)),
     friendsCount: theirs.length,
     friendList: await nameThem(theirs),
@@ -303,20 +330,13 @@ export async function getScoresForReleases(
 
   const supabase = await createClient();
 
-  const [{ data }, { data: seeds }] = await Promise.all([
-    supabase.from("ratings").select("release_mbid, score").in("release_mbid", releaseMbids),
+  const [totals, { data: seeds }] = await Promise.all([
+    scoreTotals(supabase, "album", releaseMbids),
     supabase
       .from("releases")
       .select("mbid, seed_score, artists ( seed_score )")
       .in("mbid", releaseMbids),
   ]);
-
-  const grouped = new Map<string, number[]>();
-  for (const row of data ?? []) {
-    const scores = grouped.get(row.release_mbid) ?? [];
-    scores.push(row.score);
-    grouped.set(row.release_mbid, scores);
-  }
 
   // A shelf of dashes is the thing the starting score exists to prevent, so
   // grids blend it in the same way an album page does.
@@ -334,7 +354,7 @@ export async function getScoresForReleases(
   );
 
   for (const mbid of releaseMbids) {
-    const everyone = withSeed(grouped.get(mbid) ?? [], seed.get(mbid) ?? null);
+    const everyone = withSeed(totals.get(mbid), seed.get(mbid) ?? null);
     if (everyone.count > 0) result.set(mbid, everyone.sum / everyone.count);
   }
 
@@ -374,8 +394,8 @@ export type SongScores = {
 /**
  * Scores for every song in a tracklist.
  *
- * The one query already brings back who gave what, so the people you follow
- * cost nothing more than their names and faces: a record's tracklist is where
+ * Everyone's come back as totals; yourself and the people you follow as rows,
+ * so their names and faces can go beside them: a record's tracklist is where
  * you find out your mate rated the interlude higher than the single.
  */
 export async function getSongScores(songMbids: string[]): Promise<SongScores> {
@@ -385,28 +405,32 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
   const supabase = await createClient();
   const user = await getCurrentUser();
 
-  const { data } = await supabase
-    .from("song_ratings")
-    .select("user_id, song_mbid, score")
-    .in("song_mbid", songMbids);
+  const nearby = async () => {
+    if (!user) return { following: new Set<string>(), rows: [] };
+    const followingIds = await getFollowingIds(user.id);
+    const { data } = await supabase
+      .from("song_ratings")
+      .select("user_id, song_mbid, score")
+      .in("song_mbid", songMbids)
+      .in("user_id", [user.id, ...followingIds]);
+    return { following: new Set(followingIds), rows: data ?? [] };
+  };
 
-  const rows = (data ?? []) as { user_id: string; song_mbid: string; score: number }[];
-
-  const totals = new Map<string, { sum: number; count: number }>();
-  for (const row of rows) {
-    const total = totals.get(row.song_mbid) ?? { sum: 0, count: 0 };
-    total.sum += row.score;
-    total.count += 1;
-    totals.set(row.song_mbid, total);
-    if (user && row.user_id === user.id) result.own[row.song_mbid] = row.score;
-  }
+  const [totals, { following, rows }] = await Promise.all([
+    scoreTotals(supabase, "song", songMbids),
+    nearby(),
+  ]);
 
   for (const [mbid, total] of totals) {
-    result.community[mbid] = { average: total.sum / total.count, count: total.count };
+    if (total.votes && total.average !== null) {
+      result.community[mbid] = { average: total.average, count: total.votes };
+    }
   }
 
   if (user) {
-    const following = new Set(await getFollowingIds(user.id));
+    for (const row of rows) {
+      if (row.user_id === user.id) result.own[row.song_mbid] = row.score;
+    }
     const theirs = rows.filter((row) => following.has(row.user_id));
 
     if (theirs.length > 0) {
@@ -438,50 +462,35 @@ export type TopSong = {
 };
 
 /**
- * An artist's best-rated songs, from ratings on their albums. Averaging in
- * code is fine at soft-launch scale, like the Discover page's top albums.
+ * An artist's best-rated songs, from ratings on their albums: highest average
+ * first, then the most rated. Counted by the database (migration 0018).
  */
 export async function getTopSongs(artistMbid: string, limit = 5): Promise<TopSong[]> {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("song_ratings")
-    .select(
-      "song_mbid, score, songs!inner ( title ), releases!inner ( mbid, title, cover_art_url, artist_mbid )",
-    )
-    .eq("releases.artist_mbid", artistMbid)
-    .limit(5000);
+  const { data, error } = await supabase.rpc("artist_top_songs", {
+    p_artist: artistMbid,
+    p_limit: limit,
+  });
+  if (error) logQueryError("ratings", error, "0018");
 
-  type Row = {
-    song_mbid: string;
-    score: number;
-    songs: { title: string };
-    releases: { mbid: string; title: string; cover_art_url: string | null };
-  };
-
-  const songs = new Map<string, TopSong & { sum: number }>();
-  for (const row of (data ?? []) as unknown as Row[]) {
-    const song = songs.get(row.song_mbid) ?? {
-      mbid: row.song_mbid,
-      title: row.songs.title,
-      average: 0,
-      count: 0,
-      sum: 0,
-      release: {
-        mbid: row.releases.mbid,
-        title: row.releases.title,
-        cover_art_url: row.releases.cover_art_url,
-      },
-    };
-    song.sum += row.score;
-    song.count += 1;
-    songs.set(row.song_mbid, song);
-  }
-
-  return [...songs.values()]
-    .map(({ sum, ...song }) => ({ ...song, average: sum / song.count }))
-    .sort((a, b) => b.average - a.average || b.count - a.count)
-    .slice(0, limit);
+  return (data ?? []).flatMap((row) =>
+    row.mbid && row.title && row.release_mbid && row.release_title && row.average !== null
+      ? [
+          {
+            mbid: row.mbid,
+            title: row.title,
+            average: row.average,
+            count: row.votes ?? 0,
+            release: {
+              mbid: row.release_mbid,
+              title: row.release_title,
+              cover_art_url: row.cover_art_url,
+            },
+          },
+        ]
+      : [],
+  );
 }
 
 type ArtistRef = { mbid: string; name: string };
@@ -536,16 +545,17 @@ export async function getOwnAlbumRatings(sort: Sort = "recent"): Promise<AlbumRa
   if (!user) return [];
 
   const supabase = await createClient();
-  const query = supabase
-    .from("ratings")
-    .select(
-      `score, review, created_at,
-       releases!inner ( mbid, title, cover_art_url, release_date, genres, artists ( mbid, name ) )`,
-    )
-    .eq("user_id", user.id);
-  for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
-
-  const { data } = await query;
+  const { data } = await readAll((from, to) => {
+    const query = supabase
+      .from("ratings")
+      .select(
+        `score, review, created_at,
+         releases!inner ( mbid, title, cover_art_url, release_date, genres, artists ( mbid, name ) )`,
+      )
+      .eq("user_id", user.id);
+    for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
+    return query.order("id").range(from, to);
+  });
 
   type Row = Omit<AlbumRating, "release"> & {
     releases: Omit<AlbumRating["release"], "artist"> & { artists: ArtistRef | null };
@@ -569,13 +579,14 @@ export async function getOwnArtistRatings(sort: Sort = "recent"): Promise<Artist
   if (!user) return [];
 
   const supabase = await createClient();
-  const query = supabase
-    .from("artist_ratings")
-    .select("score, review, created_at, artists!inner ( mbid, name, image_url )")
-    .eq("user_id", user.id);
-  for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
-
-  const { data } = await query;
+  const { data } = await readAll((from, to) => {
+    const query = supabase
+      .from("artist_ratings")
+      .select("score, review, created_at, artists!inner ( mbid, name, image_url )")
+      .eq("user_id", user.id);
+    for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
+    return query.order("id").range(from, to);
+  });
 
   type Row = Omit<ArtistRating, "artist"> & { artists: ArtistRating["artist"] };
 
@@ -590,17 +601,17 @@ export async function getOwnSongRatings(sort: Sort = "recent"): Promise<SongRati
   if (!user) return [];
 
   const supabase = await createClient();
-  const query = supabase
-    .from("song_ratings")
-    .select(
-      `score, created_at, songs!inner ( mbid, title ),
-       releases!inner ( mbid, title, cover_art_url, artists ( mbid, name ) )`,
-    )
-    .eq("user_id", user.id)
-    .limit(1000);
-  for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
-
-  const { data } = await query;
+  const { data } = await readAll((from, to) => {
+    const query = supabase
+      .from("song_ratings")
+      .select(
+        `score, created_at, songs!inner ( mbid, title ),
+         releases!inner ( mbid, title, cover_art_url, artists ( mbid, name ) )`,
+      )
+      .eq("user_id", user.id);
+    for (const { column, ascending } of sortOrder(sort)) query.order(column, { ascending });
+    return query.order("id").range(from, to);
+  });
 
   type Row = {
     score: number;

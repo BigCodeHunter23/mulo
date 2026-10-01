@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import { currentDrop } from "@/lib/drop";
 
 /**
@@ -38,8 +39,12 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
   const supabase = await createClient();
 
   const [{ data: myAlbums }, { data: myArtists }, { data: follows }] = await Promise.all([
-    supabase.from("ratings").select("release_mbid, score").eq("user_id", userId).limit(4000),
-    supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId).limit(4000),
+    readAll((from, to) =>
+      supabase.from("ratings").select("release_mbid, score").eq("user_id", userId).order("id").range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId).order("id").range(from, to),
+    ),
     supabase.from("follows").select("following_id").eq("follower_id", userId),
   ]);
 
@@ -72,13 +77,17 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
   const lookups = [];
   for (let i = 0; i < albumIds.length; i += CHUNK) {
     lookups.push(
-      supabase
-        .from("ratings")
-        .select("user_id, release_mbid, score")
-        .in("release_mbid", albumIds.slice(i, i + CHUNK))
-        .neq("user_id", userId)
-        .limit(10000)
-        .then(({ data }) => {
+      readAll(
+        (from, to) =>
+          supabase
+            .from("ratings")
+            .select("user_id, release_mbid, score")
+            .in("release_mbid", albumIds.slice(i, i + CHUNK))
+            .neq("user_id", userId)
+            .order("id")
+            .range(from, to),
+        10_000,
+      ).then(({ data }) => {
           for (const row of (data ?? []) as (Row & { release_mbid: string })[]) {
             add(row, albums.get(row.release_mbid)!, row.release_mbid);
           }
@@ -87,13 +96,17 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
   }
   for (let i = 0; i < artistIds.length; i += CHUNK) {
     lookups.push(
-      supabase
-        .from("artist_ratings")
-        .select("user_id, artist_mbid, score")
-        .in("artist_mbid", artistIds.slice(i, i + CHUNK))
-        .neq("user_id", userId)
-        .limit(10000)
-        .then(({ data }) => {
+      readAll(
+        (from, to) =>
+          supabase
+            .from("artist_ratings")
+            .select("user_id, artist_mbid, score")
+            .in("artist_mbid", artistIds.slice(i, i + CHUNK))
+            .neq("user_id", userId)
+            .order("id")
+            .range(from, to),
+        10_000,
+      ).then(({ data }) => {
           for (const row of (data ?? []) as (Row & { artist_mbid: string })[]) {
             add(row, artists.get(row.artist_mbid)!, null);
           }

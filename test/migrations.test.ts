@@ -123,3 +123,108 @@ describe("every migration from 0008 on", () => {
     await db.exec(migrationSql(name));
   });
 });
+
+describe("0018 score totals", () => {
+  let db: PGlite;
+  const ARTIST = "11111111-1111-4111-8111-111111111111";
+  const OTHER_ALBUM = "22222222-2222-4222-8222-222222222222";
+  const SONG = "33333333-3333-4333-8333-333333333333";
+
+  beforeAll(async () => {
+    db = await localDatabase();
+    // 1,500 people rate one album, more than the API's 1,000-row page.
+    await db.exec(`
+      insert into public.artists (mbid, name) values ('${ARTIST}', 'The Band');
+      insert into public.releases (mbid, title, artist_mbid, release_date) values
+        ('${ALBUM}', 'First', '${ARTIST}', '1994-04-19'),
+        ('${OTHER_ALBUM}', 'Second', '${ARTIST}', '1996-07-02');
+      insert into public.songs (mbid, title) values ('${SONG}', 'Opener');
+      insert into auth.users (id)
+        select ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid from generate_series(1, 1500) n;
+      insert into public.profiles (id, username)
+        select id, 'user_' || row_number() over () from auth.users;
+      insert into public.ratings (user_id, release_mbid, score, created_at)
+        select id, '${ALBUM}', case when right(id::text, 1) in ('0', '2', '4', '6', '8') then 8 else 6 end,
+               now() - interval '20 days'
+        from auth.users;
+      insert into public.ratings (user_id, release_mbid, score) values ('${U(1)}', '${OTHER_ALBUM}', 10);
+      insert into public.artist_ratings (user_id, artist_mbid, score) values ('${U(1)}', '${ARTIST}', 9), ('${U(2)}', '${ARTIST}', 7);
+      insert into public.song_ratings (user_id, song_mbid, release_mbid, score) values
+        ('${U(1)}', '${SONG}', '${OTHER_ALBUM}', 4),
+        ('${U(2)}', '${SONG}', '${ALBUM}', 6);
+    `);
+  });
+  afterAll(() => db?.close());
+
+  const rows = async <T,>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+
+  it("count every rating on an album, past a thousand", async () => {
+    const [album] = await rows<{ total: number; votes: number; average: number }>(
+      "select total::int, votes::int, average from public.score_totals('album', $1)",
+      [[ALBUM]],
+    );
+    expect(album).toEqual({ total: 1500 * 7, votes: 1500, average: 7 });
+  });
+
+  it("leave one person out for the crowd", async () => {
+    const [album] = await rows<{ votes: number }>(
+      "select votes::int from public.score_totals('album', $1, $2)",
+      [[ALBUM], U(1)],
+    );
+    expect(album.votes).toBe(1499);
+  });
+
+  it("give totals per kind, and everything of a kind without a list", async () => {
+    expect(
+      await rows("select mbid, votes::int, average from public.score_totals('artist')"),
+    ).toEqual([{ mbid: ARTIST, votes: 2, average: 8 }]);
+    expect(await rows("select mbid, votes::int from public.score_totals('song', $1)", [[SONG]])).toEqual([
+      { mbid: SONG, votes: 2 },
+    ]);
+    expect(await rows("select mbid from public.score_totals('album') order by mbid")).toHaveLength(2);
+  });
+
+  it("give chart rows with the artist joined, and songs on the album first rated on", async () => {
+    expect(
+      await rows("select mbid, title, artist_name, votes::int from public.album_chart_rows() order by votes desc"),
+    ).toEqual([
+      { mbid: ALBUM, title: "First", artist_name: "The Band", votes: 1500 },
+      { mbid: OTHER_ALBUM, title: "Second", artist_name: "The Band", votes: 1 },
+    ]);
+    expect(await rows("select mbid, release_mbid, total::int, votes::int from public.song_chart_rows()")).toEqual([
+      { mbid: SONG, release_mbid: OTHER_ALBUM, total: 10, votes: 2 },
+    ]);
+    expect(await rows("select name, total::int from public.artist_chart_rows()")).toEqual([
+      { name: "The Band", total: 16 },
+    ]);
+  });
+
+  it("rank an artist's songs", async () => {
+    expect(await rows("select title, release_title, average, votes::int from public.artist_top_songs($1)", [ARTIST])).toEqual([
+      { title: "Opener", release_title: "Second", average: 5, votes: 2 },
+    ]);
+  });
+
+  it("count somebody's ratings of every kind", async () => {
+    expect(await rows("select ratings::int, average from public.profile_rating_stats($1)", [U(1)])).toEqual([
+      { ratings: 4, average: (6 + 10 + 9 + 4) / 4 },
+    ]);
+  });
+
+  it("rank heavy rotation by people, and count who was active", async () => {
+    // This week: one person rated the second album and a song on it, another
+    // rated a song on the first. The first album's own ratings are older.
+    expect(
+      await rows(
+        "select release_mbid, people::int, ratings::int, everyone::int, albums::int from public.heavy_rotation(now() - interval '7 days')",
+      ),
+    ).toEqual([
+      { release_mbid: OTHER_ALBUM, people: 1, ratings: 2, everyone: 2, albums: 2 },
+      { release_mbid: ALBUM, people: 1, ratings: 1, everyone: 2, albums: 2 },
+    ]);
+    const month = await rows<{ release_mbid: string; people: number }>(
+      "select release_mbid, people::int from public.heavy_rotation(now() - interval '30 days', 1)",
+    );
+    expect(month).toEqual([{ release_mbid: ALBUM, people: 1500 }]);
+  });
+});

@@ -969,6 +969,68 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      album_chart_rows: {
+        Args: never
+        Returns: {
+          mbid: string | null
+          title: string | null
+          cover_art_url: string | null
+          release_date: string | null
+          artist_mbid: string | null
+          artist_name: string | null
+          total: number | null
+          votes: number | null
+        }[]
+      }
+      artist_chart_rows: {
+        Args: never
+        Returns: {
+          mbid: string | null
+          name: string | null
+          image_url: string | null
+          total: number | null
+          votes: number | null
+        }[]
+      }
+      artist_top_songs: {
+        Args: {
+          p_artist: string
+          p_limit?: number
+        }
+        Returns: {
+          mbid: string | null
+          title: string | null
+          release_mbid: string | null
+          release_title: string | null
+          cover_art_url: string | null
+          average: number | null
+          votes: number | null
+        }[]
+      }
+      heavy_rotation: {
+        Args: {
+          p_since: string
+          p_limit?: number
+        }
+        Returns: {
+          release_mbid: string | null
+          people: number | null
+          ratings: number | null
+          total: number | null
+          latest: string | null
+          everyone: number | null
+          albums: number | null
+        }[]
+      }
+      profile_rating_stats: {
+        Args: {
+          p_user: string
+        }
+        Returns: {
+          ratings: number | null
+          average: number | null
+        }[]
+      }
       rate_limit_hit: {
         Args: {
           p_bucket: string
@@ -977,6 +1039,33 @@ export type Database = {
           p_window_seconds: number
         }
         Returns: boolean
+      }
+      score_totals: {
+        Args: {
+          p_kind: string
+          p_mbids?: string[]
+          p_skip_user?: string
+        }
+        Returns: {
+          mbid: string | null
+          total: number | null
+          votes: number | null
+          average: number | null
+        }[]
+      }
+      song_chart_rows: {
+        Args: never
+        Returns: {
+          mbid: string | null
+          title: string | null
+          release_mbid: string | null
+          cover_art_url: string | null
+          release_date: string | null
+          artist_mbid: string | null
+          artist_name: string | null
+          total: number | null
+          votes: number | null
+        }[]
       }
     }
     Enums: {

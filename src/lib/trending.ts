@@ -1,6 +1,7 @@
 import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
 import { coverSrc } from "@/lib/cover-url";
+import { logQueryError } from "@/lib/supabase/errors";
 
 export type RotationAlbum = {
   mbid: string;
@@ -28,12 +29,6 @@ const MINIMUM_ALBUMS = 4;
 /** "Hot" means a crowd. Below this it would just be somebody's own ratings. */
 const MINIMUM_PEOPLE = 3;
 
-type Activity = {
-  release_mbid: string;
-  user_id: string;
-  score: number;
-  created_at: string;
-};
 
 type ReleaseRow = {
   mbid: string;
@@ -61,65 +56,40 @@ export async function getHeavyRotation(
   for (const window of WINDOWS) {
     const since = new Date(Date.now() - window.days * 86_400_000).toISOString();
 
-    const [albums, songs] = await Promise.all([
-      supabase
-        .from("ratings")
-        .select("release_mbid, user_id, score, created_at")
-        .gte("created_at", since)
-        .limit(5000),
-      supabase
-        .from("song_ratings")
-        .select("release_mbid, user_id, score, created_at")
-        .gte("created_at", since)
-        .limit(10000),
-    ]);
-
-    const activity = [...(albums.data ?? []), ...(songs.data ?? [])] as Activity[];
-    if (new Set(activity.map((row) => row.user_id)).size < MINIMUM_PEOPLE) continue;
-
-    const heat = new Map<
-      string,
-      { people: Set<string>; ratings: number; total: number; latest: string }
-    >();
-
-    for (const row of activity) {
-      const entry = heat.get(row.release_mbid) ?? {
-        people: new Set<string>(),
-        ratings: 0,
-        total: 0,
-        latest: row.created_at,
-      };
-      entry.people.add(row.user_id);
-      entry.ratings += 1;
-      entry.total += row.score;
-      if (row.created_at > entry.latest) entry.latest = row.created_at;
-      heat.set(row.release_mbid, entry);
+    // Ranked by the database (migration 0018), across every rating in the
+    // window rather than the first thousand.
+    const { data: heat, error } = await supabase.rpc("heavy_rotation", {
+      p_since: since,
+      p_limit: limit,
+    });
+    if (error) {
+      logQueryError("trending", error, "0018");
+      return null;
     }
 
-    if (heat.size < MINIMUM_ALBUMS) continue;
-
-    const ranked = [...heat.entries()]
-      .sort(
-        ([, a], [, b]) =>
-          b.people.size - a.people.size ||
-          b.ratings - a.ratings ||
-          b.latest.localeCompare(a.latest),
-      )
-      .slice(0, limit);
+    const ranked = (heat ?? []).flatMap((row) =>
+      row.release_mbid && row.ratings && row.total !== null
+        ? [{ ...row, release_mbid: row.release_mbid, ratings: row.ratings, total: row.total }]
+        : [],
+    );
+    const busy = ranked[0];
+    if (!busy || (busy.everyone ?? 0) < MINIMUM_PEOPLE) continue;
+    if ((busy.albums ?? 0) < MINIMUM_ALBUMS) continue;
 
     const { data } = await supabase
       .from("releases")
       .select("mbid, title, artist_credit, cover_art_url, artists ( name )")
       .in(
         "mbid",
-        ranked.map(([mbid]) => mbid),
+        ranked.map((entry) => entry.release_mbid),
       );
 
     const details = new Map(
       ((data ?? []) as unknown as ReleaseRow[]).map((row) => [row.mbid, row]),
     );
 
-    const hot = ranked.flatMap(([mbid, entry]) => {
+    const hot = ranked.flatMap((entry) => {
+      const mbid = entry.release_mbid;
       const row = details.get(mbid);
       if (!row) return [];
       const joined = Array.isArray(row.artists) ? row.artists[0] : row.artists;
@@ -130,7 +100,7 @@ export async function getHeavyRotation(
           title: row.title,
           artist: row.artist_credit ?? joined?.name ?? null,
           cover: coverSrc(row.cover_art_url, 250),
-          people: entry.people.size,
+          people: entry.people ?? 0,
           average: entry.total / entry.ratings,
         },
       ];

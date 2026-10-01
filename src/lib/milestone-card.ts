@@ -1,5 +1,6 @@
 import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
+import { readAll } from "@/lib/supabase/read-all";
 import { isMilestone } from "@/lib/milestones";
 
 export type MilestoneCard = {
@@ -34,13 +35,18 @@ export async function getMilestoneCard(
     .maybeSingle();
   if (!profile) return null;
 
-  const { data } = await supabase
-    .from("ratings")
-    .select("score, releases ( mbid, title, artist_credit, cover_art_url )")
-    .eq("user_id", profile.id)
-    .order("score", { ascending: false })
-    .order("created_at", { ascending: true })
-    .limit(4000);
+  // Every album rating, in pages: a milestone past a thousand would otherwise
+  // never be reached here.
+  const { data } = await readAll((from, to) =>
+    supabase
+      .from("ratings")
+      .select("score, releases ( mbid, title, artist_credit, cover_art_url )")
+      .eq("user_id", profile.id)
+      .order("score", { ascending: false })
+      .order("created_at", { ascending: true })
+      .order("id")
+      .range(from, to),
+  );
 
   const rows = (data ?? []) as unknown as {
     score: number;

@@ -51,9 +51,15 @@ Dashboard → **SQL Editor**. Paste each file's contents and run it.
    was skipped, the precheck rows are why; fix those rows and run it again.
 3. `supabase/migrations/0017_rate_limits.sql`: the rate limiter. Safe to run
    twice. Until it runs, the app allows everything and logs a warning.
+4. `supabase/migrations/0018_score_totals.sql`: totals and averages counted
+   by the database, so scores, The Charts, profile stats and Heavy Rotation
+   stay right past a thousand ratings. Safe to run twice. **Run this before
+   the Phase 2 code goes live**: until it runs, scores show as dashes, the
+   charts are empty, and the logs say "run migration 0018".
 
 Check: in the Table Editor, `profiles` now shows the new constraints, and a
-`rate_limits` table exists (it fills as people log in and rate things).
+`rate_limits` table exists (it fills as people log in and rate things). In
+**Database → Functions**, `score_totals` and `album_chart_rows` are listed.
 
 ## 4. Check the storage buckets
 

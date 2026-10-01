@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import { getRaisedOn } from "@/lib/raised-on";
 import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
@@ -270,12 +271,17 @@ export async function hitsForAlbums(
   if (mbids.length === 0) return result;
 
   const supabase = await createClient();
-  const { data: trackRows } = await supabase
-    .from("tracks")
-    .select("release_mbid, position, title, song_mbid")
-    .in("release_mbid", mbids)
-    .order("position", { ascending: true })
-    .limit(3000);
+  const { data: trackRows } = await readAll(
+    (from, to) =>
+      supabase
+        .from("tracks")
+        .select("release_mbid, position, title, song_mbid")
+        .in("release_mbid", mbids)
+        .order("position", { ascending: true })
+        .order("release_mbid")
+        .range(from, to),
+    3000,
+  );
 
   type TrackRow = {
     release_mbid: string;

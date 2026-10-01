@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 
 /** How many albums with genres it takes before a "sound" means anything. */
 const MINIMUM_ALBUMS = 5;
@@ -34,18 +35,24 @@ export async function getSound(userId: string): Promise<string[]> {
   const supabase = await createClient();
 
   const [albums, songs] = await Promise.all([
-    supabase
-      .from("ratings")
-      .select("score, releases!inner ( mbid, genres )")
-      .eq("user_id", userId)
-      .gte("score", 7)
-      .limit(1000),
-    supabase
-      .from("song_ratings")
-      .select("score, releases!inner ( mbid, genres )")
-      .eq("user_id", userId)
-      .gte("score", 7)
-      .limit(3000),
+    readAll((from, to) =>
+      supabase
+        .from("ratings")
+        .select("score, releases!inner ( mbid, genres )")
+        .eq("user_id", userId)
+        .gte("score", 7)
+        .order("id")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("song_ratings")
+        .select("score, releases!inner ( mbid, genres )")
+        .eq("user_id", userId)
+        .gte("score", 7)
+        .order("id")
+        .range(from, to),
+    ),
   ]);
 
   // How much each album counts: its own score if rated, otherwise half the

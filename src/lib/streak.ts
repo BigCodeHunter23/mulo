@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import type { Database } from "@/lib/supabase/database.types";
 
 /**
@@ -64,15 +65,22 @@ export async function getStreak(userId: string): Promise<Streak> {
 
   const results = await Promise.all(
     SOURCES.map(({ table, columns }) =>
-      supabase
-        // Typed as one of them: every source has user_id and created_at,
-        // which is all this filters on, and the typed query builder can't
-        // follow a table chosen at runtime.
-        .from(table as "reactions")
-        .select(columns)
-        .eq("user_id", userId)
-        .gte("created_at", since)
-        .limit(3000),
+      readAll(
+        (from, to) =>
+          supabase
+            // Typed as one of them: every source has user_id and created_at,
+            // which is all this filters on, and the typed query builder can't
+            // follow a table chosen at runtime.
+            .from(table as "reactions")
+            .select(columns)
+            .eq("user_id", userId)
+            .gte("created_at", since)
+            // Not every source has a unique id to page by. Time is close
+            // enough: only the day of each row matters here.
+            .order("created_at")
+            .range(from, to),
+        3000,
+      ),
     ),
   );
 

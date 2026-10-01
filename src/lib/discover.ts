@@ -1,5 +1,7 @@
 import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
+import { logQueryError } from "@/lib/supabase/errors";
+import { readAll } from "@/lib/supabase/read-all";
 
 export type AlbumSummary = {
   mbid: string;
@@ -65,31 +67,23 @@ export async function popularArtists(limit = 10): Promise<ArtistSummary[]> {
 }
 
 /**
- * The best average scores from people's ratings on MULO. Averaging in code is
- * fine at soft-launch scale; past a few thousand ratings this belongs in a
- * database view.
+ * The best average scores from people's ratings on MULO, averaged by the
+ * database (migration 0018) across every rating.
  */
 export async function topRatedOnMulo(
   limit = 10,
 ): Promise<(AlbumSummary & { average: number; count: number })[]> {
   const supabase = createPublicClient();
-  const { data: ratings } = await supabase
-    .from("ratings")
-    .select("release_mbid, score")
-    .limit(5000);
+  const { data: totals, error } = await supabase
+    .rpc("score_totals", { p_kind: "album" })
+    .order("average", { ascending: false })
+    .order("votes", { ascending: false })
+    .limit(limit);
+  if (error) logQueryError("discover", error, "0018");
 
-  const totals = new Map<string, { sum: number; count: number }>();
-  for (const rating of ratings ?? []) {
-    const total = totals.get(rating.release_mbid) ?? { sum: 0, count: 0 };
-    total.sum += rating.score;
-    total.count += 1;
-    totals.set(rating.release_mbid, total);
-  }
-
-  const ranked = [...totals.entries()]
-    .map(([mbid, t]) => ({ mbid, average: t.sum / t.count, count: t.count }))
-    .sort((a, b) => b.average - a.average || b.count - a.count)
-    .slice(0, limit);
+  const ranked = (totals ?? []).flatMap((t) =>
+    t.mbid && t.average !== null ? [{ mbid: t.mbid, average: t.average, count: t.votes ?? 0 }] : [],
+  );
 
   if (ranked.length === 0) return [];
 
@@ -216,13 +210,19 @@ export async function similarArtists(
 
   // Only records people actually listen to, so the suggestions are artists
   // somebody might have heard of rather than the deepest corner of the cache.
-  const { data: neighbours } = await supabase
-    .from("releases")
-    .select("artist_mbid, genres")
-    .overlaps("genres", mine)
-    .not("popularity", "is", null)
-    .not("artist_mbid", "is", null)
-    .limit(2000);
+  const { data: neighbours } = await readAll(
+    (from, to) =>
+      supabase
+        .from("releases")
+        .select("artist_mbid, genres")
+        .overlaps("genres", mine)
+        .not("popularity", "is", null)
+        .not("artist_mbid", "is", null)
+        .order("popularity", { ascending: false })
+        .order("mbid")
+        .range(from, to),
+    2000,
+  );
 
   // Matching what this artist is best known for counts for more than
   // matching a tag they happen to share with half of music.

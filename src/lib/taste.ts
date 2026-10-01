@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 
 export type TasteMatch = {
   /** Out of 100: how closely two people score the same records. */
@@ -46,21 +47,30 @@ export async function getTasteMatch(
   const both = [viewerId, otherUserId];
 
   const [albums, artists, songs] = await Promise.all([
-    supabase
-      .from("ratings")
-      .select("user_id, release_mbid, score")
-      .in("user_id", both)
-      .limit(4000),
-    supabase
-      .from("artist_ratings")
-      .select("user_id, artist_mbid, score")
-      .in("user_id", both)
-      .limit(4000),
-    supabase
-      .from("song_ratings")
-      .select("user_id, song_mbid, release_mbid, score")
-      .in("user_id", both)
-      .limit(8000),
+    readAll((from, to) =>
+      supabase
+        .from("ratings")
+        .select("user_id, release_mbid, score")
+        .in("user_id", both)
+        .order("id")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("artist_ratings")
+        .select("user_id, artist_mbid, score")
+        .in("user_id", both)
+        .order("id")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("song_ratings")
+        .select("user_id, song_mbid, release_mbid, score")
+        .in("user_id", both)
+        .order("id")
+        .range(from, to),
+    ),
   ]);
 
   const pairs: Pair[] = [];

@@ -1,5 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { logQueryError } from "@/lib/supabase/errors";
+import { readAll } from "@/lib/supabase/read-all";
 
 export type PublicProfile = {
   id: string;
@@ -34,7 +37,7 @@ export async function getProfileByUsername(
 export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const supabase = await createClient();
 
-  const [followers, following, albums, artists, songs] = await Promise.all([
+  const [followers, following, ratings] = await Promise.all([
     supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
@@ -43,24 +46,17 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("follower_id", userId),
-    supabase.from("ratings").select("score").eq("user_id", userId),
-    supabase.from("artist_ratings").select("score").eq("user_id", userId),
-    supabase.from("song_ratings").select("score").eq("user_id", userId),
+    // Albums, artists and songs all count, totalled by the database
+    // (migration 0018) so nobody's stats stop at a thousand ratings.
+    supabase.rpc("profile_rating_stats", { p_user: userId }).maybeSingle(),
   ]);
-
-  // Albums, artists and songs all count.
-  const scores: number[] = [albums, artists, songs].flatMap((result) =>
-    (result.data ?? []).map((r) => r.score),
-  );
+  if (ratings.error) logQueryError("social", ratings.error, "0018");
 
   return {
     followers: followers.count ?? 0,
     following: following.count ?? 0,
-    ratings: scores.length,
-    averageScore:
-      scores.length > 0
-        ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-        : null,
+    ratings: ratings.data?.ratings ?? 0,
+    averageScore: ratings.data?.average ?? null,
   };
 }
 
@@ -147,16 +143,24 @@ export async function listFollows(
     .filter((row): row is PublicProfile => Boolean(row));
 }
 
-export async function getFollowingIds(userId: string): Promise<string[]> {
+/**
+ * Everyone somebody follows. Looked up once per request: a single album page
+ * asks from several places.
+ */
+export const getFollowingIds = cache(async (userId: string): Promise<string[]> => {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", userId);
+  const { data } = await readAll((from, to) =>
+    supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", userId)
+      .order("following_id")
+      .range(from, to),
+  );
 
-  return (data ?? []).map((f) => f.following_id);
-}
+  return data.map((f) => f.following_id);
+});
 
 /** Somebody's username from their id, for building links to their pages. */
 export async function getUsername(userId: string): Promise<string | null> {

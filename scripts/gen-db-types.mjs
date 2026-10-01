@@ -6,9 +6,10 @@
 // Supabase's own `supabase gen types` reads a live database (or a local one
 // running in Docker). This reads the migrations instead, replayed on an
 // in-memory Postgres, so it needs no access to the project and no Docker, and
-// the output is in the same shape the Supabase client expects. Once the
-// project's own generator is available the two should agree; if they don't,
-// a migration hasn't been run.
+// the output is in the same shape the Supabase client expects (except that
+// function result columns are typed as possibly null; see functionBlock).
+// Once the project's own generator is available the two should agree; if
+// they don't, a migration hasn't been run.
 
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -158,8 +159,11 @@ function functionBlock(fn) {
     : "never";
   let returns;
   if (outputs.length) {
+    // Postgres keeps no "not null" on a function's result columns, and outer
+    // joins and averages over nothing really do return null, so every one is
+    // typed as possibly null. (Supabase's own generator assumes otherwise.)
     returns = `{\n${outputs
-      .map((out) => `          ${key(out.name)}: ${tsType(out.type)}`)
+      .map((out) => `          ${key(out.name)}: ${tsType(out.type)} | null`)
       .join("\n")}\n        }[]`;
   } else {
     returns = tsType(fn.return_type) + (fn.returns_set ? "[]" : "");

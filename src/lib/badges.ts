@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import {
   BADGE_COUNT,
   BADGE_GROUPS,
@@ -91,23 +92,32 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
 
   const [albums, artists, songs, following, profile, topAlbums, topArtists, votes, takes] =
     await Promise.all([
-      supabase
-        .from("ratings")
-        .select(
-          "id, score, review, created_at, release_mbid, releases!inner ( artist_mbid, release_date, genres )",
-        )
-        .eq("user_id", userId)
-        .limit(2000),
-      supabase
-        .from("artist_ratings")
-        .select("id, artist_mbid, score, review")
-        .eq("user_id", userId)
-        .limit(2000),
-      supabase
-        .from("song_ratings")
-        .select("song_mbid, release_mbid, score, created_at")
-        .eq("user_id", userId)
-        .limit(5000),
+      readAll((from, to) =>
+        supabase
+          .from("ratings")
+          .select(
+            "id, score, review, created_at, release_mbid, releases!inner ( artist_mbid, release_date, genres )",
+          )
+          .eq("user_id", userId)
+          .order("id")
+          .range(from, to),
+      ),
+      readAll((from, to) =>
+        supabase
+          .from("artist_ratings")
+          .select("id, artist_mbid, score, review")
+          .eq("user_id", userId)
+          .order("id")
+          .range(from, to),
+      ),
+      readAll((from, to) =>
+        supabase
+          .from("song_ratings")
+          .select("song_mbid, release_mbid, score, created_at")
+          .eq("user_id", userId)
+          .order("id")
+          .range(from, to),
+      ),
       supabase
         .from("follows")
         .select("*", { count: "exact", head: true })

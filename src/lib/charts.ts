@@ -4,6 +4,8 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
 import type { RatingTable } from "@/lib/rating-kinds";
+import { logQueryError } from "@/lib/supabase/errors";
+import { readAll } from "@/lib/supabase/read-all";
 
 /**
  * The Charts: MULO's all-time rankings, for albums, songs and artists, over
@@ -48,9 +50,6 @@ const CONFIDENCE: Record<ChartKind, number> = {
 
 /** The fallback middle when the site has nothing to average yet. */
 const NEUTRAL = 6.5;
-
-/** Ratings rows read in one go. Far above anything a soft launch will hit. */
-const ROW_CAP = 20_000;
 
 export type ChartEntry = {
   rank: number;
@@ -101,26 +100,36 @@ export function isChartKind(value: string): value is ChartKind {
 
 type Tally = { sum: number; votes: number };
 
-function tally(rows: { id: string; score: number }[]): Map<string, Tally> {
-  const totals = new Map<string, Tally>();
-  for (const row of rows) {
-    const current = totals.get(row.id) ?? { sum: 0, votes: 0 };
-    current.sum += row.score;
-    current.votes += 1;
-    totals.set(row.id, current);
-  }
-  return totals;
+/** A chart function's row with its totals present, which they always are. */
+function tallied<Row extends { mbid: string | null; total: number | null; votes: number | null }>(
+  rows: Row[],
+): (Row & { mbid: string; tally: Tally })[] {
+  return rows.flatMap((row) =>
+    row.mbid && row.total !== null && row.votes
+      ? [{ ...row, mbid: row.mbid, tally: { sum: row.total, votes: row.votes } }]
+      : [],
+  );
 }
 
 /** The average across every rating on MULO — the middle a thin record sinks to. */
-function siteMean(totals: Map<string, Tally>): number {
+function siteMean(tallies: Tally[]): number {
   let sum = 0;
   let votes = 0;
-  for (const t of totals.values()) {
+  for (const t of tallies) {
     sum += t.sum;
     votes += t.votes;
   }
   return votes === 0 ? NEUTRAL : sum / votes;
+}
+
+/**
+ * The chart functions (migration 0018) return one row per rated thing with
+ * its totals, counted by the database. They're read a page at a time, since
+ * there can be more rated things than the API returns at once.
+ */
+function logged<Row>(result: { data: Row[]; error: { message: string; code?: string } | null }): Row[] {
+  if (result.error) logQueryError("charts", result.error, "0018");
+  return result.data;
 }
 
 function weigh(t: Tally, site: number, confidence: number) {
@@ -135,8 +144,6 @@ function weigh(t: Tally, site: number, confidence: number) {
 function yearOf(releaseDate: string | null): string | null {
   return releaseDate ? releaseDate.slice(0, 4) : null;
 }
-
-type ArtistRef = { mbid: string; name: string } | null;
 
 type Client = ReturnType<typeof createPublicClient>;
 
@@ -155,9 +162,9 @@ function inGenre(
 }
 
 /**
- * One chart, ready to render. Everything is counted in memory rather than in
- * SQL: at MULO's size that's a few thousand rows, and it keeps the weighting
- * in one readable place instead of buried in a database function.
+ * One chart, ready to render. The database counts each rated thing's votes
+ * (fetching raw ratings was cut off at a thousand rows); the weighting stays
+ * here, in one readable place instead of buried in a database function.
  */
 export async function getChart(
   kind: ChartKind,
@@ -177,54 +184,30 @@ async function albumChart(
   genre: string | null,
   limit: number,
 ): Promise<Chart> {
-  const { data } = await supabase
-    .from("ratings")
-    .select("release_mbid, score")
-    .limit(ROW_CAP);
-
-  const totals = tally(
-    ((data ?? []) as { release_mbid: string; score: number }[]).map((row) => ({
-      id: row.release_mbid,
-      score: row.score,
-    })),
+  const rows = tallied(
+    logged(
+      await readAll((from, to) => supabase.rpc("album_chart_rows").order("mbid").range(from, to)),
+    ),
   );
-  const site = siteMean(totals);
-  if (totals.size === 0) return blank("albums", genre, site);
+  const site = siteMean(rows.map((row) => row.tally));
+  if (rows.length === 0) return blank("albums", genre, site);
 
-  const { data: releases } = await supabase
-    .from("releases")
-    .select("mbid, title, cover_art_url, release_date, genres, artists ( mbid, name )")
-    .in("mbid", [...totals.keys()]);
-
-  type Row = {
-    mbid: string;
-    title: string;
-    cover_art_url: string | null;
-    release_date: string | null;
-    genres: string[] | null;
-    artists: ArtistRef;
-  };
-
-  const rows = (releases ?? []) as unknown as Row[];
   const main = genre
     ? await getArtistGenres()
     : new Map<string, string | null>();
 
   const scored = rows
-    .filter((row) => inGenre(main, row.artists?.mbid, genre))
-    .map((row) => {
-      const t = totals.get(row.mbid)!;
-      return {
-        ...weigh(t, site, CONFIDENCE.albums),
-        mbid: row.mbid,
-        title: row.title,
-        subtitle: row.artists?.name ?? null,
-        artistMbid: row.artists?.mbid ?? null,
-        coverUrl: row.cover_art_url,
-        year: yearOf(row.release_date),
-        href: `/album/${row.mbid}`,
-      };
-    });
+    .filter((row) => inGenre(main, row.artist_mbid, genre))
+    .map((row) => ({
+      ...weigh(row.tally, site, CONFIDENCE.albums),
+      mbid: row.mbid,
+      title: row.title ?? "",
+      subtitle: row.artist_name,
+      artistMbid: row.artist_mbid,
+      coverUrl: row.cover_art_url,
+      year: yearOf(row.release_date),
+      href: `/album/${row.mbid}`,
+    }));
 
   return finish("albums", genre, scored, site, limit);
 }
@@ -234,70 +217,33 @@ async function songChart(
   genre: string | null,
   limit: number,
 ): Promise<Chart> {
-  const { data } = await supabase
-    .from("song_ratings")
-    .select("song_mbid, release_mbid, score")
-    .limit(ROW_CAP);
-
-  const rows = (data ?? []) as {
-    song_mbid: string;
-    release_mbid: string;
-    score: number;
-  }[];
-
-  const totals = tally(rows.map((row) => ({ id: row.song_mbid, score: row.score })));
-  const site = siteMean(totals);
-  if (totals.size === 0) return blank("songs", genre, site);
-
-  // A song carries no genre of its own. It borrows the album it was rated on,
-  // which is also where its cover and artist line come from.
-  const albumOf = new Map<string, string>();
-  for (const row of rows) {
-    if (!albumOf.has(row.song_mbid)) albumOf.set(row.song_mbid, row.release_mbid);
-  }
-
-  const [{ data: songs }, { data: releases }] = await Promise.all([
-    supabase.from("songs").select("mbid, title").in("mbid", [...totals.keys()]),
-    supabase
-      .from("releases")
-      .select("mbid, title, cover_art_url, release_date, genres, artists ( mbid, name )")
-      .in("mbid", [...new Set(albumOf.values())]),
-  ]);
-
-  type ReleaseRow = {
-    mbid: string;
-    title: string;
-    cover_art_url: string | null;
-    release_date: string | null;
-    genres: string[] | null;
-    artists: ArtistRef;
-  };
-
-  const album = new Map(
-    ((releases ?? []) as unknown as ReleaseRow[]).map((row) => [row.mbid, row]),
+  // A song carries no genre of its own. It borrows the album it was first
+  // rated on, which is also where its cover and artist line come from.
+  const rows = tallied(
+    logged(
+      await readAll((from, to) => supabase.rpc("song_chart_rows").order("mbid").range(from, to)),
+    ),
   );
+  const site = siteMean(rows.map((row) => row.tally));
+  if (rows.length === 0) return blank("songs", genre, site);
+
   const main = genre
     ? await getArtistGenres()
     : new Map<string, string | null>();
 
-  const scored = ((songs ?? []) as { mbid: string; title: string }[])
-    .map((song) => {
-      const home = album.get(albumOf.get(song.mbid) ?? "");
-      if (!home || !inGenre(main, home.artists?.mbid, genre)) return null;
-      const t = totals.get(song.mbid)!;
-      return {
-        ...weigh(t, site, CONFIDENCE.songs),
-        mbid: song.mbid,
-        title: song.title,
-        subtitle: home.artists?.name ?? null,
-        artistMbid: home.artists?.mbid ?? null,
-        coverUrl: home.cover_art_url,
-        year: yearOf(home.release_date),
-        // Songs have no page of their own: a song row opens its album.
-        href: `/album/${home.mbid}`,
-      };
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  const scored = rows
+    .filter((row) => inGenre(main, row.artist_mbid, genre))
+    .map((row) => ({
+      ...weigh(row.tally, site, CONFIDENCE.songs),
+      mbid: row.mbid,
+      title: row.title ?? "",
+      subtitle: row.artist_name,
+      artistMbid: row.artist_mbid,
+      coverUrl: row.cover_art_url,
+      year: yearOf(row.release_date),
+      // Songs have no page of their own: a song row opens its album.
+      href: `/album/${row.release_mbid}`,
+    }));
 
   return finish("songs", genre, scored, site, limit);
 }
@@ -307,46 +253,28 @@ async function artistChart(
   genre: string | null,
   limit: number,
 ): Promise<Chart> {
-  const { data } = await supabase
-    .from("artist_ratings")
-    .select("artist_mbid, score")
-    .limit(ROW_CAP);
-
-  const totals = tally(
-    ((data ?? []) as { artist_mbid: string; score: number }[]).map((row) => ({
-      id: row.artist_mbid,
-      score: row.score,
-    })),
-  );
-  const site = siteMean(totals);
-  if (totals.size === 0) return blank("artists", genre, site);
-
-  const ids = [...totals.keys()];
-
   // An artist carries no genre tags of their own: their main genre is worked
   // out from whatever their records are tagged with.
-  const [{ data: artists }, main] = await Promise.all([
-    supabase.from("artists").select("mbid, name, image_url").in("mbid", ids),
+  const [result, main] = await Promise.all([
+    readAll((from, to) => supabase.rpc("artist_chart_rows").order("mbid").range(from, to)),
     genre ? getArtistGenres() : Promise.resolve(new Map<string, string | null>()),
   ]);
+  const rows = tallied(logged(result));
+  const site = siteMean(rows.map((row) => row.tally));
+  if (rows.length === 0) return blank("artists", genre, site);
 
-  const scored = (
-    (artists ?? []) as { mbid: string; name: string; image_url: string | null }[]
-  )
+  const scored = rows
     .filter((row) => inGenre(main, row.mbid, genre))
-    .map((row) => {
-      const t = totals.get(row.mbid)!;
-      return {
-        ...weigh(t, site, CONFIDENCE.artists),
-        mbid: row.mbid,
-        title: row.name,
-        subtitle: null,
-        artistMbid: row.mbid,
-        coverUrl: row.image_url,
-        year: null,
-        href: `/artist/${row.mbid}`,
-      };
-    });
+    .map((row) => ({
+      ...weigh(row.tally, site, CONFIDENCE.artists),
+      mbid: row.mbid,
+      title: row.name ?? "",
+      subtitle: null,
+      artistMbid: row.mbid,
+      coverUrl: row.image_url,
+      year: null,
+      href: `/artist/${row.mbid}`,
+    }));
 
   return finish("artists", genre, scored, site, limit);
 }

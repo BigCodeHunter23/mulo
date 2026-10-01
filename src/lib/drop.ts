@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { readAll } from "@/lib/supabase/read-all";
 import { shiftDay, sydneyDay, sydneyMidnight } from "@/lib/versus";
 import { DROP_LINEUP, type DropAlbum } from "@/lib/drop-lineup";
 
@@ -60,13 +61,16 @@ export async function getDropResults(drop: Drop): Promise<DropResults> {
   const supabase = await createClient();
   const user = await getCurrentUser();
 
-  const { data } = await supabase
-    .from("ratings")
-    .select("user_id, score, created_at")
-    .eq("release_mbid", drop.album.mbid)
-    .limit(5000);
-
-  const rows = (data ?? []) as { user_id: string; score: number; created_at: string }[];
+  // The week's album is the one everybody rates, so it's the first to pass
+  // the thousand rows the API returns at once.
+  const { data: rows } = await readAll((from, to) =>
+    supabase
+      .from("ratings")
+      .select("user_id, score, created_at")
+      .eq("release_mbid", drop.album.mbid)
+      .order("id")
+      .range(from, to),
+  );
   const spread = Array.from({ length: 10 }, () => 0);
   for (const row of rows) spread[row.score - 1] += 1;
 
