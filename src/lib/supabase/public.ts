@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { supabaseUrl, supabaseAnonKey } from "@/lib/env";
 
 /**
  * A client with no user session, for reading public catalogue data where the
@@ -9,8 +10,8 @@ import type { Database } from "./database.types";
  */
 export function createPublicClient() {
   return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl(),
+    supabaseAnonKey(),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }
