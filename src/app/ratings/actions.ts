@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
+import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kinds";
 import { mbidSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { getBadges } from "@/lib/badges";
@@ -113,17 +113,21 @@ export async function rate(
   }
   if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
-  const { table, column } = RATING_TABLES[kind];
   const supabase = await createClient();
-  const { error } = await supabase.from(table).upsert(
-    {
-      user_id: user.id,
-      [column]: mbid,
-      score,
-      ...(kind === "song" ? { release_mbid: releaseMbid } : {}),
-    },
-    { onConflict: `user_id,${column}` },
-  );
+  const { error } =
+    kind === "album"
+      ? await supabase
+          .from("ratings")
+          .upsert({ user_id: user.id, release_mbid: mbid, score }, { onConflict: "user_id,release_mbid" })
+      : kind === "artist"
+        ? await supabase
+            .from("artist_ratings")
+            .upsert({ user_id: user.id, artist_mbid: mbid, score }, { onConflict: "user_id,artist_mbid" })
+        : await supabase.from("song_ratings").upsert(
+            // valid() has already insisted on the album for a song.
+            { user_id: user.id, song_mbid: mbid, release_mbid: releaseMbid!, score },
+            { onConflict: "user_id,song_mbid" },
+          );
 
   if (error) return failure(error);
 
@@ -208,7 +212,8 @@ export async function saveReview(
   if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const text = review.trim().slice(0, REVIEW_MAX);
-  const { table, column } = RATING_TABLES[kind];
+  const { column } = RATING_TABLES[kind];
+  const table = reviewedTable(kind);
 
   const supabase = await createClient();
   const { data, error } = await supabase

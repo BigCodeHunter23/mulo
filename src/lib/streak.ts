@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
 
 /**
  * Days in a row somebody has done something on MULO.
@@ -45,7 +46,7 @@ function previousDay(day: string): string {
 }
 
 /** Every table where somebody's doing something leaves a dated row. */
-const SOURCES: { table: string; columns: string }[] = [
+const SOURCES: { table: keyof Database["public"]["Tables"]; columns: string }[] = [
   { table: "ratings", columns: "created_at, updated_at" },
   { table: "artist_ratings", columns: "created_at, updated_at" },
   { table: "song_ratings", columns: "created_at, updated_at" },
@@ -64,7 +65,10 @@ export async function getStreak(userId: string): Promise<Streak> {
   const results = await Promise.all(
     SOURCES.map(({ table, columns }) =>
       supabase
-        .from(table)
+        // Typed as one of them: every source has user_id and created_at,
+        // which is all this filters on, and the typed query builder can't
+        // follow a table chosen at runtime.
+        .from(table as "reactions")
         .select(columns)
         .eq("user_id", userId)
         .gte("created_at", since)

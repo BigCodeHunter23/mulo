@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 import { REACTION_COLUMNS, type ReactionKind } from "@/lib/reactions";
 import { rowIdSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
@@ -49,9 +50,9 @@ export async function setReaction(
   if (clearError) return TRY_AGAIN;
 
   if (value !== 0) {
-    const { error } = await supabase
-      .from("reactions")
-      .insert({ user_id: user.id, [column]: ratingId, value });
+    const row: TablesInsert<"reactions"> = { user_id: user.id, value };
+    row[column] = ratingId;
+    const { error } = await supabase.from("reactions").insert(row);
     if (error) return TRY_AGAIN;
   }
 

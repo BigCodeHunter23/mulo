@@ -16,9 +16,9 @@ const input = z.object({
 });
 
 const TABLES = {
-  artist: { table: "top_artists", column: "artist_mbid" },
-  album: { table: "top_albums", column: "release_mbid" },
-} as const satisfies Record<PickKind, { table: string; column: string }>;
+  artist: "top_artists",
+  album: "top_albums",
+} as const satisfies Record<PickKind, string>;
 
 const TRY_AGAIN: SaveResult = {
   ok: false,
@@ -40,7 +40,7 @@ export async function saveTopPicks(
   if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const picks = [...new Set(mbids.filter((mbid) => mbidSchema.safeParse(mbid).success))].slice(0, 10);
-  const { table, column } = TABLES[kind];
+  const table = TABLES[kind];
   const supabase = await createClient();
 
   const { error: clearError } = await supabase
@@ -50,13 +50,14 @@ export async function saveTopPicks(
   if (clearError) return TRY_AGAIN;
 
   if (picks.length > 0) {
-    const { error } = await supabase.from(table).insert(
-      picks.map((mbid, i) => ({
-        user_id: user.id,
-        position: i + 1,
-        [column]: mbid,
-      })),
-    );
+    const { error } =
+      kind === "artist"
+        ? await supabase
+            .from("top_artists")
+            .insert(picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, artist_mbid: mbid })))
+        : await supabase
+            .from("top_albums")
+            .insert(picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, release_mbid: mbid })));
     if (error) return TRY_AGAIN;
   }
 

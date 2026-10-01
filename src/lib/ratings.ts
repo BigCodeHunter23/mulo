@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
-import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
+import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kinds";
 import { bestFirst, NO_FRIENDS, type FriendScore, type SearchFriends } from "@/lib/friend-scores";
 
 export { NO_FRIENDS };
@@ -349,7 +349,8 @@ export async function getOwnRating(
   if (!user) return null;
 
   const supabase = await createClient();
-  const { table, column } = RATING_TABLES[kind];
+  const { column } = RATING_TABLES[kind];
+  const table = reviewedTable(kind);
 
   const { data } = await supabase
     .from(table)

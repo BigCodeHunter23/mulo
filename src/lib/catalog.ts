@@ -65,7 +65,9 @@ function byNewest(a: Release, b: Release) {
  */
 let seedColumnsExist = true;
 
-function withoutSeed<T extends Record<string, unknown>>(row: T) {
+type SeedColumn = "seed_score" | "seed_votes" | "seed_source";
+
+function withoutSeed<T extends Record<SeedColumn, unknown>>(row: T): Omit<T, SeedColumn> {
   const { seed_score, seed_votes, seed_source, ...rest } = row;
   void seed_score;
   void seed_votes;
@@ -85,8 +87,8 @@ function isUnknownColumn(error: { code?: string; message?: string } | null) {
  * Save a catalogue row, dropping the seed and trying once more if this
  * database hasn't got the columns yet.
  */
-async function saveWithSeed<T extends Record<string, unknown>>(
-  write: (row: Record<string, unknown>) => PromiseLike<{
+async function saveWithSeed<T extends Record<SeedColumn, unknown>>(
+  write: (row: T | Omit<T, SeedColumn>) => PromiseLike<{
     error: { code?: string; message?: string } | null;
   }>,
   row: T,

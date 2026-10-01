@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { RATING_TABLES } from "@/lib/rating-kinds";
+import { RATING_TABLES, reviewedTable } from "@/lib/rating-kinds";
 
 export type Review = {
   id: number;
@@ -21,7 +21,8 @@ export async function getReviews(
   mbid: string,
 ): Promise<Review[]> {
   const supabase = await createClient();
-  const { table, column } = RATING_TABLES[kind];
+  const { column } = RATING_TABLES[kind];
+  const table = reviewedTable(kind);
 
   const { data } = await supabase
     .from(table)

@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
 /**
  * A client with no user session, for reading public catalogue data where the
@@ -7,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
  * discovery. Needing no cookies keeps those reads simple and cacheable.
  */
 export function createPublicClient() {
-  return createClient(
+  return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } },

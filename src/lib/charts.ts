@@ -3,6 +3,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
+import type { RatingTable } from "@/lib/rating-kinds";
 
 /**
  * The Charts: MULO's all-time rankings, for albums, songs and artists, over
@@ -400,7 +401,7 @@ export type ChartProgress = {
   total: number;
 };
 
-const PROGRESS_COLUMNS: Record<ChartKind, { table: string; column: string }> = {
+const PROGRESS_COLUMNS: Record<ChartKind, { table: RatingTable; column: string }> = {
   albums: { table: "ratings", column: "release_mbid" },
   songs: { table: "song_ratings", column: "song_mbid" },
   artists: { table: "artist_ratings", column: "artist_mbid" },
