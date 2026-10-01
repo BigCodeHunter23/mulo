@@ -65,7 +65,7 @@ export async function getTopPicks(
       .eq("user_id", userId)
       .order("position");
 
-    return ((data ?? []) as unknown as ArtistRow[]).map(toArtistPick);
+    return (data ?? []).map(toArtistPick);
   }
 
   const { data } = await supabase
@@ -74,7 +74,7 @@ export async function getTopPicks(
     .eq("user_id", userId)
     .order("position");
 
-  return ((data ?? []) as unknown as AlbumRow[]).map(toAlbumPick);
+  return (data ?? []).map(toAlbumPick);
 }
 
 /** The same list for the share picture, which runs without a session. */
@@ -91,7 +91,7 @@ export async function getPublicTopPicks(
       .eq("user_id", userId)
       .order("position");
 
-    return ((data ?? []) as unknown as ArtistRow[]).map(toArtistPick);
+    return (data ?? []).map(toArtistPick);
   }
 
   const { data } = await supabase
@@ -100,7 +100,7 @@ export async function getPublicTopPicks(
     .eq("user_id", userId)
     .order("position");
 
-  return ((data ?? []) as unknown as AlbumRow[]).map(toAlbumPick);
+  return (data ?? []).map(toAlbumPick);
 }
 
 export type PickSuggestions = {
@@ -133,10 +133,7 @@ export async function getPickSuggestions(
       .order("created_at", best)
       .limit(RATED_LIMIT);
 
-    const rated = (data ?? []) as unknown as {
-      score: number;
-      artists: ArtistRow["artists"];
-    }[];
+    const rated = data ?? [];
 
     if (rated.length > 0) {
       return {
@@ -175,10 +172,7 @@ export async function getPickSuggestions(
     .order("created_at", best)
     .limit(RATED_LIMIT);
 
-  const rated = (data ?? []) as unknown as {
-    score: number;
-    releases: AlbumRow["releases"];
-  }[];
+  const rated = data ?? [];
 
   if (rated.length > 0) {
     return {
@@ -200,7 +194,7 @@ export async function getPickSuggestions(
 
   return {
     source: "popular",
-    picks: ((popular ?? []) as unknown as AlbumRow["releases"][]).map((release) => ({
+    picks: (popular ?? []).map((release) => ({
       ...toAlbumPick({ position: 0, releases: release }),
       score: null,
     })),

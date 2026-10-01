@@ -48,10 +48,7 @@ export async function getMilestoneCard(
       .range(from, to),
   );
 
-  const rows = (data ?? []) as unknown as {
-    score: number;
-    releases: { mbid: string; title: string; artist_credit: string | null; cover_art_url: string | null } | null;
-  }[];
+  const rows = data ?? [];
   if (rows.length < count) return null;
 
   return {

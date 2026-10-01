@@ -7,6 +7,14 @@ export type VersusSideKey = "left" | "right";
 
 export const SIDES: readonly VersusSideKey[] = ["left", "right"];
 
+/**
+ * A pick as the database holds it: plain text, with a check that allows only
+ * "left" and "right" (migration 0010), so this only narrows the type.
+ */
+export function sideKey(value: string): VersusSideKey {
+  return value === "right" ? "right" : "left";
+}
+
 /** The longest a take on a Versus can be. */
 export const TAKE_LIMIT = 280;
 

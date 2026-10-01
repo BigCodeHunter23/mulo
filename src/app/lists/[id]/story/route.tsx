@@ -19,15 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .maybeSingle();
   if (!data) return new Response("Not found", { status: 404 });
 
-  const list = data as unknown as {
-    title: string;
-    ranked: boolean;
-    profiles: { username: string; display_name: string | null } | null;
-    list_items: {
-      position: number;
-      releases: { title: string; artist_credit: string | null; cover_art_url: string | null } | null;
-    }[];
-  };
+  const list = data;
   const items = [...list.list_items]
     .filter((item) => item.releases)
     .sort((a, b) => a.position - b.position);

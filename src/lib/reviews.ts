@@ -34,15 +34,7 @@ export async function getReviews(
     .order("created_at", { ascending: false })
     .limit(50);
 
-  type Row = {
-    id: number;
-    score: number;
-    review: string | null;
-    created_at: string;
-    profiles: { username: string; display_name: string | null; avatar_url: string | null };
-  };
-
-  return ((data ?? []) as unknown as Row[]).map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
     username: row.profiles.username,
     display_name: row.profiles.display_name,

@@ -5,13 +5,14 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getFollowingIds } from "@/lib/social";
 import { VERSUS_PAIRS, VERSUS_START, type VersusPair } from "@/lib/versus-pairs";
-import type {
-  VersusMatchup,
-  VersusPerson,
-  VersusResult,
-  VersusSideKey,
-  VersusTally,
-  VersusView,
+import {
+  sideKey,
+  type VersusMatchup,
+  type VersusPerson,
+  type VersusResult,
+  type VersusSideKey,
+  type VersusTally,
+  type VersusView,
 } from "@/lib/versus-shared";
 
 const SYDNEY = "Australia/Sydney";
@@ -127,7 +128,7 @@ async function fetchMatchup(day: string): Promise<VersusMatchup | null> {
     .eq("day", day)
     .maybeSingle();
 
-  return data ? toMatchup(data as unknown as MatchupRow) : null;
+  return data ? toMatchup(data) : null;
 }
 
 /** The matchup that ran on a day, if there was one. */
@@ -185,7 +186,7 @@ async function friendPicks(
     .order("created_at", { ascending: true })
     .limit(1000);
 
-  return (data ?? []) as unknown as FriendPick[];
+  return (data ?? []).map((row) => ({ ...row, pick: sideKey(row.pick) }));
 }
 
 function bySide(picks: FriendPick[], matchupId: number): VersusTally["friends"] {
@@ -281,10 +282,7 @@ export async function getRecentResults(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  const rows = (data ?? []) as unknown as {
-    pick: VersusSideKey;
-    versus_matchups: MatchupRow;
-  }[];
+  const rows = data ?? [];
   if (rows.length === 0) return [];
 
   const ids = rows.map((row) => row.versus_matchups.id);
@@ -297,7 +295,7 @@ export async function getRecentResults(
     const matchup = toMatchup(row.versus_matchups);
     return {
       matchup,
-      mine: row.pick,
+      mine: sideKey(row.pick),
       tally: { ...counts[i], friends: bySide(picks, matchup.id) },
       at: closesAt(matchup.day),
     };
@@ -328,6 +326,6 @@ export async function getLatestVersusAt(userId: string): Promise<string | null> 
   // Nothing can be newer than this morning's matchup opening.
   if (!picked) return sydneyMidnight(today).toISOString();
 
-  const row = latest.data?.[0] as unknown as { versus_matchups: { day: string } } | undefined;
+  const row = latest.data?.[0];
   return row ? closesAt(row.versus_matchups.day) : null;
 }

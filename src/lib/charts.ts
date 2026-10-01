@@ -380,6 +380,8 @@ export async function getChartProgress(chart: Chart): Promise<ChartProgress> {
     );
 
   const yours = new Map<string, number>();
+  // The column changes with the chart, which the typed query builder can't
+  // follow, so the row's shape is spelled out here.
   for (const row of (data ?? []) as unknown as Record<string, string | number>[]) {
     yours.set(String(row[column]), Number(row.score));
   }

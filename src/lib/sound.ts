@@ -22,8 +22,6 @@ const DISPLAY: Record<string, string> = {
   "neo soul": "neo-soul",
 };
 
-type AlbumRow = { score: number; releases: { mbid: string; genres: string[] } };
-type SongRow = { score: number; releases: { mbid: string; genres: string[] } };
 
 /**
  * Somebody's sound, worked out from what they rate highly rather than asked
@@ -59,13 +57,13 @@ export async function getSound(userId: string): Promise<string[]> {
   // average of its songs' scores.
   const weight = new Map<string, { genres: string[]; value: number }>();
 
-  for (const row of (albums.data ?? []) as unknown as AlbumRow[]) {
+  for (const row of albums.data ?? []) {
     if (row.releases.genres.length === 0) continue;
     weight.set(row.releases.mbid, { genres: row.releases.genres, value: row.score - 6 });
   }
 
   const songScores = new Map<string, { genres: string[]; scores: number[] }>();
-  for (const row of (songs.data ?? []) as unknown as SongRow[]) {
+  for (const row of songs.data ?? []) {
     if (weight.has(row.releases.mbid) || row.releases.genres.length === 0) continue;
     const entry = songScores.get(row.releases.mbid) ?? {
       genres: row.releases.genres,

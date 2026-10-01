@@ -30,12 +30,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   ]);
   if (!data) return brandCard(fonts);
 
-  const list = data as unknown as {
-    title: string;
-    ranked: boolean;
-    profiles: { username: string; display_name: string | null } | null;
-    list_items: { position: number; releases: { cover_art_url: string | null } | null }[];
-  };
+  const list = data;
   const items = [...list.list_items].sort((a, b) => a.position - b.position);
   const covers = await Promise.all(
     items.slice(0, 4).map((item) => loadImage(coverSrc(item.releases?.cover_art_url, 250))),

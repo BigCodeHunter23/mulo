@@ -15,18 +15,6 @@ export type RaisedOn = {
   };
 };
 
-type Row = {
-  raised_era: string | null;
-  raised_scene: string | null;
-  releases: {
-    mbid: string;
-    title: string;
-    artist_credit: string | null;
-    cover_art_url: string | null;
-    release_date: string | null;
-  } | null;
-};
-
 /** The record somebody was raised on, with its decade and scene, if they've picked. */
 export async function getRaisedOn(userId: string): Promise<RaisedOn | null> {
   const supabase = await createClient();
@@ -40,7 +28,7 @@ export async function getRaisedOn(userId: string): Promise<RaisedOn | null> {
     .eq("id", userId)
     .maybeSingle();
 
-  const row = data as unknown as Row | null;
+  const row = data;
   if (!row?.releases) return null;
 
   const { era, scene } = findScene(row.raised_era, row.raised_scene);

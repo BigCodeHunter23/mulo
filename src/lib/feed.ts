@@ -2,8 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { getReactions, NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
-import { MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
-import type { VersusMatchup, VersusSideKey } from "@/lib/versus-shared";
+import { MATCHUP_SELECT, sydneyDay, toMatchup } from "@/lib/versus";
+import { sideKey, type VersusMatchup, type VersusSideKey } from "@/lib/versus-shared";
 
 type Author = { username: string; display_name: string | null; avatar_url: string | null };
 
@@ -66,32 +66,6 @@ type ReleaseRow = {
   title: string;
   cover_art_url: string | null;
   artists: { mbid: string; name: string } | null;
-};
-
-type AlbumRow = {
-  id: number;
-  score: number;
-  review: string | null;
-  created_at: string;
-  profiles: Author;
-  releases: ReleaseRow;
-};
-
-type ArtistRow = {
-  id: number;
-  score: number;
-  review: string | null;
-  created_at: string;
-  profiles: Author;
-  artists: { mbid: string; name: string; image_url: string | null };
-};
-
-type PickRow = {
-  id: number;
-  pick: VersusSideKey;
-  created_at: string;
-  profiles: Author;
-  versus_matchups: MatchupRow;
 };
 
 type SongRow = {
@@ -201,7 +175,7 @@ async function loadFeed(
   ]);
 
   const items: FeedItem[] = [
-    ...((albumResult.data ?? []) as unknown as AlbumRow[]).map(
+    ...(albumResult.data ?? []).map(
       (row): FeedItem => ({
         kind: "album",
         key: `album-${row.id}`,
@@ -214,7 +188,7 @@ async function loadFeed(
         release: toAlbum(row.releases),
       }),
     ),
-    ...((artistResult.data ?? []) as unknown as ArtistRow[]).map(
+    ...(artistResult.data ?? []).map(
       (row): FeedItem => ({
         kind: "artist",
         key: `artist-${row.id}`,
@@ -227,8 +201,8 @@ async function loadFeed(
         artist: row.artists,
       }),
     ),
-    ...groupSongs((songResult.data ?? []) as unknown as SongRow[]),
-    ...((pickResult.data ?? []) as unknown as PickRow[]).map(
+    ...groupSongs(songResult.data ?? []),
+    ...(pickResult.data ?? []).map(
       (row): FeedItem => ({
         kind: "pick",
         key: `pick-${row.id}`,
@@ -237,7 +211,7 @@ async function loadFeed(
         created_at: row.created_at,
         author: row.profiles,
         matchup: toMatchup(row.versus_matchups),
-        pick: row.pick,
+        pick: sideKey(row.pick),
         revealed: false,
       }),
     ),

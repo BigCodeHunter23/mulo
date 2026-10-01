@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
@@ -79,9 +80,6 @@ type ReleaseRef = {
   artists: ArtistRef | null;
 };
 
-type AlbumRow = { score: number; releases: ReleaseRef };
-type SongRow = { score: number; songs: { mbid: string; title: string }; releases: ReleaseRef };
-type ArtistRow = { score: number; artists: ArtistRef };
 
 const RELEASE =
   "releases!inner ( mbid, title, artist_credit, cover_art_url, artist_mbid, artists ( mbid, name, image_url ) )";
@@ -116,7 +114,7 @@ function crown(picks: MixtapePick[], saved: string | undefined) {
  * was first made, so changing a score later doesn't move it to another month.
  */
 async function load(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   userId: string,
   month: string,
 ): Promise<Mixtape> {
@@ -160,9 +158,9 @@ async function load(
       .eq("month", month),
   ]);
 
-  const albumRows = (albumResult.data ?? []) as unknown as AlbumRow[];
-  const songRows = (songResult.data ?? []) as unknown as SongRow[];
-  const artistRows = (artistResult.data ?? []) as unknown as ArtistRow[];
+  const albumRows = albumResult.data ?? [];
+  const songRows = songResult.data ?? [];
+  const artistRows = artistResult.data ?? [];
   const saved = new Map(
     ((pickResult.data ?? []) as { kind: RankOffKind; mbid: string }[]).map((row) => [
       row.kind,

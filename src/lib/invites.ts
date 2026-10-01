@@ -31,7 +31,7 @@ export async function findInvite(code: string): Promise<Inviter | null> {
     .eq("code", code)
     .maybeSingle();
 
-  const joined = data?.profiles as unknown as Inviter | Inviter[] | undefined;
+  const joined = data?.profiles;
   return (Array.isArray(joined) ? joined[0] : joined) ?? null;
 }
 

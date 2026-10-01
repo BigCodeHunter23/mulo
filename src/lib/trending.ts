@@ -32,14 +32,6 @@ const MINIMUM_ALBUMS = 4;
 const MINIMUM_PEOPLE = 3;
 
 
-type ReleaseRow = {
-  mbid: string;
-  title: string;
-  artist_credit: string | null;
-  cover_art_url: string | null;
-  artists: { name: string } | { name: string }[] | null;
-};
-
 /**
  * What MULO has in heavy rotation, from MULO's own activity rather than an
  * outside chart. ListenBrainz's weekly chart was the obvious source, but its
@@ -86,7 +78,7 @@ async function rotation(limit: number): Promise<HeavyRotation | null> {
       );
 
     const details = new Map(
-      ((data ?? []) as unknown as ReleaseRow[]).map((row) => [row.mbid, row]),
+      (data ?? []).map((row) => [row.mbid, row]),
     );
 
     const hot = ranked.flatMap((entry) => {

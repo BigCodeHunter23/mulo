@@ -14,18 +14,6 @@ import {
 
 export type { Badge };
 
-type AlbumRating = {
-  id: number;
-  score: number;
-  review: string | null;
-  created_at: string;
-  release_mbid: string;
-  releases: {
-    artist_mbid: string | null;
-    release_date: string | null;
-    genres: string[];
-  } | null;
-};
 type ArtistRating = {
   id: number;
   artist_mbid: string;
@@ -146,7 +134,7 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
         .eq("user_id", userId),
     ]);
 
-  const albumRatings = (albums.data ?? []) as unknown as AlbumRating[];
+  const albumRatings = albums.data ?? [];
   const artistRatings = (artists.data ?? []) as ArtistRating[];
   const songRatings = (songs.data ?? []) as SongRating[];
   const all = [...albumRatings, ...artistRatings, ...songRatings];

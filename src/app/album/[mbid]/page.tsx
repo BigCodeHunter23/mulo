@@ -41,15 +41,9 @@ export async function generateMetadata({
 
   if (!data) return { title: "Album" };
 
-  // Without generated database types, supabase-js can't tell this join is
-  // many-to-one and types it as a list, so handle either shape.
-  const joined = data.artists as unknown as
-    | { name: string }
-    | { name: string }[]
-    | null;
-  const artist = Array.isArray(joined) ? joined[0]?.name : joined?.name;
-  const year = (data.release_date as string | null)?.slice(0, 4);
-  const title = artist ? `${data.title} — ${artist}` : String(data.title);
+  const artist = data.artists?.name;
+  const year = data.release_date?.slice(0, 4);
+  const title = artist ? `${data.title} — ${artist}` : data.title;
   const description = `${data.title}${artist ? ` by ${artist}` : ""}${
     year ? ` (${year})` : ""
   }. Rate and review it on MULO.`;

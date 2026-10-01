@@ -52,7 +52,7 @@ export async function mostPlayedAlbums(limit = 15): Promise<AlbumSummary[]> {
     .order("popularity", { ascending: false })
     .limit(limit);
 
-  return ((data ?? []) as unknown as ReleaseRow[]).map(toAlbum);
+  return (data ?? []).map(toAlbum);
 }
 
 /** Well-known artists with a photo, most-played first. */
@@ -99,7 +99,7 @@ async function topRated(limit: number): Promise<TopRated[]> {
     .in("mbid", ranked.map((r) => r.mbid));
 
   const albums = new Map(
-    ((rows ?? []) as unknown as ReleaseRow[]).map((row) => [row.mbid, toAlbum(row)]),
+    (rows ?? []).map((row) => [row.mbid, toAlbum(row)]),
   );
 
   return ranked.flatMap((r) => {
@@ -185,7 +185,7 @@ export async function newReleases(limit = 10): Promise<AlbumSummary[]> {
     .order("release_date", { ascending: false })
     .limit(limit);
 
-  return ((data ?? []) as unknown as ReleaseRow[]).map(toAlbum);
+  return (data ?? []).map(toAlbum);
 }
 
 /** How many of an artist's own genre tags to match on. */

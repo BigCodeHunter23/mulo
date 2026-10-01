@@ -98,6 +98,8 @@ export default async function ReportsInbox({
   let { data, error } = await load(SELECT_WITH_LISTS);
   if (error) ({ data, error } = await load(SELECT_WITH_TAKES));
   if (error) ({ data, error } = await load(SELECT));
+  // The select is chosen at runtime, so its shape can't be inferred; ReportRow
+  // spells out the fullest one, with the later joins optional.
   const reports = (data ?? []) as unknown as ReportRow[];
 
   const tab = (active: boolean) =>

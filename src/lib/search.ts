@@ -162,8 +162,8 @@ export async function searchCatalog(
 
   const seen = new Set<string>();
   const albums = [
-    ...((albumResult.data ?? []) as unknown as AlbumRow[]),
-    ...((byArtist.data ?? []) as unknown as AlbumRow[]),
+    ...(albumResult.data ?? []),
+    ...(byArtist.data ?? []),
   ]
     .filter((row) => (seen.has(row.mbid) ? false : (seen.add(row.mbid), true)))
     .map((row) => ({
@@ -181,7 +181,10 @@ export async function searchCatalog(
 
   // A song can sit on more than one album; keep its best-known one.
   const bestSongs = new Map<string, { row: SongRow; rank: number }>();
-  for (const row of (songResult.data ?? []) as unknown as SongRow[]) {
+  for (const track of songResult.data ?? []) {
+    // The query leaves out tracks with no song; this tells the types so.
+    if (!track.song_mbid) continue;
+    const row = { ...track, song_mbid: track.song_mbid };
     const rank = matchRank(row.title, query);
     const current = bestSongs.get(row.song_mbid);
     const morePopular =

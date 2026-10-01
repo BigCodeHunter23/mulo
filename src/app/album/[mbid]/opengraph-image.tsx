@@ -19,34 +19,26 @@ export default async function Image({
   const { mbid } = await params;
   const supabase = createPublicClient();
 
-  const [{ data: release }, { data: ratings }, fonts] = await Promise.all([
+  const [{ data: release }, { data: totals }, fonts] = await Promise.all([
     supabase
       .from("releases")
       .select("title, release_date, cover_art_url, artists ( name )")
       .eq("mbid", mbid)
       .maybeSingle(),
-    supabase.from("ratings").select("score").eq("release_mbid", mbid),
+    // Counted by the database (migration 0018), past a thousand ratings.
+    supabase.rpc("score_totals", { p_kind: "album", p_mbids: [mbid] }).maybeSingle(),
     ogFonts(),
   ]);
 
   if (!release) return brandCard(fonts);
 
   const cover = await loadImage(release.cover_art_url);
-  // Without generated database types, supabase-js can't tell this join is
-  // many-to-one and types it as a list, so handle either shape.
-  const joined = release.artists as unknown as
-    | { name: string }
-    | { name: string }[]
-    | null;
-  const artist =
-    (Array.isArray(joined) ? joined[0]?.name : joined?.name) ?? null;
-  const year = (release.release_date as string | null)?.slice(0, 4) ?? null;
+  const artist = release.artists?.name ?? null;
+  const year = release.release_date?.slice(0, 4) ?? null;
+  const average = totals?.average ?? null;
+  const votes = totals?.votes ?? 0;
 
-  const scores = (ratings ?? []).map((r) => Number(r.score));
-  const average =
-    scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-
-  const rawTitle = String(release.title);
+  const rawTitle = release.title;
   const title = rawTitle.length > 60 ? `${rawTitle.slice(0, 57)}…` : rawTitle;
   const titleSize = title.length > 36 ? 56 : title.length > 20 ? 68 : 84;
 
@@ -146,8 +138,8 @@ export default async function Image({
                 color: OG.muted,
               }}
             >
-              {scores.length > 0
-                ? `${scores.length} rating${scores.length === 1 ? "" : "s"} on MULO`
+              {votes > 0
+                ? `${votes} rating${votes === 1 ? "" : "s"} on MULO`
                 : "Be the first to rate it"}
             </div>
           </div>

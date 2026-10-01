@@ -39,6 +39,8 @@ export async function getReactions(
     .select(`user_id, value, ${column}`)
     .in(column, ratingIds);
 
+  // The column changes with the kind, which the typed query builder can't
+  // follow, so the row's shape is spelled out here.
   for (const row of (data ?? []) as unknown as ({
     user_id: string;
     value: number;

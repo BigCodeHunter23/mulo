@@ -9,9 +9,8 @@ import {
   MATCHUP_SELECT,
   sydneyMidnight,
   toMatchup,
-  type MatchupRow,
 } from "@/lib/versus";
-import type { VersusMatchup, VersusResult, VersusSideKey } from "@/lib/versus-shared";
+import { sideKey, type VersusMatchup, type VersusResult } from "@/lib/versus-shared";
 
 /** When somebody last opened their notifications, kept per browser. */
 export const SEEN_COOKIE = "mulo_notifications_seen";
@@ -56,17 +55,6 @@ export type Notification =
   | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
   /** A Versus they picked in has closed. */
   | { kind: "versus-result"; key: string; at: string; result: VersusResult };
-
-type ReactionRow = {
-  id: number;
-  value: number;
-  created_at: string;
-  profiles: Person;
-  ratings?: { releases: { mbid: string; title: string } | null };
-  artist_ratings?: { artists: { mbid: string; name: string } | null };
-  versus_votes?: { pick: VersusSideKey; versus_matchups: MatchupRow | null };
-  versus_takes?: { versus_matchups: MatchupRow | null };
-};
 
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
 
@@ -234,7 +222,7 @@ export async function getNotifications(
         ? [{ kind: "follow", key: `follow-${row.follower_id}`, at: row.created_at, person }]
         : [];
     }),
-    ...((albumReactions.data ?? []) as unknown as ReactionRow[]).flatMap(
+    ...(albumReactions.data ?? []).flatMap(
       (row): Notification[] => {
         const release = row.ratings?.releases;
         return release
@@ -252,7 +240,7 @@ export async function getNotifications(
           : [];
       },
     ),
-    ...((artistReactions.data ?? []) as unknown as ReactionRow[]).flatMap(
+    ...(artistReactions.data ?? []).flatMap(
       (row): Notification[] => {
         const artist = row.artist_ratings?.artists;
         return artist
@@ -270,7 +258,7 @@ export async function getNotifications(
           : [];
       },
     ),
-    ...((pickReactions.data ?? []) as unknown as ReactionRow[]).flatMap(
+    ...(pickReactions.data ?? []).flatMap(
       (row): Notification[] => {
         const vote = row.versus_votes;
         if (!vote?.versus_matchups) return [];
@@ -284,12 +272,12 @@ export async function getNotifications(
             value: row.value === 1 ? 1 : -1,
             on: "pick",
             subject: { title: matchup.title, href: `/versus/${matchup.day}` },
-            picked: matchup[vote.pick].name,
+            picked: matchup[sideKey(vote.pick)].name,
           },
         ];
       },
     ),
-    ...((takeReactions.data ?? []) as unknown as ReactionRow[]).flatMap(
+    ...(takeReactions.data ?? []).flatMap(
       (row): Notification[] => {
         const take = row.versus_takes;
         if (!take?.versus_matchups) return [];

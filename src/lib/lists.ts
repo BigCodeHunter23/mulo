@@ -89,7 +89,7 @@ export async function getUserLists(userId: string): Promise<ListSummary[]> {
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(100);
-  return ((data ?? []) as unknown as SummaryRow[]).map(summarise);
+  return (data ?? []).map(summarise);
 }
 
 /** Lists from everyone, freshest first, skipping empty ones. */
@@ -100,7 +100,7 @@ export async function getRecentLists(limit = 24): Promise<ListSummary[]> {
     .select(SUMMARY)
     .order("updated_at", { ascending: false })
     .limit(limit * 2);
-  return ((data ?? []) as unknown as SummaryRow[])
+  return (data ?? [])
     .map(summarise)
     .filter((list) => list.count > 0)
     .slice(0, limit);
@@ -123,7 +123,7 @@ export async function getListsWithAlbum(releaseMbid: string, limit = 6): Promise
     .in("id", ids)
     .order("updated_at", { ascending: false })
     .limit(limit);
-  return ((data ?? []) as unknown as SummaryRow[]).map(summarise);
+  return (data ?? []).map(summarise);
 }
 
 /** One list with all its albums, in order. */
@@ -142,26 +142,7 @@ export async function getList(id: number): Promise<ListDetail | null> {
     .maybeSingle();
   if (!data) return null;
 
-  const row = data as unknown as {
-    id: number;
-    user_id: string;
-    title: string;
-    description: string | null;
-    ranked: boolean;
-    updated_at: string;
-    profiles: ProfileRow | null;
-    list_items: {
-      release_mbid: string;
-      position: number;
-      note: string | null;
-      releases: {
-        title: string;
-        artist_credit: string | null;
-        cover_art_url: string | null;
-        release_date: string | null;
-      } | null;
-    }[];
-  };
+  const row = data;
 
   return {
     id: row.id,
@@ -198,7 +179,7 @@ export async function getMyListsFor(
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(100);
-  return ((data ?? []) as unknown as { id: number; title: string; list_items: { release_mbid: string }[] }[]).map(
+  return (data ?? []).map(
     (list) => ({
       id: list.id,
       title: list.title,

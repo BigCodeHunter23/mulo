@@ -26,14 +26,6 @@ export type Takes = {
   takes: VersusTake[];
 };
 
-type Row = {
-  id: number;
-  body: string;
-  created_at: string;
-  user_id: string;
-  profiles: VersusTake["author"];
-};
-
 /** Everyone's take on a matchup, the most loved first, with the side each picked. */
 export async function getTakes(matchupId: number): Promise<Takes> {
   const supabase = createPublicClient();
@@ -47,7 +39,7 @@ export async function getTakes(matchupId: number): Promise<Takes> {
 
   if (error) return { available: false, takes: [] };
 
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = data ?? [];
   if (rows.length === 0) return { available: true, takes: [] };
 
   const [{ data: picks }, reactions, user] = await Promise.all([

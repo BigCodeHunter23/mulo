@@ -17,8 +17,6 @@ export type Nomination = {
   mine: boolean;
 };
 
-type ArtistRow = { mbid: string; name: string; image_url: string | null };
-
 export async function getNominations(userId: string | null, limit = 20): Promise<Nomination[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -33,13 +31,7 @@ export async function getNominations(userId: string | null, limit = 20): Promise
     .limit(300);
   if (error || !data) return [];
 
-  const rows = data as unknown as {
-    id: number;
-    created_at: string;
-    left: ArtistRow | null;
-    right: ArtistRow | null;
-    versus_nomination_backers: { user_id: string }[];
-  }[];
+  const rows = data;
 
   return rows
     .filter((row) => row.left && row.right)

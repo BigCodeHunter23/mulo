@@ -131,6 +131,8 @@ export async function listFollows(
     .order(wanted)
     .range(offset, offset + size - 1);
 
+  // Which column is wanted depends on the direction, which the typed query
+  // builder can't follow.
   const ids = ((links ?? []) as unknown as Record<string, string>[]).map(
     (row) => row[wanted],
   );

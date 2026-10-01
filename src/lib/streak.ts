@@ -87,6 +87,8 @@ export async function getStreak(userId: string): Promise<Streak> {
   const active = new Set<string>();
   for (const { data } of results) {
     // A table that isn't there yet, or refuses the read, just adds nothing.
+    // The table and columns change per source, so the row's shape is spelled
+    // out here.
     for (const row of (data ?? []) as unknown as Record<string, string | null>[]) {
       if (row.created_at) active.add(dayOf(row.created_at));
       // An edited score or a review written later is activity on that day too.

@@ -311,13 +311,7 @@ export async function getScoresForReleases(
   // A shelf of dashes is the thing the starting score exists to prevent, so
   // grids blend it in the same way an album page does.
   const seed = new Map(
-    (
-      (seeds ?? []) as unknown as {
-        mbid: string;
-        seed_score: number | null;
-        artists: { seed_score: number | null } | null;
-      }[]
-    ).map((row) => [
+    (seeds ?? []).map((row) => [
       row.mbid,
       row.seed_score ?? fromArtist(row.artists?.seed_score ?? null),
     ]),
@@ -523,11 +517,7 @@ export async function getOwnAlbumRatings(sort: Sort = "recent"): Promise<AlbumRa
     return query.order("id").range(from, to);
   });
 
-  type Row = Omit<AlbumRating, "release"> & {
-    releases: Omit<AlbumRating["release"], "artist"> & { artists: ArtistRef | null };
-  };
-
-  return ((data ?? []) as unknown as Row[]).map(({ releases, ...row }) => ({
+  return (data ?? []).map(({ releases, ...row }) => ({
     ...row,
     release: {
       mbid: releases.mbid,
@@ -554,9 +544,7 @@ export async function getOwnArtistRatings(sort: Sort = "recent"): Promise<Artist
     return query.order("id").range(from, to);
   });
 
-  type Row = Omit<ArtistRating, "artist"> & { artists: ArtistRating["artist"] };
-
-  return ((data ?? []) as unknown as Row[]).map(({ artists, ...row }) => ({
+  return (data ?? []).map(({ artists, ...row }) => ({
     ...row,
     artist: artists,
   }));
@@ -579,14 +567,7 @@ export async function getOwnSongRatings(sort: Sort = "recent"): Promise<SongRati
     return query.order("id").range(from, to);
   });
 
-  type Row = {
-    score: number;
-    created_at: string;
-    songs: SongRating["song"];
-    releases: Omit<SongRating["release"], "artist"> & { artists: ArtistRef | null };
-  };
-
-  return ((data ?? []) as unknown as Row[]).map((row) => ({
+  return (data ?? []).map((row) => ({
     score: row.score,
     created_at: row.created_at,
     song: row.songs,
@@ -645,11 +626,7 @@ export async function getHighestRatedAlbums(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  type Row = Omit<AlbumRating, "release"> & {
-    releases: Omit<AlbumRating["release"], "artist"> & { artists: ArtistRef | null };
-  };
-
-  return ((data ?? []) as unknown as Row[]).map(({ releases, ...row }) => ({
+  return (data ?? []).map(({ releases, ...row }) => ({
     ...row,
     release: {
       mbid: releases.mbid,
