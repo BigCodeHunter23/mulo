@@ -1,6 +1,8 @@
 import "server-only";
 import { ImageResponse } from "next/og";
 import { siteUrl } from "@/lib/site";
+// Only from the places MULO's pictures live, never anything large or SVG.
+import { fetchImage } from "@/lib/image-fetch";
 
 /** Brand colours for generated images, matching globals.css. */
 export const OG = {
@@ -12,8 +14,6 @@ export const OG = {
   accent: "#f2803f",
   gold: "#f5c518",
 } as const;
-
-const USER_AGENT = "MULO/0.1 ( https://mulo-plum.vercel.app )";
 
 type OgFont = {
   name: string;
@@ -70,22 +70,6 @@ export async function ogFonts(): Promise<OgFont[] | undefined> {
   return fonts.length > 0 ? fonts : undefined;
 }
 
-type Fetched = { type: string; data: ArrayBuffer; url: string };
-
-async function fetchImage(url: string): Promise<Fetched | null> {
-  try {
-    const response = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(6000),
-    });
-    const type = response.headers.get("content-type") ?? "";
-    if (!response.ok || !type.startsWith("image/")) return null;
-
-    return { type, data: await response.arrayBuffer(), url: response.url };
-  } catch {
-    return null;
-  }
-}
 
 const COMMONS_FILE =
   /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+)/;
