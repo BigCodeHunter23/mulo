@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { loginPath, safeRedirectPath, signupPath } from "./redirects";
+import { loginPath, safeRedirectPath, signupPath, withQuery } from "./redirects";
+
+describe("withQuery", () => {
+  it("keeps the values that are set, encoded", () => {
+    expect(withQuery("/stack", { decade: "1990", genre: "hip hop", run: undefined })).toBe(
+      "/stack?decade=1990&genre=hip+hop",
+    );
+  });
+
+  it("leaves a bare path alone", () => {
+    expect(withQuery("/goat", { kind: "" })).toBe("/goat");
+  });
+});
 
 describe("safeRedirectPath", () => {
   it.each([

@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setReaction } from "@/app/reactions/actions";
+import LoginLink from "@/components/LoginLink";
 import { haptic } from "@/lib/haptics";
 
 type Kind = "album" | "artist" | "take" | "pick";
@@ -111,13 +111,10 @@ export default function Reactions({
 
   if (!signedIn) {
     return (
-      <Link
-        href="/login"
-        className={`${base} border-border text-text-muted hover:text-text`}
-      >
+      <LoginLink className={`${base} border-border text-text-muted hover:text-text`}>
         <Heart filled={false} />
         {state.love > 0 ? state.love : "Love"}
-      </Link>
+      </LoginLink>
     );
   }
 

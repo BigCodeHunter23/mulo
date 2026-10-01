@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
+import LoginLink from "@/components/LoginLink";
 import { useFormStatus } from "react-dom";
 import { submitReport, type ReportState } from "@/app/report/actions";
 import { REPORT_REASONS } from "@/lib/report-reasons";
@@ -56,9 +56,7 @@ export default function ReportButton({
 
   if (!signedIn) {
     return (
-      <Link href="/login" className={quietLink}>
-        {label}
-      </Link>
+      <LoginLink className={quietLink}>{label}</LoginLink>
     );
   }
 

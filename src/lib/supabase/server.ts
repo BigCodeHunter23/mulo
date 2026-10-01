@@ -1,6 +1,8 @@
+import "server-only";
 import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { SESSION_COOKIE_OPTIONS } from "./cookies";
 
 /**
  * Cached per request: a single page render asks for the client from several
@@ -13,6 +15,7 @@ export const createClient = cache(async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: SESSION_COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { backNomination, nominateMatchup } from "./actions";
+import { loginPath } from "@/lib/redirects";
+import LoginLink from "@/components/LoginLink";
 import type { Nomination } from "@/lib/nominations";
 import { artistPhotoSrc } from "@/lib/cover-url";
 import { buttonClass, fieldClass } from "@/components/ui";
@@ -24,6 +26,7 @@ export default function Nominations({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [nominations, setNominations] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -38,7 +41,7 @@ export default function Nominations({
   function toggle(nomination: Nomination) {
     haptic("tap");
     if (!signedIn) {
-      router.push("/login");
+      router.push(loginPath(pathname));
       return;
     }
     const back = !nomination.mine;
@@ -131,9 +134,9 @@ function NominateForm({ signedIn, onDone }: { signedIn: boolean; onDone: () => v
 
   if (!signedIn) {
     return (
-      <Link href="/login" className={`${buttonClass({ variant: "secondary", size: "sm" })} mt-4`}>
+      <LoginLink className={`${buttonClass({ variant: "secondary", size: "sm" })} mt-4`}>
         Log in to nominate
-      </Link>
+      </LoginLink>
     );
   }
 

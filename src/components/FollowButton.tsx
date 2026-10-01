@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { setFollowing } from "@/app/u/[username]/actions";
 import { buttonClass } from "@/components/ui";
+import LoginLink from "@/components/LoginLink";
 import { haptic } from "@/lib/haptics";
 
 /**
@@ -36,12 +36,11 @@ export default function FollowButton({
 
   if (!signedIn) {
     return (
-      <Link
-        href="/login"
+      <LoginLink
         className={`${buttonClass({ size: size === "small" ? "sm" : "md" })} ${block ? "w-full" : ""}`}
       >
         Follow
-      </Link>
+      </LoginLink>
     );
   }
 

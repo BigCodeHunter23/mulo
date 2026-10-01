@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { rate } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import Portal from "@/components/Portal";
+import LoginLink from "@/components/LoginLink";
 import { coverSrc } from "@/lib/cover-url";
 import { haptic } from "@/lib/haptics";
 
@@ -110,9 +111,9 @@ export default function QuickRate({
 
           {status === "login" ? (
             <p className="mt-5 text-center text-sm text-text-secondary">
-              <Link href="/login" className="font-medium text-accent hover:underline">
+              <LoginLink className="font-medium text-accent hover:underline">
                 Log in
-              </Link>{" "}
+              </LoginLink>{" "}
               to rate albums.
             </p>
           ) : (

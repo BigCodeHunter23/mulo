@@ -6,6 +6,7 @@ import { rate, removeRating } from "@/app/ratings/actions";
 import type { FriendScore } from "@/lib/friend-scores";
 import Avatar from "@/components/Avatar";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
+import LoginLink from "@/components/LoginLink";
 import { PlayButton, PreviewCredit } from "@/components/PreviewPlayer";
 import { Star } from "@/components/StarScore";
 import { haptic } from "@/lib/haptics";
@@ -210,12 +211,9 @@ export default function SongList({
     <div>
       {hasSongs && !signedIn && (
         <p className="-mt-2 mb-4 text-xs text-text-muted">
-          <Link
-            href="/login"
-            className="font-medium text-accent underline-offset-4 hover:underline"
-          >
+          <LoginLink className="font-medium text-accent underline-offset-4 hover:underline">
             Log in
-          </Link>{" "}
+          </LoginLink>{" "}
           to rate songs.
         </p>
       )}

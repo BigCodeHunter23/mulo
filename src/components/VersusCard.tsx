@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { castVote } from "@/app/versus/actions";
+import LoginLink from "@/components/LoginLink";
 import { artistPhotoSrc } from "@/lib/cover-url";
 import {
   leader,
@@ -353,13 +354,13 @@ export default function VersusCard({
       )}
       {!view.signedIn && !closed && (
         <div className="mt-4 flex flex-wrap justify-center gap-3">
-          <Link href="/login" className={buttonClass({ size: compact ? "sm" : "md" })}>
+          <LoginLink className={buttonClass({ size: compact ? "sm" : "md" })}>
             Log in to pick
-          </Link>
+          </LoginLink>
           {!compact && (
-            <Link href="/login?mode=signup" className={buttonClass({ variant: "secondary" })}>
+            <LoginLink mode="signup" className={buttonClass({ variant: "secondary" })}>
               Join MULO
-            </Link>
+            </LoginLink>
           )}
         </div>
       )}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { sizedAvatar } from "@/lib/record-avatar";
 import { isActive } from "@/components/NavLink";
+import LoginLink from "@/components/LoginLink";
 
 const ICON = "h-6 w-6";
 
@@ -115,10 +116,10 @@ export default function MobileNav({
             You
           </Link>
         ) : (
-          <Link href="/login" aria-current={me ? "page" : undefined} className={tab(me)}>
+          <LoginLink aria-current={me ? "page" : undefined} className={tab(me)}>
             <PersonIcon />
             Log in
-          </Link>
+          </LoginLink>
         )}
       </div>
     </nav>

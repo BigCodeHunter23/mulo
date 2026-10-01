@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** Remembers which invite somebody arrived through, until they sign up. */
@@ -52,4 +53,19 @@ export async function connectInvite(newUserId: string, code: string) {
       ],
       { onConflict: "follower_id,following_id", ignoreDuplicates: true },
     );
+}
+
+/**
+ * Finishes an invite once somebody has an account: called the moment sign-up
+ * hands back a session, or when they follow the confirmation email. The
+ * cookie only exists in the browser that opened the invite, so a link opened
+ * elsewhere simply has nothing to connect.
+ */
+export async function consumeInviteCookie(userId: string) {
+  const store = await cookies();
+  const code = store.get(INVITE_COOKIE)?.value;
+  if (!code) return;
+
+  await connectInvite(userId, code);
+  store.delete(INVITE_COOKIE);
 }

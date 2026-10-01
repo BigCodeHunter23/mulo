@@ -4,7 +4,8 @@ import type { VersusMatchup, VersusSideKey } from "@/lib/versus-shared";
 import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
 import ReportButton from "@/components/ReportButton";
-import { ButtonLink, SectionHeading } from "@/components/ui";
+import LoginLink from "@/components/LoginLink";
+import { buttonClass, SectionHeading } from "@/components/ui";
 import { DeleteTake, TakeComposer } from "./TakeControls";
 
 function timeAgo(iso: string) {
@@ -62,9 +63,7 @@ export default async function Takes({
           </p>
           {!signedIn && (
             <div className="mt-4">
-              <ButtonLink href="/login" size="sm">
-                Log in to pick
-              </ButtonLink>
+              <LoginLink className={buttonClass({ size: "sm" })}>Log in to pick</LoginLink>
             </div>
           )}
         </div>

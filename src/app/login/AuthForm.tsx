@@ -6,7 +6,9 @@ import { useFormStatus } from "react-dom";
 import { login, signup, type AuthState } from "./actions";
 import { buttonClass, Field, fieldClass, Notice } from "@/components/ui";
 
-function SubmitButton({ mode }: { mode: "login" | "signup" }) {
+type Mode = "login" | "signup";
+
+function SubmitButton({ mode }: { mode: Mode }) {
   const { pending } = useFormStatus();
 
   return (
@@ -28,12 +30,16 @@ function SubmitButton({ mode }: { mode: "login" | "signup" }) {
 
 export default function AuthForm({
   initialMode = "login",
+  next = "/",
+  notice,
 }: {
-  initialMode?: "login" | "signup";
+  initialMode?: Mode;
+  /** Where to go once logged in: the page that asked them to log in. */
+  next?: string;
+  /** Why they were sent here, such as an email link that didn't work. */
+  notice?: string;
 }) {
-  const [mode, setMode] = useState<"login" | "signup">(initialMode);
-  const action = mode === "login" ? login : signup;
-  const [state, formAction] = useActionState<AuthState, FormData>(action, {});
+  const [mode, setMode] = useState<Mode>(initialMode);
 
   return (
     <div className="flex flex-col gap-7">
@@ -53,6 +59,7 @@ export default function AuthForm({
           <button
             key={m}
             type="button"
+            aria-pressed={mode === m}
             onClick={() => setMode(m)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === m
@@ -65,10 +72,25 @@ export default function AuthForm({
         ))}
       </div>
 
+      {/* Keyed by mode, so a message from one never lingers on the other. */}
+      <AuthPanel key={mode} mode={mode} next={next} notice={notice} />
+    </div>
+  );
+}
+
+function AuthPanel({ mode, next, notice }: { mode: Mode; next: string; notice?: string }) {
+  const action = mode === "login" ? login : signup;
+  const [state, formAction] = useActionState<AuthState, FormData>(action, {});
+
+  return (
+    <>
+      {notice && !state.message && !state.error && <Notice tone="info">{notice}</Notice>}
       {state.message && <Notice tone="info">{state.message}</Notice>}
       {state.error && <Notice tone="error">{state.error}</Notice>}
 
       <form action={formAction} className="flex flex-col gap-5">
+        <input type="hidden" name="next" value={next} />
+
         <Field label="Email">
           <input
             id="email"
@@ -76,6 +98,7 @@ export default function AuthForm({
             type="email"
             autoComplete="email"
             required
+            maxLength={254}
             className={fieldClass}
           />
         </Field>
@@ -90,7 +113,8 @@ export default function AuthForm({
             type="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             required
-            minLength={6}
+            minLength={mode === "signup" ? 6 : undefined}
+            maxLength={72}
             className={fieldClass}
           />
         </Field>
@@ -106,6 +130,6 @@ export default function AuthForm({
           Forgotten your password?
         </Link>
       )}
-    </div>
+    </>
   );
 }

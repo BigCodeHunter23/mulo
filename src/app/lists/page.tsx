@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getRecentLists, getUserLists } from "@/lib/lists";
+import { loginPath } from "@/lib/redirects";
 import ListCard from "@/components/ListCard";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -25,7 +26,7 @@ export default async function ListsPage() {
             Best debuts, Sunday mornings, the albums that raised you: put them in order and share them.
           </p>
         </div>
-        <ButtonLink href={user ? "/lists/new" : "/login"}>New list</ButtonLink>
+        <ButtonLink href={user ? "/lists/new" : loginPath("/lists/new")}>New list</ButtonLink>
       </header>
 
       {user && (

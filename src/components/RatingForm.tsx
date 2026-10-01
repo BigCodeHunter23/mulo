@@ -9,6 +9,7 @@ import {
   type RatingResult,
 } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
+import LoginLink from "@/components/LoginLink";
 import { buttonClass, fieldClass } from "@/components/ui";
 import { haptic } from "@/lib/haptics";
 import { promptFor, REVIEW_COMFORTABLE, REVIEW_MAX } from "@/lib/review-prompts";
@@ -78,12 +79,9 @@ export default function RatingForm({
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface/40 px-5 py-6 text-center">
         <p className="text-sm text-text-secondary">
-          <Link
-            href="/login"
-            className="font-medium text-accent underline-offset-4 hover:underline"
-          >
+          <LoginLink className="font-medium text-accent underline-offset-4 hover:underline">
             Log in
-          </Link>{" "}
+          </LoginLink>{" "}
           to rate and review this {noun}.
         </p>
       </div>

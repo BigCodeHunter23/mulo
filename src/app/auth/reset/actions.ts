@@ -1,32 +1,23 @@
 "use server";
 
-import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { authCallbackUrl } from "@/lib/auth";
+import { emailSchema, field, firstError } from "@/lib/validation";
 
 export type ResetState = { error?: string; message?: string };
-
-/** This site's own origin, for building the link that goes in the email. */
-async function siteOrigin() {
-  const h = await headers();
-  const origin = h.get("origin");
-  if (origin) return origin;
-
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const protocol = h.get("x-forwarded-proto") ?? "https";
-  return `${protocol}://${host}`;
-}
 
 export async function requestReset(
   _prev: ResetState,
   formData: FormData,
 ): Promise<ResetState> {
+  const email = emailSchema.safeParse(field(formData, "email"));
+  if (!email.success) return { error: firstError(email.error) };
+
   const supabase = await createClient();
-  const email = String(formData.get("email") ?? "").trim();
-
-  if (!email) return { error: "Enter the email address on your account." };
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${await siteOrigin()}/auth/confirm?next=/auth/update-password`,
+  const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
+    // From Vercel's settings, never the request's Host header, which could
+    // be forged to send somebody's reset link elsewhere.
+    redirectTo: authCallbackUrl("/auth/update-password"),
   });
 
   if (error) {
@@ -35,7 +26,8 @@ export async function requestReset(
         error: "Too many reset emails just now. Please wait a few minutes.",
       };
     }
-    return { error: error.message };
+    console.error("[auth] password reset failed:", error.message);
+    return { error: "Couldn't send a reset email just now. Please try again in a minute." };
   }
 
   // Say the same thing either way, so this can't be used to find out which

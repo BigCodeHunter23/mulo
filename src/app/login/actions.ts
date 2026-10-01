@@ -1,11 +1,26 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { connectInvite, INVITE_COOKIE } from "@/lib/invites";
+import { authCallbackUrl } from "@/lib/auth";
+import { consumeInviteCookie } from "@/lib/invites";
+import { safeRedirectPath } from "@/lib/redirects";
+import {
+  emailSchema,
+  field,
+  firstError,
+  newPasswordSchema,
+  passwordSchema,
+} from "@/lib/validation";
 
 export type AuthState = { error?: string; message?: string };
+
+/** Where a new account goes first: it needs a username before anything else works. */
+const AFTER_SIGNUP = "/welcome?intro=1";
+
+const loginInput = z.object({ email: emailSchema, password: passwordSchema });
+const signupInput = z.object({ email: emailSchema, password: newPasswordSchema });
 
 /** Supabase's raw messages are terse and jargon-y; say something useful. */
 function friendlyError(message: string) {
@@ -29,64 +44,66 @@ function friendlyError(message: string) {
   if (m.includes("invalid") && m.includes("email")) {
     return "That doesn't look like a valid email address.";
   }
-  return message;
+  // Anything else is Supabase talking to developers, not to people.
+  console.error("[auth] unexpected Supabase error:", message);
+  return "Something went wrong on our side. Please try again in a minute.";
 }
 
 export async function login(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  const input = loginInput.safeParse({
+    email: field(formData, "email"),
+    password: field(formData, "password"),
+  });
+  if (!input.success) return { error: firstError(input.error) };
+
   const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword(input.data);
+  if (error) return { error: friendlyError(error.message) };
 
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    return { error: friendlyError(error.message) };
-  }
-
-  redirect("/");
+  // Back to wherever they were when they were asked to log in.
+  redirect(safeRedirectPath(field(formData, "next")) ?? "/");
 }
 
 export async function signup(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  const input = signupInput.safeParse({
+    email: field(formData, "email"),
+    password: field(formData, "password"),
+  });
+  if (!input.success) return { error: firstError(input.error) };
+
   const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    ...input.data,
+    // The confirmation email links back here, which finishes signing in and
+    // carries on to the welcome steps. Without it the link went to the bare
+    // site address, where nothing completed the sign-in.
+    options: { emailRedirectTo: authCallbackUrl(AFTER_SIGNUP) },
+  });
 
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-
-  const { data, error } = await supabase.auth.signUp({ email, password });
-
-  if (error) {
-    return { error: friendlyError(error.message) };
-  }
+  if (error) return { error: friendlyError(error.message) };
 
   // When email confirmation is switched off, Supabase signs the user straight
-  // in and returns a session. Otherwise they need to click the emailed link.
-  if (data.session) {
-    // Arrived through somebody's invite link: follow each other straight away.
-    const store = await cookies();
-    const invite = store.get(INVITE_COOKIE)?.value;
-    if (invite && data.user) {
-      await connectInvite(data.user.id, invite);
-      store.delete(INVITE_COOKIE);
-    }
-
-    redirect("/welcome?intro=1");
+  // in and returns a session. Otherwise they need to click the emailed link,
+  // and /auth/confirm does the rest.
+  if (data.session && data.user) {
+    await consumeInviteCookie(data.user.id);
+    redirect(AFTER_SIGNUP);
   }
 
   return {
-    message:
-      "Account created. Check your email for a confirmation link, then log in.",
+    message: "Account created. Check your email for a confirmation link.",
   };
 }
 
 export async function logout() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  // This device only: logging out on a phone shouldn't end the laptop's session.
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }

@@ -21,7 +21,6 @@ export function safeRedirectPath(value: unknown): string | null {
   if (typeof value !== "string") return null;
   if (value.length === 0 || value.length > 2048) return null;
   if (!value.startsWith("/") || value.startsWith("//")) return null;
-  // eslint-disable-next-line no-control-regex -- refusing control characters is the point
   if (/[\\\u0000-\u001f\u007f]/.test(value)) return null;
 
   let url: URL;
@@ -33,6 +32,22 @@ export function safeRedirectPath(value: unknown): string | null {
   if (url.origin !== BASE) return null;
 
   return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/**
+ * A path with the query parameters that are set, so a page's filters survive
+ * a trip through the login page. Empty and missing values are left out.
+ */
+export function withQuery(
+  path: string,
+  query: Record<string, string | undefined | null>,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value) params.set(key, value);
+  }
+  const search = params.toString();
+  return search ? `${path}?${search}` : path;
 }
 
 /**

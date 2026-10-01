@@ -57,6 +57,7 @@ export default function UpdatePasswordPage() {
             autoComplete="new-password"
             required
             minLength={6}
+            maxLength={72}
             className={fieldClass}
           />
         </Field>
@@ -68,6 +69,7 @@ export default function UpdatePasswordPage() {
             autoComplete="new-password"
             required
             minLength={6}
+            maxLength={72}
             className={fieldClass}
           />
         </Field>

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { field, firstError, newPasswordSchema } from "@/lib/validation";
 
 export type UpdatePasswordState = {
   error?: string;
@@ -22,20 +23,26 @@ export async function updatePassword(
     };
   }
 
-  const password = String(formData.get("password") ?? "");
-  const confirm = String(formData.get("confirm") ?? "");
-
-  if (password.length < 6) {
-    return { error: "Your password needs to be at least 6 characters." };
-  }
-  if (password !== confirm) {
+  const password = newPasswordSchema.safeParse(field(formData, "password"));
+  if (!password.success) return { error: firstError(password.error) };
+  if (password.data !== field(formData, "confirm")) {
     return { error: "Those two passwords don't match." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password });
+  const { error } = await supabase.auth.updateUser({ password: password.data });
 
-  if (error) return { error: error.message };
+  if (error) {
+    const m = error.message.toLowerCase();
+    if (m.includes("different from the old")) {
+      return { error: "Pick a password you haven't used here before." };
+    }
+    if (m.includes("weak") || m.includes("password should")) {
+      return { error: "That password is too easy to guess. Try a longer one." };
+    }
+    console.error("[auth] password update failed:", error.message);
+    return { error: "Couldn't save your new password. Please try again." };
+  }
 
   redirect("/");
 }

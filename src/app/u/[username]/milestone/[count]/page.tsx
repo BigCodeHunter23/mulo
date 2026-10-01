@@ -8,7 +8,8 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import Avatar from "@/components/Avatar";
 import ShareButton from "@/components/ShareButton";
 import StoryButton from "@/components/StoryButton";
-import { ButtonLink } from "@/components/ui";
+import LoginLink from "@/components/LoginLink";
+import { buttonClass } from "@/components/ui";
 
 type Params = Promise<{ username: string; count: string }>;
 
@@ -69,7 +70,11 @@ export default async function MilestonePage({ params }: { params: Params }) {
             src={`${milestonePath(card.profile.username, card.count)}/story`}
             filename={`mulo-${card.count}-albums`}
           />
-          {!user && <ButtonLink href="/login?mode=signup" variant="secondary">Join MULO</ButtonLink>}
+          {!user && (
+            <LoginLink mode="signup" className={buttonClass({ variant: "secondary" })}>
+              Join MULO
+            </LoginLink>
+          )}
         </div>
       </div>
 
