@@ -1,27 +1,62 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { LIST_LIMIT } from "@/lib/lists";
+import { mbidSchema, rowIdSchema } from "@/lib/validation";
 
 /**
- * Everything that changes a list. Row-level security already stops anyone
- * touching a list that isn't theirs; the checks here are for plain answers
- * rather than silent failures.
+ * Everything that changes a list. Each change checks first that the list is
+ * the caller's own, so the answer is a plain "not yours" rather than a quiet
+ * success that row-level security then refuses underneath.
  */
 
 export type ListResult = { ok: true; id?: number } | { ok: false; error: string };
 
-const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRY_AGAIN: ListResult = { ok: false, error: "Couldn't save that. Please try again." };
 
-function clean(text: unknown, max: number) {
-  return String(text ?? "").trim().slice(0, max);
+/** The database holds the same limits (migration 0015). */
+const TITLE_MAX = 80;
+const DESCRIPTION_MAX = 500;
+const NOTE_MAX = 280;
+
+const text = z.string().optional();
+
+const listInput = z.object({
+  title: z.string(),
+  description: text,
+  ranked: z.boolean().optional(),
+  releaseMbid: mbidSchema.optional(),
+});
+
+const itemInput = z.object({ id: rowIdSchema, releaseMbid: mbidSchema });
+
+function clean(value: string | undefined, max: number) {
+  return (value ?? "").trim().slice(0, max);
 }
 
 function refresh(id: number) {
   revalidatePath(`/lists/${id}`);
   revalidatePath("/lists");
+}
+
+/**
+ * Null when the signed-in person owns the list; otherwise the answer to give
+ * back instead of changing anything.
+ */
+async function refuseUnlessOwner(id: number): Promise<ListResult | null> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Log in to change your lists." };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("lists")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data ? null : { ok: false, error: "That list isn't yours to change." };
 }
 
 /** Marks a list as just changed, so it rises to the top of the recent lists. */
@@ -61,17 +96,20 @@ export async function createList(input: {
   /** An album to start it with, when made from an album page. */
   releaseMbid?: string;
 }): Promise<ListResult> {
+  const parsed = listInput.safeParse(input);
+  if (!parsed.success) return TRY_AGAIN;
+
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to make a list." };
 
-  const title = clean(input.title, 80);
+  const title = clean(parsed.data.title, TITLE_MAX);
   if (!title) return { ok: false, error: "Give your list a name." };
-  const description = clean(input.description, 500) || null;
+  const description = clean(parsed.data.description, DESCRIPTION_MAX) || null;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("lists")
-    .insert({ user_id: user.id, title, description, ranked: Boolean(input.ranked) })
+    .insert({ user_id: user.id, title, description, ranked: Boolean(parsed.data.ranked) })
     .select("id")
     .single();
   if (error || !data) {
@@ -81,8 +119,10 @@ export async function createList(input: {
   }
 
   const id = Number(data.id);
-  if (input.releaseMbid && MBID.test(input.releaseMbid)) {
-    await supabase.from("list_items").insert({ list_id: id, release_mbid: input.releaseMbid, position: 1 });
+  if (parsed.data.releaseMbid) {
+    await supabase
+      .from("list_items")
+      .insert({ list_id: id, release_mbid: parsed.data.releaseMbid, position: 1 });
   }
   refresh(id);
   return { ok: true, id };
@@ -92,17 +132,21 @@ export async function updateList(
   id: number,
   input: { title: string; description?: string; ranked: boolean },
 ): Promise<ListResult> {
-  if (!Number.isSafeInteger(id)) return TRY_AGAIN;
-  const title = clean(input.title, 80);
+  const parsed = listInput.safeParse(input);
+  if (!rowIdSchema.safeParse(id).success || !parsed.success) return TRY_AGAIN;
+  const title = clean(parsed.data.title, TITLE_MAX);
   if (!title) return { ok: false, error: "Give your list a name." };
+
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("lists")
     .update({
       title,
-      description: clean(input.description, 500) || null,
-      ranked: Boolean(input.ranked),
+      description: clean(parsed.data.description, DESCRIPTION_MAX) || null,
+      ranked: Boolean(parsed.data.ranked),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -113,7 +157,10 @@ export async function updateList(
 }
 
 export async function deleteList(id: number): Promise<ListResult> {
-  if (!Number.isSafeInteger(id)) return TRY_AGAIN;
+  if (!rowIdSchema.safeParse(id).success) return TRY_AGAIN;
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
+
   const supabase = await createClient();
   const { error } = await supabase.from("lists").delete().eq("id", id);
   if (error) return TRY_AGAIN;
@@ -122,7 +169,10 @@ export async function deleteList(id: number): Promise<ListResult> {
 }
 
 export async function addToList(id: number, releaseMbid: string): Promise<ListResult> {
-  if (!Number.isSafeInteger(id) || !MBID.test(releaseMbid)) return TRY_AGAIN;
+  if (!itemInput.safeParse({ id, releaseMbid }).success) return TRY_AGAIN;
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
+
   const current = await items(id);
   if (current.some((item) => item.release_mbid === releaseMbid)) return { ok: true };
   if (current.length >= LIST_LIMIT) {
@@ -140,7 +190,10 @@ export async function addToList(id: number, releaseMbid: string): Promise<ListRe
 }
 
 export async function removeFromList(id: number, releaseMbid: string): Promise<ListResult> {
-  if (!Number.isSafeInteger(id) || !MBID.test(releaseMbid)) return TRY_AGAIN;
+  if (!itemInput.safeParse({ id, releaseMbid }).success) return TRY_AGAIN;
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("list_items")
@@ -156,7 +209,15 @@ export async function removeFromList(id: number, releaseMbid: string): Promise<L
 
 /** Moves an album to a new spot (1 is the top), shuffling the rest along. */
 export async function moveInList(id: number, releaseMbid: string, to: number): Promise<ListResult> {
-  if (!Number.isSafeInteger(id) || !MBID.test(releaseMbid) || !Number.isInteger(to)) return TRY_AGAIN;
+  if (
+    !itemInput.safeParse({ id, releaseMbid }).success ||
+    !z.number().int().safeParse(to).success
+  ) {
+    return TRY_AGAIN;
+  }
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
+
   const order = (await items(id)).map((item) => item.release_mbid);
   const from = order.indexOf(releaseMbid);
   if (from < 0) return TRY_AGAIN;
@@ -172,11 +233,16 @@ export async function moveInList(id: number, releaseMbid: string, to: number): P
 }
 
 export async function setListNote(id: number, releaseMbid: string, note: string): Promise<ListResult> {
-  if (!Number.isSafeInteger(id) || !MBID.test(releaseMbid)) return TRY_AGAIN;
+  if (!itemInput.safeParse({ id, releaseMbid }).success || typeof note !== "string") {
+    return TRY_AGAIN;
+  }
+  const refused = await refuseUnlessOwner(id);
+  if (refused) return refused;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("list_items")
-    .update({ note: clean(note, 280) || null })
+    .update({ note: clean(note, NOTE_MAX) || null })
     .eq("list_id", id)
     .eq("release_mbid", releaseMbid)
     .select("list_id");

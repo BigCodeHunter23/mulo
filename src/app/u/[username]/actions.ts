@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { userIdSchema, usernameSchema } from "@/lib/validation";
 
 export type FollowResult =
   | { ok: true }
@@ -13,6 +14,10 @@ export async function setFollowing(
   username: string,
   follow: boolean,
 ): Promise<FollowResult> {
+  if (!userIdSchema.safeParse(targetId).success || typeof follow !== "boolean") {
+    return { ok: false, error: "Couldn't update that. Please try again." };
+  }
+
   const user = await getCurrentUser();
   if (!user) {
     return { ok: false, error: "Log in to follow people.", needsLogin: true };
@@ -38,7 +43,8 @@ export async function setFollowing(
     return { ok: false, error: "Couldn't update that. Please try again." };
   }
 
-  revalidatePath(`/u/${username}`);
+  // The username only says which page to refresh; never trust it for more.
+  if (usernameSchema.safeParse(username).success) revalidatePath(`/u/${username}`);
   revalidatePath("/people");
   revalidatePath("/");
   return { ok: true };

@@ -5,10 +5,18 @@ import { getCachedRelease } from "@/lib/catalog";
 import { eraForYear, findScene } from "@/lib/raised-on-shared";
 import { isRecordAvatar, recordAvatarPath } from "@/lib/record-avatar";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+import { z } from "zod";
+import { mbidSchema } from "@/lib/validation";
 
 export type RaisedOnResult = { ok: true } | { ok: false; error: string };
+
+const raisedOnInput = z.object({
+  mbid: mbidSchema,
+  // Checked against the real list by findScene; this only bounds the size.
+  era: z.string().max(40).nullable(),
+  scene: z.string().max(40).nullable(),
+  useAsPicture: z.boolean(),
+});
 
 /**
  * Saves the record somebody was raised on. It becomes their picture when they
@@ -22,7 +30,7 @@ export async function saveRaisedOn(input: {
 }): Promise<RaisedOnResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
-  if (typeof input?.mbid !== "string" || !UUID.test(input.mbid)) {
+  if (!raisedOnInput.safeParse(input).success) {
     return { ok: false, error: "Couldn't save that. Please try again." };
   }
 

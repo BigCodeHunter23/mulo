@@ -1,12 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import type { PickKind } from "@/lib/top-picks";
+import { mbidSchema } from "@/lib/validation";
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
-const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const input = z.object({
+  kind: z.enum(["artist", "album"]),
+  // The builder sends ten at most; anything past a handful more is not a GOAT.
+  mbids: z.array(z.string()).max(50),
+});
 
 const TABLES = {
   artist: { table: "top_artists", column: "artist_mbid" },
@@ -26,12 +32,12 @@ export async function saveTopPicks(
   kind: PickKind,
   mbids: string[],
 ): Promise<SaveResult> {
-  if (!Object.hasOwn(TABLES, kind) || !Array.isArray(mbids)) return TRY_AGAIN;
+  if (!input.safeParse({ kind, mbids }).success) return TRY_AGAIN;
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to save your list." };
 
-  const picks = [...new Set(mbids.filter((mbid) => MBID.test(mbid)))].slice(0, 10);
+  const picks = [...new Set(mbids.filter((mbid) => mbidSchema.safeParse(mbid).success))].slice(0, 10);
   const { table, column } = TABLES[kind];
   const supabase = await createClient();
 

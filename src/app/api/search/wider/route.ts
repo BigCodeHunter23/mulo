@@ -8,7 +8,8 @@ import { widerResults } from "@/lib/wider-search";
  * box shows MULO's results first.
  */
 export async function GET(request: NextRequest) {
-  const query = (request.nextUrl.searchParams.get("q") ?? "").trim();
+  // Long enough for any real artist or album name; no reason to send more on.
+  const query = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 100);
   if (query.length < 2) return NextResponse.json({ artists: [], albums: [], failed: false });
 
   const [artists, albums] = await Promise.allSettled([

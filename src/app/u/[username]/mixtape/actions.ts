@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getMixtape, MONTH_PATTERN, type RankOffKind } from "@/lib/mixtape";
+import { getMixtape, type RankOffKind } from "@/lib/mixtape";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { mbidSchema, monthSchema } from "@/lib/validation";
 
 export type RankOffResult = { ok: true } | { ok: false; error: string };
 
@@ -14,7 +15,11 @@ export async function saveRankOff(
 ): Promise<RankOffResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
-  if (!MONTH_PATTERN.test(month) || (kind !== "album" && kind !== "song")) {
+  if (
+    !monthSchema.safeParse(month).success ||
+    (kind !== "album" && kind !== "song") ||
+    !mbidSchema.safeParse(mbid).success
+  ) {
     return { ok: false, error: "Couldn't save that. Please try again." };
   }
 

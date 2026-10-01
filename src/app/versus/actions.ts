@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, getTally } from "@/lib/versus";
 import { TAKE_LIMIT, type VersusSideKey, type VersusTally } from "@/lib/versus-shared";
+import { mbidSchema, rowIdSchema } from "@/lib/validation";
+
+const isRowId = (value: unknown) => rowIdSchema.safeParse(value).success;
+const isMbid = (value: unknown): value is string => mbidSchema.safeParse(value).success;
 
 export type PickResult =
   | { ok: true; mine: VersusSideKey; tally: VersusTally }
@@ -16,7 +20,7 @@ export async function castVote(
   matchupId: number,
   pick: VersusSideKey,
 ): Promise<PickResult> {
-  if (!Number.isSafeInteger(matchupId) || (pick !== "left" && pick !== "right")) {
+  if (!isRowId(matchupId) || (pick !== "left" && pick !== "right")) {
     return { ok: false, error: TRY_AGAIN };
   }
 
@@ -60,7 +64,7 @@ export type TakeResult = { ok: true } | { ok: false; error: string };
 /** Your case for the side you picked: one take each, and only once you've picked. */
 export async function postTake(matchupId: number, body: string): Promise<TakeResult> {
   const text = typeof body === "string" ? body.trim() : "";
-  if (!Number.isSafeInteger(matchupId)) return { ok: false, error: TRY_AGAIN };
+  if (!isRowId(matchupId)) return { ok: false, error: TRY_AGAIN };
   if (text.length === 0) return { ok: false, error: "Say something first." };
   if (text.length > TAKE_LIMIT) {
     return { ok: false, error: `Keep it to ${TAKE_LIMIT} characters.` };
@@ -90,7 +94,7 @@ export async function postTake(matchupId: number, body: string): Promise<TakeRes
 }
 
 export async function deleteTake(takeId: number): Promise<TakeResult> {
-  if (!Number.isSafeInteger(takeId)) return { ok: false, error: TRY_AGAIN };
+  if (!isRowId(takeId)) return { ok: false, error: TRY_AGAIN };
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
@@ -110,15 +114,13 @@ export async function deleteTake(takeId: number): Promise<TakeResult> {
 
 export type NominationResult = { ok: true } | { ok: false; error: string };
 
-const ARTIST_MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * Puts a matchup forward. The pair is stored with the lower id on the left,
  * so either order finds the same nomination; one that already exists just
  * gets backed.
  */
 export async function nominateMatchup(a: string, b: string): Promise<NominationResult> {
-  if (!ARTIST_MBID.test(a) || !ARTIST_MBID.test(b)) return { ok: false, error: TRY_AGAIN };
+  if (!isMbid(a) || !isMbid(b)) return { ok: false, error: TRY_AGAIN };
   const [left, right] = [a.toLowerCase(), b.toLowerCase()].sort();
   if (left === right) return { ok: false, error: "Pick two different artists." };
 
@@ -169,7 +171,7 @@ export async function nominateMatchup(a: string, b: string): Promise<NominationR
 
 /** Backs a nomination, or takes the backing back. */
 export async function backNomination(id: number, back: boolean): Promise<NominationResult> {
-  if (!Number.isSafeInteger(id)) return { ok: false, error: TRY_AGAIN };
+  if (!isRowId(id) || typeof back !== "boolean") return { ok: false, error: TRY_AGAIN };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to back a matchup." };
 

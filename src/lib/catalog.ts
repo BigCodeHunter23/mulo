@@ -15,6 +15,7 @@ import {
   MbNotFoundError,
 } from "@/lib/musicbrainz";
 import { getArtistExtras } from "@/lib/wikidata";
+import { mbidSchema } from "@/lib/validation";
 
 export type Artist = {
   mbid: string;
@@ -106,7 +107,15 @@ function copyCoverLater(release: Pick<Release, "mbid" | "cover_art_url">) {
   }
 }
 
+/**
+ * Ids arrive from the address bar, so anything that isn't shaped like a
+ * MusicBrainz id is "not found" before it costs a query or a request to
+ * MusicBrainz.
+ */
+const isMbid = (value: unknown) => mbidSchema.safeParse(value).success;
+
 export async function getCachedArtist(mbid: string): Promise<Artist | null> {
+  if (!isMbid(mbid)) return null;
   const supabase = await createClient();
 
   const { data: cached } = await supabase
@@ -159,6 +168,7 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
 export async function getCachedArtistAlbums(
   artistMbid: string,
 ): Promise<Release[]> {
+  if (!isMbid(artistMbid)) return [];
   const supabase = await createClient();
 
   const [{ data: artist }, { data: cached }] = await Promise.all([
@@ -226,6 +236,7 @@ export async function getCachedArtistAlbums(
 }
 
 export async function getCachedRelease(mbid: string): Promise<Release | null> {
+  if (!isMbid(mbid)) return null;
   const supabase = await createClient();
 
   const { data: cached } = await supabase
@@ -303,6 +314,7 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
 }
 
 export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
+  if (!isMbid(releaseMbid)) return [];
   const supabase = await createClient();
 
   const [{ data: release }, { data: cached }] = await Promise.all([

@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
+import { mbidSchema } from "@/lib/validation";
 import { getBadges } from "@/lib/badges";
 import { getCrowd } from "@/lib/ratings";
 import { isMilestone, milestonePath } from "@/lib/milestones";
@@ -38,7 +40,11 @@ export type RatingResult =
 
 type DbError = { code?: string; message: string; details?: string | null };
 
-const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const kindSchema = z.enum(["album", "artist", "song"]);
+const reviewKindSchema = z.enum(["album", "artist"]);
+const scoreSchema = z.number().int().min(1).max(10);
+/** Reviews are cut to this length, as the review box already limits them. */
+const REVIEW_MAX = 1000;
 
 const PLURAL: Record<RatingKind, string> = {
   album: "albums",
@@ -71,9 +77,9 @@ function failure(error: DbError): RatingResult {
  * These arrive straight from the browser, so check them: a known kind, real
  * MusicBrainz ids, and for a song, the album it was rated on.
  */
-function valid(kind: RatingKind, mbid: string, releaseMbid?: string) {
-  if (!Object.hasOwn(RATING_TABLES, kind) || !MBID.test(mbid)) return false;
-  return kind !== "song" || MBID.test(releaseMbid ?? "");
+function valid(kind: unknown, mbid: unknown, releaseMbid?: unknown): kind is RatingKind {
+  if (!kindSchema.safeParse(kind).success || !mbidSchema.safeParse(mbid).success) return false;
+  return kind !== "song" || mbidSchema.safeParse(releaseMbid).success;
 }
 
 /** Refresh the page the rating was made on, and "My ratings". */
@@ -102,7 +108,7 @@ export async function rate(
     return { ok: false, error: `Log in to rate ${PLURAL[kind]}.`, needsLogin: true };
   }
 
-  if (!Number.isInteger(score) || score < 1 || score > 10) {
+  if (!scoreSchema.safeParse(score).success) {
     return { ok: false, error: "Scores run from 1 to 10." };
   }
 
@@ -186,7 +192,11 @@ export async function saveReview(
   mbid: string,
   review: string,
 ): Promise<RatingResult> {
-  if ((kind !== "album" && kind !== "artist") || !valid(kind, mbid)) {
+  if (
+    !reviewKindSchema.safeParse(kind).success ||
+    !valid(kind, mbid) ||
+    typeof review !== "string"
+  ) {
     return TRY_AGAIN;
   }
 
@@ -195,7 +205,7 @@ export async function saveReview(
     return { ok: false, error: "Log in to write a review.", needsLogin: true };
   }
 
-  const text = String(review).trim().slice(0, 1000);
+  const text = review.trim().slice(0, REVIEW_MAX);
   const { table, column } = RATING_TABLES[kind];
 
   const supabase = await createClient();

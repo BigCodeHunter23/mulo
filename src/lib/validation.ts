@@ -64,8 +64,8 @@ export const passwordSchema = z
   .max(PASSWORD_MAX, "That email and password combination doesn't match an account.");
 
 /** Free text from a form, trimmed, with an upper limit the database also holds. */
-export function textSchema(max: number) {
-  return z.string().trim().max(max);
+export function textSchema(max: number, message = `Keep it to ${max} characters.`) {
+  return z.string().trim().max(max, message);
 }
 
 /** A form field as a string: missing or a file both read as empty. */

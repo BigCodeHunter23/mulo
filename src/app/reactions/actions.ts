@@ -1,9 +1,17 @@
 "use server";
 
+import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { REACTION_COLUMNS, type ReactionKind } from "@/lib/reactions";
+import { rowIdSchema } from "@/lib/validation";
 
 export type ReactionResult = { ok: true } | { ok: false; error: string };
+
+const input = z.object({
+  kind: z.enum(["album", "artist", "take", "pick"]),
+  ratingId: rowIdSchema,
+  value: z.union([z.literal(1), z.literal(-1), z.literal(0)]),
+});
 
 const TRY_AGAIN: ReactionResult = {
   ok: false,
@@ -21,9 +29,7 @@ export async function setReaction(
   ratingId: number,
   value: 1 | -1 | 0,
 ): Promise<ReactionResult> {
-  if (!Object.hasOwn(REACTION_COLUMNS, kind)) return TRY_AGAIN;
-  if (!Number.isInteger(ratingId) || ratingId < 1) return TRY_AGAIN;
-  if (value !== 1 && value !== -1 && value !== 0) return TRY_AGAIN;
+  if (!input.safeParse({ kind, ratingId, value }).success) return TRY_AGAIN;
 
   const user = await getCurrentUser();
   if (!user) {
