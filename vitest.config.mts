@@ -14,5 +14,8 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     restoreMocks: true,
+    // The first test to import a server action loads its whole module graph,
+    // which can take several seconds on a slow or synced disk.
+    testTimeout: 20_000,
   },
 });

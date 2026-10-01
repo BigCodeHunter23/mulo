@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, type RatingKind } from "@/lib/rating-kinds";
 import { mbidSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { getBadges } from "@/lib/badges";
 import { getCrowd } from "@/lib/ratings";
 import { isMilestone, milestonePath } from "@/lib/milestones";
@@ -102,15 +103,15 @@ export async function rate(
   releaseMbid?: string,
 ): Promise<RatingResult> {
   if (!valid(kind, mbid, releaseMbid)) return TRY_AGAIN;
+  if (!scoreSchema.safeParse(score).success) {
+    return { ok: false, error: "Scores run from 1 to 10." };
+  }
 
   const user = await getCurrentUser();
   if (!user) {
     return { ok: false, error: `Log in to rate ${PLURAL[kind]}.`, needsLogin: true };
   }
-
-  if (!scoreSchema.safeParse(score).success) {
-    return { ok: false, error: "Scores run from 1 to 10." };
-  }
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const { table, column } = RATING_TABLES[kind];
   const supabase = await createClient();
@@ -204,6 +205,7 @@ export async function saveReview(
   if (!user) {
     return { ok: false, error: "Log in to write a review.", needsLogin: true };
   }
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const text = review.trim().slice(0, REVIEW_MAX);
   const { table, column } = RATING_TABLES[kind];
@@ -234,6 +236,7 @@ export async function removeRating(
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first.", needsLogin: true };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const { table, column } = RATING_TABLES[kind];
   const supabase = await createClient();

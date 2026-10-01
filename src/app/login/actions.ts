@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { authCallbackUrl } from "@/lib/auth";
 import { consumeInviteCookie } from "@/lib/invites";
 import { safeRedirectPath } from "@/lib/redirects";
+import { allowAddress } from "@/lib/rate-limit";
 import {
   emailSchema,
   field,
@@ -18,6 +19,8 @@ export type AuthState = { error?: string; message?: string };
 
 /** Where a new account goes first: it needs a username before anything else works. */
 const AFTER_SIGNUP = "/welcome?intro=1";
+
+const TOO_MANY_ATTEMPTS = "Too many attempts just now. Please wait a few minutes and try again.";
 
 const loginInput = z.object({ email: emailSchema, password: passwordSchema });
 const signupInput = z.object({ email: emailSchema, password: newPasswordSchema });
@@ -58,6 +61,7 @@ export async function login(
     password: field(formData, "password"),
   });
   if (!input.success) return { error: firstError(input.error) };
+  if (!(await allowAddress("login"))) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(input.data);
@@ -76,6 +80,7 @@ export async function signup(
     password: field(formData, "password"),
   });
   if (!input.success) return { error: firstError(input.error) };
+  if (!(await allowAddress("signup"))) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({

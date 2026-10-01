@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import type { PickKind } from "@/lib/top-picks";
 import { mbidSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
@@ -36,6 +37,7 @@ export async function saveTopPicks(
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to save your list." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const picks = [...new Set(mbids.filter((mbid) => mbidSchema.safeParse(mbid).success))].slice(0, 10);
   const { table, column } = TABLES[kind];

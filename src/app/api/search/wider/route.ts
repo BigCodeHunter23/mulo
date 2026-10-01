@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { searchArtists, searchReleaseGroups } from "@/lib/musicbrainz";
 import { widerResults } from "@/lib/wider-search";
+import { allowAddress } from "@/lib/rate-limit";
 
 /**
  * The whole of MusicBrainz, for the search box as you type. Slower than
@@ -11,6 +12,15 @@ export async function GET(request: NextRequest) {
   // Long enough for any real artist or album name; no reason to send more on.
   const query = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 100);
   if (query.length < 2) return NextResponse.json({ artists: [], albums: [], failed: false });
+
+  // Every one of these is a request to MusicBrainz, which bans addresses that
+  // ask too often. Refused looks like a busy moment: the box says so and moves on.
+  if (!(await allowAddress("widerSearch"))) {
+    return NextResponse.json(
+      { artists: [], albums: [], failed: true },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": "60" } },
+    );
+  }
 
   const [artists, albums] = await Promise.allSettled([
     searchArtists(query),

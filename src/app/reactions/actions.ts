@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { REACTION_COLUMNS, type ReactionKind } from "@/lib/reactions";
 import { rowIdSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type ReactionResult = { ok: true } | { ok: false; error: string };
 
@@ -35,6 +36,7 @@ export async function setReaction(
   if (!user) {
     return { ok: false, error: "Log in to react." };
   }
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const column = REACTION_COLUMNS[kind];
   const supabase = await createClient();

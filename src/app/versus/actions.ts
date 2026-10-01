@@ -5,6 +5,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, getTally } from "@/lib/versus";
 import { TAKE_LIMIT, type VersusSideKey, type VersusTally } from "@/lib/versus-shared";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 const isRowId = (value: unknown) => rowIdSchema.safeParse(value).success;
 const isMbid = (value: unknown): value is string => mbidSchema.safeParse(value).success;
@@ -26,6 +27,7 @@ export async function castVote(
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to pick." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -72,6 +74,7 @@ export async function postTake(matchupId: number, body: string): Promise<TakeRes
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to post a take." };
+  if (!(await allowUser("post", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -98,6 +101,7 @@ export async function deleteTake(takeId: number): Promise<TakeResult> {
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -126,6 +130,7 @@ export async function nominateMatchup(a: string, b: string): Promise<NominationR
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to nominate." };
+  if (!(await allowUser("post", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   let { data: existing } = await supabase
@@ -174,6 +179,7 @@ export async function backNomination(id: number, back: boolean): Promise<Nominat
   if (!isRowId(id) || typeof back !== "boolean") return { ok: false, error: TRY_AGAIN };
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to back a matchup." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   const { error } = back

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { authCallbackUrl } from "@/lib/auth";
+import { allowAddress } from "@/lib/rate-limit";
 import { emailSchema, field, firstError } from "@/lib/validation";
 
 export type ResetState = { error?: string; message?: string };
@@ -12,6 +13,9 @@ export async function requestReset(
 ): Promise<ResetState> {
   const email = emailSchema.safeParse(field(formData, "email"));
   if (!email.success) return { error: firstError(email.error) };
+  if (!(await allowAddress("reset"))) {
+    return { error: "Too many reset emails just now. Please wait a few minutes." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.data, {

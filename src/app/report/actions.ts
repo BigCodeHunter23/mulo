@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { REPORT_REASONS } from "@/lib/report-reasons";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { field, firstError, rowIdText, textSchema, userIdSchema } from "@/lib/validation";
 
 export type ReportState = { error?: string; message?: string };
@@ -46,6 +47,7 @@ export async function submitReport(
     list_id: field(formData, "list_id"),
   });
   if (!input.success) return { error: firstError(input.error) };
+  if (!(await allowUser("report", user.id))) return { error: TOO_MANY };
   const report = input.data;
 
   const supabase = await createClient();

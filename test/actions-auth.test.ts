@@ -11,6 +11,8 @@ const session = vi.hoisted(() => ({
   user: null as { id: string; email: string | null } | null,
   /** What the database answers: nothing, unless a test says otherwise. */
   db: { touched: 0 },
+  /** Whether the rate limiter says no. */
+  limited: false,
 }));
 
 /**
@@ -36,7 +38,10 @@ function emptyClient() {
     );
   return {
     from: query,
-    rpc: query,
+    rpc: (name: string) =>
+      name === "rate_limit_hit"
+        ? Promise.resolve({ data: !session.limited, error: null })
+        : query(),
     storage: { from: query },
     auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) },
   };
@@ -74,6 +79,46 @@ function form(fields: Record<string, string>) {
 beforeEach(() => {
   session.user = null;
   session.db.touched = 0;
+  session.limited = false;
+});
+
+describe("over the rate limit", () => {
+  beforeEach(() => {
+    session.user = { id: OTHER, email: "someone@example.com" };
+    session.limited = true;
+  });
+
+  const TOO_MANY = /doing that a lot/;
+
+  it.each([
+    ["rate", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 8)],
+    ["setReaction", async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 1)],
+    ["setFollowing", async () => (await import("@/app/u/[username]/actions")).setFollowing(MBID, "alex", true)],
+    ["createList", async () => (await import("@/app/lists/actions")).createList({ title: "Mine" })],
+    ["addToList", async () => (await import("@/app/lists/actions")).addToList(1, MBID)],
+    ["postTake", async () => (await import("@/app/versus/actions")).postTake(1, "Obviously")],
+    ["nominateMatchup", async () => (await import("@/app/versus/actions")).nominateMatchup(MBID, OTHER)],
+  ])("%s says so and does nothing", async (_name, call) => {
+    const result = (await call()) as { ok: boolean; error?: string };
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(TOO_MANY);
+  });
+
+  it("a report says so", async () => {
+    const { submitReport } = await import("@/app/report/actions");
+    const result = await submitReport({}, form({ reason: "Spam or advertising", rating_id: "1" }));
+    expect(result.error).toMatch(TOO_MANY);
+  });
+
+  it("logging in, signing up and resetting a password say so before asking Supabase", async () => {
+    session.user = null;
+    const { login, signup } = await import("@/app/login/actions");
+    const { requestReset } = await import("@/app/auth/reset/actions");
+    const details = form({ email: "someone@example.com", password: "longenough" });
+    expect((await login({}, details)).error).toMatch(/Too many attempts/);
+    expect((await signup({}, details)).error).toMatch(/Too many attempts/);
+    expect((await requestReset({}, details)).error).toMatch(/Too many reset emails/);
+  });
 });
 
 describe("signed out, every action refuses before touching the database", () => {

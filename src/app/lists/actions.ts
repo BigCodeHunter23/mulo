@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { LIST_LIMIT } from "@/lib/lists";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 /**
  * Everything that changes a list. Each change checks first that the list is
@@ -42,12 +43,14 @@ function refresh(id: number) {
 }
 
 /**
- * Null when the signed-in person owns the list; otherwise the answer to give
- * back instead of changing anything.
+ * Null when the signed-in person owns the list (and isn't changing lists
+ * faster than a person would); otherwise the answer to give back instead of
+ * changing anything.
  */
 async function refuseUnlessOwner(id: number): Promise<ListResult | null> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to change your lists." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -101,6 +104,7 @@ export async function createList(input: {
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to make a list." };
+  if (!(await allowUser("post", user.id))) return { ok: false, error: TOO_MANY };
 
   const title = clean(parsed.data.title, TITLE_MAX);
   if (!title) return { ok: false, error: "Give your list a name." };

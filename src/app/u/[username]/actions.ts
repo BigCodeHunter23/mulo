@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { userIdSchema, usernameSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type FollowResult =
   | { ok: true }
@@ -22,6 +23,7 @@ export async function setFollowing(
   if (!user) {
     return { ok: false, error: "Log in to follow people.", needsLogin: true };
   }
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
   if (targetId === user.id) {
     return { ok: false, error: "You can't follow yourself." };
   }

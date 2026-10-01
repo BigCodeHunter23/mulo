@@ -16,6 +16,9 @@ import {
 } from "@/lib/musicbrainz";
 import { getArtistExtras } from "@/lib/wikidata";
 import { mbidSchema } from "@/lib/validation";
+// New albums and artists cost a MusicBrainz request, which bans addresses that
+// ask too often; limit how many one visitor can set off.
+import { allowAddress, RateLimitedError } from "@/lib/rate-limit";
 
 export type Artist = {
   mbid: string;
@@ -127,6 +130,10 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   // image_url null means we have never looked for a photo; an empty string
   // means we looked and there wasn't one, so we don't ask again every visit.
   if (cached && cached.image_url !== null) return cached;
+  if (!(await allowAddress("catalog"))) {
+    if (cached) return cached;
+    throw new RateLimitedError("catalog");
+  }
 
   let mb;
   try {
@@ -188,6 +195,8 @@ export async function getCachedArtistAlbums(
   // not the same as having all of them. Only trust the list once the whole
   // discography has been fetched.
   if (artist?.albums_cached_at) return cached ?? [];
+  // Too many new lookups from this address: the albums known so far will do.
+  if (!(await allowAddress("catalog"))) return cached ?? [];
 
   let groups;
   try {
@@ -250,6 +259,10 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
   if (cached?.details_cached_at) {
     copyCoverLater(cached);
     return cached;
+  }
+  if (!(await allowAddress("catalog"))) {
+    if (cached) return cached;
+    throw new RateLimitedError("catalog");
   }
 
   let mb;
@@ -333,6 +346,7 @@ export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
   // Only a tracklist taken from the standard edition, with its songs, is
   // final. One saved before that gets replaced.
   if (release?.tracks_cached_at) return cached ?? [];
+  if (!(await allowAddress("catalog"))) return cached ?? [];
 
   let mbTracks;
   try {

@@ -1,10 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { searchCatalog } from "@/lib/search";
 import { friendsForResults, NO_FRIENDS } from "@/lib/ratings";
+import { allowAddress } from "@/lib/rate-limit";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 /** Catalogue search for the as-you-type search box. */
 export async function GET(request: NextRequest) {
+  // Some search boxes read the body without checking the status, so a refusal
+  // still has the usual shape: nothing found.
+  if (!(await allowAddress("search"))) {
+    return NextResponse.json(
+      { artists: [], albums: [], songs: [], friends: NO_FRIENDS },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": "60" } },
+    );
+  }
+
   const query = request.nextUrl.searchParams.get("q") ?? "";
   const results = await searchCatalog(query, 8);
 

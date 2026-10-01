@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getMixtape, type RankOffKind } from "@/lib/mixtape";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { mbidSchema, monthSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type RankOffResult = { ok: true } | { ok: false; error: string };
 
@@ -15,6 +16,7 @@ export async function saveRankOff(
 ): Promise<RankOffResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
   if (
     !monthSchema.safeParse(month).success ||
     (kind !== "album" && kind !== "song") ||

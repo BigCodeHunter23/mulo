@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { safeRedirectPath } from "@/lib/redirects";
 import { field, firstError, textSchema, usernameSchema } from "@/lib/validation";
 import { imageTypeOf } from "@/lib/image-type";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type ProfileState = { error?: string; message?: string };
 
@@ -72,6 +73,7 @@ export async function saveProfile(
     bio: field(formData, "bio"),
   });
   if (!input.success) return { error: firstError(input.error) };
+  if (!(await allowUser("write", user.id))) return { error: TOO_MANY };
   const { username, display_name, bio } = input.data;
 
   let avatarUrl: string | undefined;

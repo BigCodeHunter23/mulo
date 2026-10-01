@@ -7,6 +7,7 @@ import { isRecordAvatar, recordAvatarPath } from "@/lib/record-avatar";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { z } from "zod";
 import { mbidSchema } from "@/lib/validation";
+import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type RaisedOnResult = { ok: true } | { ok: false; error: string };
 
@@ -30,6 +31,7 @@ export async function saveRaisedOn(input: {
 }): Promise<RaisedOnResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in first." };
+  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
   if (!raisedOnInput.safeParse(input).success) {
     return { ok: false, error: "Couldn't save that. Please try again." };
   }
