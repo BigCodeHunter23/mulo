@@ -1,4 +1,6 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
+import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 import { createPublicClient } from "@/lib/supabase/public";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
@@ -70,16 +72,20 @@ export async function popularArtists(limit = 10): Promise<ArtistSummary[]> {
  * The best average scores from people's ratings on MULO, averaged by the
  * database (migration 0018) across every rating.
  */
-export async function topRatedOnMulo(
-  limit = 10,
-): Promise<(AlbumSummary & { average: number; count: number })[]> {
+type TopRated = AlbumSummary & { average: number; count: number };
+
+async function topRated(limit: number): Promise<TopRated[]> {
   const supabase = createPublicClient();
   const { data: totals, error } = await supabase
     .rpc("score_totals", { p_kind: "album" })
     .order("average", { ascending: false })
     .order("votes", { ascending: false })
     .limit(limit);
-  if (error) logQueryError("discover", error, "0018");
+  if (error) {
+    logQueryError("discover", error, "0018");
+    // Thrown rather than returned empty, so a failed read is never cached.
+    throw new Error(error.message);
+  }
 
   const ranked = (totals ?? []).flatMap((t) =>
     t.mbid && t.average !== null ? [{ mbid: t.mbid, average: t.average, count: t.votes ?? 0 }] : [],
@@ -100,6 +106,20 @@ export async function topRatedOnMulo(
     const album = albums.get(r.mbid);
     return album ? [{ ...album, average: r.average, count: r.count }] : [];
   });
+}
+
+/** The same for everybody, so kept and shared for a few minutes. */
+const cachedTopRated = unstable_cache(topRated, ["top-rated-on-mulo"], {
+  revalidate: SHARED_CACHE_SECONDS,
+});
+
+export async function topRatedOnMulo(limit = 10): Promise<TopRated[]> {
+  try {
+    return await cachedTopRated(limit);
+  } catch {
+    // Already logged; the shelf hides itself, as it does with no ratings.
+    return [];
+  }
 }
 
 /** Mulberry32: small, fast, and the same sequence for the same seed. */

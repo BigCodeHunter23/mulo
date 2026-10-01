@@ -1,5 +1,7 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/public";
+import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
@@ -128,7 +130,11 @@ function siteMean(tallies: Tally[]): number {
  * there can be more rated things than the API returns at once.
  */
 function logged<Row>(result: { data: Row[]; error: { message: string; code?: string } | null }): Row[] {
-  if (result.error) logQueryError("charts", result.error, "0018");
+  if (result.error) {
+    logQueryError("charts", result.error, "0018");
+    // Thrown rather than charted as empty, so a failed read is never cached.
+    throw new Error(result.error.message);
+  }
   return result.data;
 }
 
@@ -166,17 +172,32 @@ function inGenre(
  * (fetching raw ratings was cut off at a thousand rows); the weighting stays
  * here, in one readable place instead of buried in a database function.
  */
-export async function getChart(
-  kind: ChartKind,
-  options: { genre?: string | null; limit?: number } = {},
-): Promise<Chart> {
-  const genre = options.genre ?? null;
-  const limit = options.limit ?? 100;
+async function buildChart(kind: ChartKind, genre: string | null, limit: number): Promise<Chart> {
   const supabase = createPublicClient();
 
   if (kind === "albums") return albumChart(supabase, genre, limit);
   if (kind === "songs") return songChart(supabase, genre, limit);
   return artistChart(supabase, genre, limit);
+}
+
+/**
+ * A chart is the same for everybody and moves slowly, so each one is kept
+ * for a few minutes and shared across visitors rather than recounted on
+ * every view. A new rating shows up in it within that time.
+ */
+const cachedChart = unstable_cache(buildChart, ["chart"], { revalidate: SHARED_CACHE_SECONDS });
+
+export async function getChart(
+  kind: ChartKind,
+  options: { genre?: string | null; limit?: number } = {},
+): Promise<Chart> {
+  const genre = options.genre ?? null;
+  try {
+    return await cachedChart(kind, genre, options.limit ?? 100);
+  } catch {
+    // Already logged; the page shows an empty chart, as it did before.
+    return blank(kind, genre, NEUTRAL);
+  }
 }
 
 async function albumChart(

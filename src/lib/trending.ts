@@ -1,7 +1,9 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/public";
 import { coverSrc } from "@/lib/cover-url";
 import { logQueryError } from "@/lib/supabase/errors";
+import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 
 export type RotationAlbum = {
   mbid: string;
@@ -48,9 +50,7 @@ type ReleaseRow = {
  * is used when there is enough going on, the month when there isn't, and
  * nothing at all when even the month is too quiet to rank.
  */
-export async function getHeavyRotation(
-  limit = 10,
-): Promise<HeavyRotation | null> {
+async function rotation(limit: number): Promise<HeavyRotation | null> {
   const supabase = createPublicClient();
 
   for (const window of WINDOWS) {
@@ -64,7 +64,8 @@ export async function getHeavyRotation(
     });
     if (error) {
       logQueryError("trending", error, "0018");
-      return null;
+      // Thrown rather than returned empty, so a failed read is never cached.
+      throw new Error(error.message);
     }
 
     const ranked = (heat ?? []).flatMap((row) =>
@@ -110,4 +111,18 @@ export async function getHeavyRotation(
   }
 
   return null;
+}
+
+/** The same for everybody, so kept and shared for a few minutes. */
+const cachedRotation = unstable_cache(rotation, ["heavy-rotation"], {
+  revalidate: SHARED_CACHE_SECONDS,
+});
+
+export async function getHeavyRotation(limit = 10): Promise<HeavyRotation | null> {
+  try {
+    return await cachedRotation(limit);
+  } catch {
+    // Already logged; the section hides itself, as it does on a quiet week.
+    return null;
+  }
 }
