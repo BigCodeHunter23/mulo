@@ -1,9 +1,9 @@
 # Built, installed or generated: never edited by hand.
-.next/
-node_modules/
-coverage/
-test-results/
-playwright-report/
+/.next/
+/node_modules/
+/coverage/
+/test-results/
+/playwright-report/
 package-lock.json
 next-env.d.ts
 src/lib/supabase/database.types.ts
@@ -15,4 +15,4 @@ src/lib/drop-lineup.ts
 
 # Prose and SQL keep the line breaks they were written with.
 *.md
-supabase/
+/supabase/
