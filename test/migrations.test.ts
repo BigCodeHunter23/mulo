@@ -274,3 +274,19 @@ describe("0019 search indexes", () => {
     expect(rows.map((row) => row["QUERY PLAN"]).join("\n")).toContain("artists_name_trgm_idx");
   });
 });
+
+describe("running a migration twice", () => {
+  let db: PGlite;
+  beforeAll(async () => {
+    db = await localDatabase();
+  });
+  afterAll(() => db?.close());
+
+  // The owner pastes each file into the SQL editor by hand, and sometimes
+  // runs one again to be sure. From 0008 on, a second run must be harmless.
+  const rerunnable = migrationFiles().filter((name) => name >= "0008");
+
+  it.each(rerunnable)("%s", async (name) => {
+    await expect(db.exec(migrationSql(name))).resolves.toBeDefined();
+  });
+});
