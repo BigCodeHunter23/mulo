@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MULO
 
-## Getting Started
+A social rating site for music: rate albums, artists and songs out of 10,
+follow people, and see three scores wherever something is rated (yellow for
+everyone, red for you, blue for the people you follow).
 
-First, run the development server:
+Live at https://mulo-plum.vercel.app.
+
+- How the code fits together: [docs/architecture.md](docs/architecture.md)
+- Product notes and conventions for anyone (or any agent) changing it:
+  [CLAUDE.md](CLAUDE.md)
+- Copy and tone: [docs/voice.md](docs/voice.md)
+- Supabase dashboard steps and pending migrations:
+  [docs/supabase-setup.md](docs/supabase-setup.md)
+
+## Stack
+
+Next.js 16 (App Router) with React 19 and Tailwind v4, on Vercel in Sydney
+(`syd1`). Supabase (Postgres, auth, storage) in Sydney. The catalogue comes
+from MusicBrainz and is cached in Postgres; artist photos and bios from
+Wikidata and Wikipedia; popularity from ListenBrainz.
+
+## Running it locally
+
+You need Node 22 (see `.nvmrc`) and access to a Supabase project.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.example` explains each setting. The three Supabase ones are required;
+the site logs a plain message at startup for any that are missing.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Use a test project for local work, not the live one.** The service role
+key bypasses row-level security, so a local mistake with it lands on real
+data.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+| Command                | What it does                                                            |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `npm run dev`          | Development server with hot reload.                                     |
+| `npm run build`        | Production build.                                                       |
+| `npm run start`        | Serve the production build.                                             |
+| `npm run typecheck`    | Generate route types, then check TypeScript.                            |
+| `npm run lint`         | ESLint.                                                                 |
+| `npm run format`       | Rewrite files with Prettier.                                            |
+| `npm run format:check` | Report files Prettier would change.                                     |
+| `npm test`             | Unit tests (Vitest), including replaying every migration in PGlite.     |
+| `npm run test:e2e`     | Browser tests (Playwright) against a production build. Build first.     |
+| `npm run check`        | Typecheck, lint, format check and unit tests in one go.                 |
+| `npm run db:types`     | Regenerate `src/lib/supabase/database.types.ts` from the migrations.    |
 
-To learn more about Next.js, take a look at the following resources:
+Browser tests that sign in need a non-production Supabase project and the
+`E2E_*` settings in `.env.example`; without them they skip.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Checks on every push
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, the
+Prettier check, unit tests, a production build and the browser tests on
+every push and pull request. A red cross on a commit in GitHub means one of
+them failed; the run's page says which.
 
-## Deploy on Vercel
+## Deploying
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A push to `master` deploys to production on Vercel. Other branches get
+preview deployments.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Database changes are separate: each file in `supabase/migrations/` is run by
+hand in the Supabase SQL editor, in order. Every migration is written to be
+safe to run twice. If a code change depends on a migration, run the
+migration first; `docs/supabase-setup.md` lists the ones still pending.
+
+## Scripts
+
+One-off maintenance scripts in `scripts/` run against the database named in
+`.env.local`, for example:
+
+```bash
+node --env-file=.env.local scripts/seed-catalog.mjs --albums=1000
+```
+
+Each explains what it does and its options at the top of the file, including
+whether it's safe to stop and rerun.
