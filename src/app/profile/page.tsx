@@ -43,7 +43,7 @@ export default async function ProfileSettingsPage() {
         </Link>
       )}
 
-      {/* The header only has room for Log out on wide screens. */}
+      {/* Also in the account menu; kept here, where people look for it. */}
       <form action={logout} className="mt-12 border-t border-border pt-6">
         <button type="submit" className={buttonClass({ variant: "secondary" })}>
           Log out

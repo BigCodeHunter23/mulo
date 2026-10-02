@@ -1,54 +1,26 @@
 import Link from "next/link";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import { logout } from "@/app/login/actions";
-import Avatar from "@/components/Avatar";
+import AccountMenu from "@/components/AccountMenu";
 import LoginLink from "@/components/LoginLink";
 import MobileNav from "@/components/MobileNav";
 import NavLink from "@/components/NavLink";
 import NotificationBell from "@/components/NotificationBell";
+import SiteSearch from "@/components/SiteSearch";
 import { buttonClass } from "@/components/ui";
 
-function PeopleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-    >
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5" />
-      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.8.8 3 2.6 3.5 5.2" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-    >
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
+/**
+ * The bar across the top of every page, worked out on the server from the
+ * session cookie so it never flashes the wrong state.
+ *
+ * The links are the public places anyone can go. Everything that belongs to
+ * the signed-in person (their pages, People, settings, logging out) lives in
+ * the menu behind their avatar; signed out, that corner offers Log in and Join.
+ */
 export default async function Header() {
-  const supabase = await createClient();
   const user = await getCurrentUser();
 
   const { data: profile } = user
-    ? await supabase
+    ? await (await createClient())
         .from("profiles")
         .select("username, display_name, avatar_url")
         .eq("id", user.id)
@@ -62,81 +34,46 @@ export default async function Header() {
     <>
       <header className="sticky top-0 z-50 border-b border-border bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:gap-6 sm:px-6">
-          <Link href="/" className="flex items-baseline gap-1.5" aria-label="MULO home">
+          <Link href="/" className="flex shrink-0 items-baseline gap-1.5" aria-label="MULO home">
             <span className="display text-xl text-accent">MULO</span>
           </Link>
 
           {/* On phones these live in the tab bar at the bottom instead. */}
-          <nav className="hidden items-center gap-5 sm:flex">
+          <nav aria-label="Main" className="hidden shrink-0 items-center gap-5 sm:flex">
             <NavLink href="/">Home</NavLink>
             <NavLink href="/discover">Discover</NavLink>
             <NavLink href="/charts">Charts</NavLink>
-            <NavLink href="/lists" className="hidden lg:inline">
+            <NavLink href="/versus">Versus</NavLink>
+            <NavLink href="/lists" className="hidden md:inline">
               Lists
             </NavLink>
-            <NavLink href="/search">Search</NavLink>
-            {/* The directory of everyone is for people with an account. */}
-            {user && <NavLink href="/people">People</NavLink>}
-            <NavLink href="/versus">Versus</NavLink>
-            {/* The rest appear as the screen has room; Log out is also on Edit profile. */}
-            {user && (
-              <>
-                <NavLink href="/stack">The Stack</NavLink>
-                <NavLink href={profileHref} className="hidden md:inline">
-                  My profile
-                </NavLink>
-                <NavLink href="/goat" className="hidden md:inline">
-                  Your GOAT
-                </NavLink>
-                <NavLink href="/ratings" className="hidden lg:inline">
-                  My ratings
-                </NavLink>
-              </>
-            )}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2 sm:gap-3">
-            {/* The tab bar has room for five and search isn't one of them, so
-                on a phone this is the way to it from anywhere. */}
-            <Link
-              href="/search"
-              aria-label="Search"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-raised hover:text-text sm:hidden"
-            >
-              <SearchIcon />
-            </Link>
-            {user && (
-              <Link
-                href="/people"
-                aria-label="People"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-raised hover:text-text sm:hidden"
-              >
-                <PeopleIcon />
-              </Link>
-            )}
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+            <SiteSearch />
             {user ? (
               <>
-                <form action={logout} className="hidden lg:block">
-                  <button
-                    type="submit"
-                    className="text-sm text-text-secondary transition-colors hover:text-text"
-                  >
-                    Log out
-                  </button>
-                </form>
                 <NotificationBell />
-                <Link
-                  href={profileHref}
-                  className="hidden transition-opacity hover:opacity-80 sm:block"
-                  aria-label="Your profile"
-                >
-                  <Avatar url={profile?.avatar_url ?? null} name={name} size="sm" />
-                </Link>
+                <AccountMenu
+                  profile={{
+                    username: profile?.username ?? null,
+                    name,
+                    avatarUrl: profile?.avatar_url ?? null,
+                  }}
+                />
               </>
             ) : (
-              <span className="hidden sm:block">
-                <LoginLink className={buttonClass({ size: "sm" })}>Log in</LoginLink>
-              </span>
+              <>
+                {/* On phones, Log in is in the tab bar. */}
+                <span className="hidden sm:block">
+                  <LoginLink className={buttonClass({ variant: "ghost", size: "sm" })}>Log in</LoginLink>
+                </span>
+                <span className="shrink-0">
+                  <LoginLink mode="signup" className={buttonClass({ size: "sm" })}>
+                    Join
+                  </LoginLink>
+                </span>
+              </>
             )}
           </div>
         </div>

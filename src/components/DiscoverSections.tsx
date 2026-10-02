@@ -19,7 +19,7 @@ import ArtistCard from "@/components/ArtistCard";
 import FeedItem from "@/components/FeedItem";
 import ListCard from "@/components/ListCard";
 import HoldTip from "@/components/HoldTip";
-import DiscoverSearch from "@/components/DiscoverSearch";
+import { SearchPrompt } from "@/components/SiteSearch";
 import { getRecentLists } from "@/lib/lists";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
 import {
@@ -43,7 +43,7 @@ export default function DiscoverSections({ search = false }: { search?: boolean 
         {/* First thing on the page. Anybody who came to look one record up is
             here for this, and below the week's banners it read as a footnote
             to them rather than the way in. */}
-        {search && <DiscoverSearch />}
+        {search && <SearchPrompt />}
         <Suspense fallback={null}>
           <DropBanner />
         </Suspense>
