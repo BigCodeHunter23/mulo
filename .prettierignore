@@ -1,0 +1,18 @@
+# Built, installed or generated: never edited by hand.
+.next/
+node_modules/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+next-env.d.ts
+src/lib/supabase/database.types.ts
+
+# Hand-kept lineups, one entry per line so they read as a list.
+src/lib/eras.ts
+src/lib/versus-pairs.ts
+src/lib/drop-lineup.ts
+
+# Prose and SQL keep the line breaks they were written with.
+*.md
+supabase/
