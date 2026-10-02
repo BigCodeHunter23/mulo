@@ -19,7 +19,7 @@ export default function Badges({ badges, href }: { badges: Badge[]; href: string
         <li
           key={badge.slug}
           title={badge.description}
-          className="flex items-center gap-1.5 rounded-full border border-score-overall/30 bg-score-overall/10 px-3 py-1 text-xs font-medium text-[#f3d98a]"
+          className="flex items-center gap-1.5 rounded-full border border-score-overall/30 bg-score-overall/10 px-3 py-1 text-xs font-medium text-gold"
         >
           <BadgeIcon slug={badge.slug} className="h-3.5 w-3.5 text-score-overall" />
           {badge.name}

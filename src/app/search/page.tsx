@@ -111,7 +111,7 @@ async function MoreFromMusicBrainz({
 
   if (wider.artists.length === 0 && wider.albums.length === 0) {
     return failed ? (
-      <p className="rounded-lg border border-score-overall/30 bg-score-overall/10 px-3 py-2 text-sm text-[#f3d98a]">
+      <p className="rounded-lg border border-score-overall/30 bg-score-overall/10 px-3 py-2 text-sm text-gold">
         The wider music database is busy right now, so these are MULO&rsquo;s
         results only. Try again in a moment for more.
       </p>

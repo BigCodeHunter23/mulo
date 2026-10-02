@@ -103,7 +103,7 @@ export default function ListItems({
         </div>
       )}
 
-      {error && <p className="mb-4 text-sm text-score-you">{error}</p>}
+      {error && <p role="alert" className="mb-4 text-sm text-score-you">{error}</p>}
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-text-secondary">

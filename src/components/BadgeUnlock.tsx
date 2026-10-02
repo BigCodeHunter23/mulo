@@ -204,7 +204,7 @@ export default function BadgeUnlock({
                 {badge.milestone}
               </h2>
             </div>
-            <p className="badge-unlock-name display mt-4 text-3xl text-[#f3d98a]">albums rated</p>
+            <p className="badge-unlock-name display mt-4 text-3xl text-gold">albums rated</p>
             <p className="badge-unlock-copy mt-2 text-sm text-text-secondary">
               Your top-rated records are on a card, ready to share.
             </p>
@@ -256,7 +256,7 @@ export default function BadgeUnlock({
 
           <h2
             id="badge-unlock-name"
-            className="badge-unlock-name display mt-8 text-4xl text-[#f3d98a] sm:text-5xl"
+            className="badge-unlock-name display mt-8 text-4xl text-gold sm:text-5xl"
           >
             {badge.name}
           </h2>

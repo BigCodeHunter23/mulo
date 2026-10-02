@@ -252,12 +252,12 @@ export default function VersusCard({
               </span>
             )}
             {isMine && (
-              <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-[#0b0b0e]">
+              <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-ink">
                 Your pick
               </span>
             )}
             {closed && ahead === side && (
-              <span className="absolute right-2 top-2 rounded-full bg-score-overall px-2 py-0.5 text-[11px] font-bold text-[#0b0b0e]">
+              <span className="absolute right-2 top-2 rounded-full bg-score-overall px-2 py-0.5 text-[11px] font-bold text-ink">
                 Took it
               </span>
             )}
@@ -348,7 +348,7 @@ export default function VersusCard({
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
+        <p role="alert" className="mt-3 text-sm text-error-soft">
           {error}
         </p>
       )}

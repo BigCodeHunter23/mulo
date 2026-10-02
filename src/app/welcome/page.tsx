@@ -80,7 +80,7 @@ function Progress({ step }: { step: Step }) {
           <span
             className={`flex h-6 w-6 items-center justify-center rounded-full font-semibold ${
               i < current
-                ? "bg-accent text-[#0b0b0e]"
+                ? "bg-accent text-ink"
                 : i === current
                   ? "border border-accent text-accent"
                   : "border border-border text-text-muted"

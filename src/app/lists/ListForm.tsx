@@ -80,7 +80,7 @@ export default function ListForm({
         />
         Ranked: number the albums, so the order counts
       </label>
-      {error && <p className="text-sm text-score-you">{error}</p>}
+      {error && <p role="alert" className="text-sm text-score-you">{error}</p>}
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className={buttonClass()}>
           {pending ? "Saving…" : list ? "Save" : "Create list"}

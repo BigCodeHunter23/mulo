@@ -21,8 +21,11 @@
 
   --text: #f4f4f6;
   --text-secondary: #a8a8b3;
-  /* Light enough to read as body text on any surface (WCAG AA). */
-  --text-muted: #80808d;
+  /* Light enough to read as body text on any surface, hover included
+     (WCAG AA, at least 4.5:1 on --surface-hover). */
+  --text-muted: #8a8a96;
+  /* Dark text on bright fills: the accent, score chips, gold. */
+  --ink: #0b0b0e;
 
   --accent: #f2803f;
   --accent-hover: #ff9457;
@@ -33,6 +36,13 @@
   --score-you: #ff5147;
   --score-friends: #8ba4ff;
   --success: #35c46b;
+  /* Message text, softened to sit on a tinted panel. */
+  --error-soft: #ffb4ae;
+  --success-soft: #8ee7ae;
+  /* Badges and other things worth a little shine. */
+  --gold: #f3d98a;
+  /* The black of a record. */
+  --vinyl: #15151b;
 }
 
 @theme inline {
@@ -52,6 +62,11 @@
   --color-score-you: var(--score-you);
   --color-score-friends: var(--score-friends);
   --color-success: var(--success);
+  --color-ink: var(--ink);
+  --color-error-soft: var(--error-soft);
+  --color-success-soft: var(--success-soft);
+  --color-gold: var(--gold);
+  --color-vinyl: var(--vinyl);
   --font-sans: var(--font-inter);
 }
 
@@ -192,7 +207,7 @@ main {
 
 ::selection {
   background: var(--accent);
-  color: #0b0b0e;
+  color: var(--ink);
 }
 
 /* Keyboard focus stays visible without shouting on every mouse click. */

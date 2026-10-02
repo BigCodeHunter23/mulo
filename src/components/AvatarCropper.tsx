@@ -204,7 +204,7 @@ export default function AvatarCropper({
         style={{ maxWidth: STAGE }}
       />
 
-      {error && <p className="text-center text-sm text-score-you">{error}</p>}
+      {error && <p role="alert" className="text-center text-sm text-score-you">{error}</p>}
 
       <div className="flex gap-3">
         <button

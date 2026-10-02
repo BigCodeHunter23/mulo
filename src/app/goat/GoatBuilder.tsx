@@ -434,7 +434,7 @@ export default function GoatBuilder({
         </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-score-you">{error}</p>}
+      {error && <p role="alert" className="mb-4 text-sm text-score-you">{error}</p>}
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-surface/40 px-5 py-8 text-center text-sm text-text-secondary">
@@ -582,7 +582,7 @@ export default function GoatBuilder({
                       +
                     </span>
                     {item.score != null && (
-                      <span className="absolute right-0 top-0 rounded-md bg-score-you px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-[#0b0b0e]">
+                      <span className="absolute right-0 top-0 rounded-md bg-score-you px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-ink">
                         {item.score}
                       </span>
                     )}

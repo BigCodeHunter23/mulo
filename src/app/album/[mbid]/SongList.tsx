@@ -308,7 +308,7 @@ export default function SongList({
               )}
               {theirs.length > 0 && <FriendsChip scores={theirs} />}
               {mine !== undefined && (
-                <span className="w-7 shrink-0 rounded-md bg-score-you py-0.5 text-center text-xs font-bold tabular-nums text-[#0b0b0e]">
+                <span className="w-7 shrink-0 rounded-md bg-score-you py-0.5 text-center text-xs font-bold tabular-nums text-ink">
                   {mine}
                 </span>
               )}
@@ -366,7 +366,7 @@ export default function SongList({
                         aria-pressed={mine === n}
                         className={`h-10 rounded-lg border text-sm font-semibold tabular-nums transition-all active:scale-95 ${
                           mine === n
-                            ? "border-score-you bg-score-you text-[#0b0b0e]"
+                            ? "border-score-you bg-score-you text-ink"
                             : "border-border bg-surface text-text-secondary hover:border-border-strong hover:text-text"
                         }`}
                       >

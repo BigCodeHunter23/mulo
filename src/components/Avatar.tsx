@@ -43,9 +43,11 @@ export default function Avatar({
     );
   }
 
+  // Named like a photo would be, so a link made of just an avatar still says who.
   return (
     <span
-      aria-hidden="true"
+      role="img"
+      aria-label={name}
       className={`${box} ${text} flex shrink-0 items-center justify-center rounded-full bg-surface-raised font-semibold text-text-secondary ring-1 ring-border`}
     >
       {initial}

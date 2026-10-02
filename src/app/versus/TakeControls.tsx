@@ -65,7 +65,7 @@ export function TakeComposer({
         </button>
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-[#ffb4ae]">
+        <p role="alert" className="mt-2 text-sm text-error-soft">
           {error}
         </p>
       )}

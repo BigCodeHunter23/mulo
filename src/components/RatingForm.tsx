@@ -190,7 +190,7 @@ export default function RatingForm({
             aria-pressed={score === n}
             className={`h-12 w-full rounded-lg border text-base font-semibold tabular-nums transition-all active:scale-95 sm:h-11 sm:w-11 sm:text-sm ${
               score === n
-                ? "border-score-you bg-score-you text-[#0b0b0e]"
+                ? "border-score-you bg-score-you text-ink"
                 : "border-border bg-surface-raised text-text-secondary hover:border-border-strong hover:text-text"
             }`}
           >

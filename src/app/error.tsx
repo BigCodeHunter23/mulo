@@ -9,7 +9,7 @@ export default function Error({ reset }: { reset: () => void }) {
       </p>
       <button
         onClick={reset}
-        className="inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-[#0b0b0e] transition-colors hover:bg-accent-hover"
+        className="inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-ink transition-colors hover:bg-accent-hover"
       >
         Try again
       </button>

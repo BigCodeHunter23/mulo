@@ -116,7 +116,7 @@ export default function AlbumCard({
           {yours !== undefined && (
             <span
               title={`You rated it ${yours}`}
-              className="absolute right-1.5 top-1.5 min-w-7 rounded-md bg-score-you px-1.5 py-0.5 text-center text-xs font-bold tabular-nums text-[#0b0b0e] shadow-md"
+              className="absolute right-1.5 top-1.5 min-w-7 rounded-md bg-score-you px-1.5 py-0.5 text-center text-xs font-bold tabular-nums text-ink shadow-md"
             >
               {yours}
             </span>

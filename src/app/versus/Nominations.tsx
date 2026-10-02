@@ -71,7 +71,7 @@ export default function Nominations({
 
       <NominateForm signedIn={signedIn} onDone={() => router.refresh()} />
 
-      {error && <p className="mt-3 text-sm text-score-you">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-score-you">{error}</p>}
 
       {nominations.length > 0 && (
         <ol className="mt-6 flex flex-col gap-2">
@@ -174,7 +174,7 @@ function NominateForm({ signedIn, onDone }: { signedIn: boolean; onDone: () => v
           {pending ? "Sending…" : "Nominate"}
         </button>
         {done && <span className="text-sm text-success">✓ Nominated. It&rsquo;s in the list below.</span>}
-        {error && <span className="text-sm text-score-you">{error}</span>}
+        {error && <span role="alert" className="text-sm text-score-you">{error}</span>}
       </div>
     </div>
   );

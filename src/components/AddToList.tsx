@@ -100,7 +100,7 @@ export default function AddToList({
               ))}
             </ul>
           )}
-          {error && <p className="px-2 py-1 text-xs text-score-you">{error}</p>}
+          {error && <p role="alert" className="px-2 py-1 text-xs text-score-you">{error}</p>}
           <Link
             href={`/lists/new?add=${releaseMbid}`}
             className="mt-1 block rounded-lg px-2 py-2 text-sm font-medium text-accent hover:bg-surface-hover"

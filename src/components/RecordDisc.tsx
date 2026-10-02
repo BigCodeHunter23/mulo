@@ -20,7 +20,7 @@ export default function RecordDisc({
   return (
     <span
       aria-hidden="true"
-      className={`relative block shrink-0 overflow-hidden rounded-full bg-[#15151b] shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] ${
+      className={`relative block shrink-0 overflow-hidden rounded-full bg-vinyl shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] ${
         spinning ? "record-spin" : ""
       } ${className}`}
     >

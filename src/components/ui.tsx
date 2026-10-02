@@ -22,7 +22,7 @@ const BUTTON_BASE =
   "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50";
 
 const VARIANTS = {
-  primary: "bg-accent font-semibold text-[#0b0b0e] hover:bg-accent-hover",
+  primary: "bg-accent font-semibold text-ink hover:bg-accent-hover",
   secondary:
     "border border-border-strong bg-surface-raised text-text hover:bg-surface-hover",
   ghost: "text-text-secondary hover:text-text hover:bg-surface-raised",
@@ -67,7 +67,7 @@ export function ButtonLink({
  * 16px, the size below which iPhones zoom the page in when a field is tapped.
  */
 export const fieldClass =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-text placeholder:text-text-muted transition-colors focus:border-accent/60 focus:outline-none focus-visible:outline-none sm:py-2 sm:text-sm";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-text placeholder:text-text-muted transition-[color,border-color,box-shadow] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40 sm:py-2 sm:text-sm";
 
 export function Field({
   label,
@@ -98,11 +98,17 @@ export function Notice({
 }) {
   const styles =
     tone === "error"
-      ? "border-score-you/30 bg-score-you/10 text-[#ffb4ae]"
-      : "border-success/30 bg-success/10 text-[#8ee7ae]";
+      ? "border-score-you/30 bg-score-you/10 text-error-soft"
+      : "border-success/30 bg-success/10 text-success-soft";
 
+  // Said aloud as it appears: an error straight away, anything else politely.
   return (
-    <p className={`rounded-lg border px-3 py-2 text-sm ${styles}`}>{children}</p>
+    <p
+      role={tone === "error" ? "alert" : "status"}
+      className={`rounded-lg border px-3 py-2 text-sm ${styles}`}
+    >
+      {children}
+    </p>
   );
 }
 

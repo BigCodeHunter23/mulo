@@ -70,12 +70,12 @@ export default function FollowButton({
         className={`inline-flex items-center justify-center rounded-lg border text-sm font-semibold transition-all active:scale-95 ${dimensions} ${
           following
             ? "border-border-strong bg-transparent text-text-secondary hover:border-score-you/50 hover:text-score-you"
-            : "border-accent bg-accent text-[#0b0b0e] hover:bg-accent-hover"
+            : "border-accent bg-accent text-ink hover:bg-accent-hover"
         }`}
       >
         {following ? "Following" : "Follow"}
       </button>
-      {error && <p className="text-xs text-score-you">{error}</p>}
+      {error && <p role="alert" className="text-xs text-score-you">{error}</p>}
     </div>
   );
 }

@@ -365,7 +365,7 @@ export default function RaisedOnPicker({
                 <span className="artwork relative block aspect-square overflow-hidden rounded-xl ring-2 ring-transparent transition group-hover:ring-accent/60">
                   <Cover url={album.cover} className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]" />
                   {initial?.mbid === album.mbid && (
-                    <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-[#0b0b0e]">
+                    <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-ink">
                       Your record
                     </span>
                   )}
@@ -398,7 +398,7 @@ export default function RaisedOnPicker({
                 aria-pressed={candidate.id === era.id}
                 className={`h-9 rounded-full border px-3.5 text-sm font-semibold transition-colors ${
                   candidate.id === era.id
-                    ? "border-accent bg-accent text-[#0b0b0e]"
+                    ? "border-accent bg-accent text-ink"
                     : "border-border bg-surface text-text-secondary hover:text-text"
                 }`}
               >
@@ -538,7 +538,7 @@ export default function RaisedOnPicker({
                       checked={useAsPicture}
                       onChange={(event) => setUseAsPicture(event.target.checked)}
                       disabled={pending || saved}
-                      className="h-4 w-4 accent-[#f2803f]"
+                      className="h-4 w-4 accent-accent"
                     />
                     Use it as my picture instead of my photo
                   </label>
@@ -549,7 +549,7 @@ export default function RaisedOnPicker({
                 )}
 
                 {error && (
-                  <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
+                  <p role="alert" className="mt-3 text-sm text-error-soft">
                     {error}
                   </p>
                 )}

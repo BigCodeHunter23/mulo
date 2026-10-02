@@ -37,7 +37,7 @@ function Tile({ badge }: { badge: BoardBadge }) {
       <span className="min-w-0">
         <span
           className={`display-sm block text-sm ${
-            badge.earned ? "text-[#f3d98a]" : "text-text-secondary"
+            badge.earned ? "text-gold" : "text-text-secondary"
           }`}
         >
           {badge.name}
@@ -68,7 +68,7 @@ function Ladder({ ladder }: { ladder: BoardLadder }) {
             key={tier.slug}
             className={`rounded-lg border px-2 py-1.5 text-center text-[11px] font-medium leading-tight ${
               tier.earned
-                ? "border-score-overall/30 bg-score-overall/10 text-[#f3d98a]"
+                ? "border-score-overall/30 bg-score-overall/10 text-gold"
                 : "border-dashed border-border text-text-muted"
             }`}
           >

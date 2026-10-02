@@ -82,7 +82,8 @@ export default function TopPicks({
     <div className="rounded-2xl border border-border bg-surface/50 px-4 py-7 sm:px-8">
       <div className="goat-reveal flex flex-col items-center text-center" style={delay(1)}>
         <Crown />
-        <Link href={href(first)} className="group mt-2.5 block">
+        {/* The title below is the same link, for keyboards and screen readers. */}
+        <Link href={href(first)} tabIndex={-1} aria-hidden="true" className="group mt-2.5 block">
           <Art
             pick={first}
             round={round}
@@ -110,7 +111,7 @@ export default function TopPicks({
               className="goat-reveal flex w-24 flex-col items-center text-center sm:w-28"
               style={delay(i + 2)}
             >
-              <Link href={href(pick)} className="group block">
+              <Link href={href(pick)} tabIndex={-1} aria-hidden="true" className="group block">
                 <Art
                   pick={pick}
                   round={round}

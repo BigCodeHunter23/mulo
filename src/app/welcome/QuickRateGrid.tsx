@@ -144,7 +144,7 @@ export default function QuickRateGrid({
                   )}
                   {score !== undefined && !isOpen && (
                     <span
-                      className={`absolute rounded-md bg-score-you px-2 py-0.5 text-sm font-bold tabular-nums text-[#0b0b0e] shadow-lg ${
+                      className={`absolute rounded-md bg-score-you px-2 py-0.5 text-sm font-bold tabular-nums text-ink shadow-lg ${
                         round ? "bottom-2 left-1/2 -translate-x-1/2" : "right-2 top-2"
                       }`}
                     >
@@ -167,7 +167,7 @@ export default function QuickRateGrid({
                         aria-pressed={score === n}
                         className={`aspect-square rounded-md text-sm font-semibold tabular-nums transition-colors ${
                           score === n
-                            ? "bg-score-you text-[#0b0b0e]"
+                            ? "bg-score-you text-ink"
                             : "bg-bg/85 text-text hover:bg-surface-hover"
                         }`}
                       >

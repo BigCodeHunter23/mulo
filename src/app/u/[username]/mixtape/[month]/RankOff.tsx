@@ -244,7 +244,7 @@ export default function RankOff({
                     </button>
                   </div>
                   {error && (
-                    <p role="alert" className="mt-3 text-sm text-[#ffb4ae]">
+                    <p role="alert" className="mt-3 text-sm text-error-soft">
                       {error}
                     </p>
                   )}

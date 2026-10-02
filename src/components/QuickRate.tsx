@@ -126,7 +126,7 @@ export default function QuickRate({
                   aria-pressed={picked === score}
                   className={`flex h-12 items-center justify-center rounded-lg border text-base font-semibold tabular-nums transition-[color,background-color,border-color,transform] active:scale-90 ${
                     picked === score
-                      ? "border-score-you bg-score-you text-[#0b0b0e]"
+                      ? "border-score-you bg-score-you text-ink"
                       : "border-border bg-surface text-text hover:border-score-you/60 hover:text-score-you"
                   }`}
                 >
@@ -135,7 +135,7 @@ export default function QuickRate({
               ))}
             </div>
           )}
-          {status === "error" && error && <p className="mt-3 text-center text-sm text-score-you">{error}</p>}
+          {status === "error" && error && <p role="alert" className="mt-3 text-center text-sm text-score-you">{error}</p>}
           <Link
             href={`/album/${mbid}`}
             onClick={onClose}
