@@ -32,6 +32,49 @@ in plain language, and give them links and exact steps when they need to act.
 - Voice: `docs/voice.md`. Features and badges can carry music culture; section
   headings, buttons, navigation and errors stay plain.
 
+## Engineering conventions
+
+`docs/architecture.md` has the structure in full. The rules that matter most:
+
+- **Branches and commits.** Work on a branch and push it; `master` deploys
+  live, so it only moves when the owner says so and any migration the code
+  needs has been run. Commit messages are `<type>: <description>` (feat, fix,
+  refactor, perf, docs, test, chore, ci, style). Small commits, one idea
+  each.
+- **Before calling something done:** `npm run check` (typecheck, lint,
+  Prettier, unit tests) and `npm run build` pass. CI runs the same plus the
+  browser tests on every push.
+- **TypeScript is strict**, plus `noImplicitReturns`,
+  `noFallthroughCasesInSwitch` and `noImplicitOverride`. No `any`. Avoid
+  casts; the few left (`as unknown as`) each carry a comment saying why.
+- **Database types are generated.** After adding or changing a migration,
+  run `npm run db:types` and commit the result; a unit test fails otherwise.
+  When a table is chosen at runtime, branch per kind with literal table
+  names (see `RATING_TABLES` and `reviewedTable` in `rating-kinds.ts`) rather
+  than casting.
+- **Reads:** never trust one request to return everything. Count in SQL
+  (an `.rpc()` function in a migration) or page with `readAll()`. Log
+  failures with `logQueryError(area, error, migration?)`.
+- **Server actions** go validate (zod, `validation.ts`) → `getCurrentUser()`
+  → rate limit (`allowUser`/`allowAddress`) → write through the session
+  client → `revalidatePath` → return `{ ok, error }` with a plain message.
+  Never show a raw database error. `test/actions-auth.test.ts` covers every
+  action, so add new ones there.
+- **Signed-in-only pages** are listed once in `src/lib/access.ts` and call
+  `requireUser(returnTo)`.
+- **Settings:** the required ones (Supabase) are read through
+  `src/lib/env.ts`, which validates them. Optional ones with a safe fallback
+  (`ADMIN_EMAILS`, `NEXT_PUBLIC_SITE_URL`, Vercel's own) are read where
+  they're used. Every setting is listed in `.env.example`.
+- **Caching:** site-wide reads that are the same for everyone use
+  `unstable_cache` with `SHARED_CACHE_SECONDS`. Don't cache per-person data.
+- **New dependencies** need a reason in the commit message; prefer what's
+  already here.
+- **Accessibility:** menus, dialogs and the search combobox follow the ARIA
+  patterns (keyboard, Escape, focus return). Messages use `Notice`, or
+  `role="alert"` for errors. Text colour tokens keep 4.5:1 contrast. Shared
+  pieces are in `src/components/ui.tsx`; reuse them.
+
 ## Where things are
 
 - `src/lib/`: `catalog.ts` (MusicBrainz caching), `ratings.ts`, `feed.ts`,
@@ -191,9 +234,13 @@ in plain language, and give them links and exact steps when they need to act.
   Heavy Rotation, more friends, new releases, the rest of the feed, people to
   follow, then Around MULO (everyone else's recent ratings, minus anything
   already shown above).
-- Navigation: on phones the header is just the logo, People and the bell, and
-  `MobileNav` is a tab bar along the bottom (hidden during `/welcome`); the
-  layout leaves room for it. Wider screens use the header links.
+- Navigation: the header has Home, Discover, Charts and Versus (plus Lists
+  from tablet width), search (`SiteSearch`: a box from tablet width, an icon
+  opening a sheet below it, `/` or Ctrl/Cmd+K anywhere, hidden on `/search`),
+  the bell, and `AccountMenu` (your pages, The Stack, People, settings, log
+  out). On phones the header links hide and `MobileNav` is a tab bar along
+  the bottom (Home, Discover, The Stack, Versus, you; hidden during
+  `/welcome`); the layout leaves room for it.
 - Motion lives in `globals.css` (clash, crown drop, sparks, deal-in, count-up
   and friends) and every animation is switched off under
   `prefers-reduced-motion`. `Celebrate.tsx` has the crown and sparks.
@@ -227,6 +274,14 @@ in plain language, and give them links and exact steps when they need to act.
 
 ## Testing
 
-An agent can't sign in, so signed-in pages can't be driven directly. To check
-them, write temporary rows under the test accounts (`diagtest99`, `alextest`)
-with the service role, view the pages signed out, then delete the rows.
+- `npm test`: unit tests, including every migration replayed in PGlite, so a
+  migration that fails to apply (or to apply twice) fails here first.
+- `npm run test:e2e`: browser tests against a production build. Without a
+  database, build with stand-in settings
+  (`NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co`, the two keys
+  `placeholder`): signed-out tests run, signed-in ones skip. That's what CI
+  does until a test Supabase project exists.
+- An agent can't sign in, so signed-in pages can't be driven directly. To
+  check them, write temporary rows under the test accounts (`diagtest99`,
+  `alextest`) with the service role, view the pages signed out, then delete
+  the rows.
