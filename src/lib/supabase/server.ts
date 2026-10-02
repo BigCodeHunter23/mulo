@@ -13,28 +13,22 @@ import { SESSION_COOKIE_OPTIONS } from "./cookies";
 export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(
-    supabaseUrl(),
-    supabaseAnonKey(),
-    {
-      cookieOptions: SESSION_COOKIE_OPTIONS,
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // setAll is called from a Server Component; safe to ignore
-            // because the proxy refreshes the session on every request.
-          }
-        },
+  return createServerClient<Database>(supabaseUrl(), supabaseAnonKey(), {
+    cookieOptions: SESSION_COOKIE_OPTIONS,
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        } catch {
+          // setAll is called from a Server Component; safe to ignore
+          // because the proxy refreshes the session on every request.
+        }
       },
     },
-  );
+  });
 });
 
 export type CurrentUser = { id: string; email: string | null };

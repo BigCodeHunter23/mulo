@@ -9,9 +9,7 @@ import { supabaseUrl, supabaseAnonKey } from "@/lib/env";
  * discovery. Needing no cookies keeps those reads simple and cacheable.
  */
 export function createPublicClient() {
-  return createClient<Database>(
-    supabaseUrl(),
-    supabaseAnonKey(),
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  return createClient<Database>(supabaseUrl(), supabaseAnonKey(), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
