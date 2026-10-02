@@ -156,7 +156,7 @@ function Shortcuts() {
   ];
 
   return (
-    <nav aria-label="More on MULO" className="-mx-4 overflow-x-auto px-4 sm:hidden">
+    <nav aria-label="More on MULO" className="rail -mx-4 overflow-x-auto px-4 sm:hidden">
       <ul className="flex w-max gap-2">
         {links.map((link) => (
           <li key={link.href}>

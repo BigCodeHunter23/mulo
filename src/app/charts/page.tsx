@@ -84,7 +84,7 @@ export default async function ChartsPage({
       </header>
 
       {/* Albums / Songs / Artists */}
-      <nav className="mt-6 flex gap-2 overflow-x-auto pb-1" aria-label="Chart type">
+      <nav className="rail -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Chart type">
         {CHART_KINDS.map((option) => (
           <Link
             key={option.id}
@@ -98,7 +98,7 @@ export default async function ChartsPage({
       </nav>
 
       {/* Everything, or one genre */}
-      <nav className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Genre">
+      <nav className="rail -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Genre">
         <Link
           href={chartHref(kind, null)}
           aria-current={genre === null ? "page" : undefined}

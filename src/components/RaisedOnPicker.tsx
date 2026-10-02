@@ -388,7 +388,7 @@ export default function RaisedOnPicker({
         <BackButton label="Decades" onClick={() => back({ era: null })} />
 
         {/* Hop straight to another decade without going back. */}
-        <div className="-mx-4 mt-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+        <div className="rail -mx-4 mt-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <div className="flex min-w-max gap-2">
             {ERAS.map((candidate) => (
               <button
