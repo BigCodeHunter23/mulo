@@ -3,3 +3,6 @@
 
 # style: format the codebase with Prettier
 a4703f4d38c97896c007f3bb6a791ec4ed717512
+
+# style: format the Supabase clients with Prettier
+2a69b734ee06711bc9d6c8f9fea1acef864f1bdb
