@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { withQuery } from "@/lib/redirects";
@@ -9,10 +8,9 @@ import { getFollowingIds, listProfiles } from "@/lib/social";
 import { getRaisedOn } from "@/lib/raised-on";
 import { getStack } from "@/lib/stack";
 import { isRecordAvatar } from "@/lib/record-avatar";
-import FollowButton from "@/components/FollowButton";
 import InviteButton from "@/components/InviteButton";
-import Avatar from "@/components/Avatar";
 import RaisedOnPicker from "@/components/RaisedOnPicker";
+import PersonRow from "@/components/PersonRow";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import WelcomeProfileForm from "./WelcomeProfileForm";
 import QuickRateGrid from "./QuickRateGrid";
@@ -219,37 +217,14 @@ async function FollowStep({ userId }: { userId: string }) {
       ) : (
         <ul className="mt-8 flex flex-col gap-2">
           {others.map((profile) => (
-            <li
+            <PersonRow
               key={profile.id}
-              className="flex items-center gap-3.5 rounded-xl border border-border bg-surface p-3.5"
-            >
-              <Link href={`/u/${profile.username}`}>
-                <Avatar
-                  url={profile.avatar_url}
-                  name={profile.display_name || profile.username}
-                  size="md"
-                />
-              </Link>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/u/${profile.username}`}
-                  className="block truncate font-medium text-text transition-colors hover:text-accent"
-                >
-                  {profile.display_name || profile.username}
-                </Link>
-                <p className="truncate text-sm text-text-muted">
-                  @{profile.username}
-                </p>
-              </div>
-              <FollowButton
-                targetId={profile.id}
-                username={profile.username}
-                signedIn
-                isSelf={false}
-                isFollowing={following.has(profile.id)}
-                size="small"
-              />
-            </li>
+              profile={profile}
+              signedIn
+              isSelf={false}
+              isFollowing={following.has(profile.id)}
+              showBio={false}
+            />
           ))}
         </ul>
       )}

@@ -67,7 +67,7 @@ export default function AuthForm({
                 : "text-text-muted hover:text-text"
             }`}
           >
-            {m === "login" ? "Log in" : "Sign up"}
+            {m === "login" ? "Log in" : "Join"}
           </button>
         ))}
       </div>

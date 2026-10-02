@@ -148,11 +148,10 @@ export async function NewReleases() {
  */
 function Shortcuts() {
   const links = [
-    { href: "/search", label: "Search" },
     { href: "/charts", label: "The Charts" },
     { href: "/lists", label: "Lists" },
-    { href: "/goat", label: "Your GOAT" },
-    { href: "/ratings", label: "My Ratings" },
+    { href: "/goat", label: "My GOAT" },
+    { href: "/ratings", label: "My ratings" },
     { href: "/guess", label: "Guess the score" },
   ];
 

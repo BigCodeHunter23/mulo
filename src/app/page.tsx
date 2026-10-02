@@ -7,9 +7,8 @@ import { getFollowingFeed, getGlobalFeed, type FeedItem as Item } from "@/lib/fe
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import { getHeavyRotation } from "@/lib/trending";
 import { isRecordAvatar, RAISED_ON_PROMPT_COOKIE } from "@/lib/record-avatar";
-import Avatar from "@/components/Avatar";
 import FeedItem from "@/components/FeedItem";
-import FollowButton from "@/components/FollowButton";
+import PersonRow from "@/components/PersonRow";
 import HeavyRotation from "@/components/HeavyRotation";
 import TodaysVersus, { TodaysVersusPlaceholder } from "@/components/TodaysVersus";
 import DiscoverSections, { NewReleases } from "@/components/DiscoverSections";
@@ -216,35 +215,14 @@ async function PeopleToFollow({ userId }: { userId: string }) {
       </SectionHeading>
       <ul className="flex flex-col gap-2">
         {suggestions.map((profile) => (
-          <li
+          <PersonRow
             key={profile.id}
-            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-border-strong"
-          >
-            <Link href={`/u/${profile.username}`}>
-              <Avatar
-                url={profile.avatar_url}
-                name={profile.display_name || profile.username}
-                size="md"
-              />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/u/${profile.username}`}
-                className="block truncate font-medium text-text transition-colors hover:text-accent"
-              >
-                {profile.display_name || profile.username}
-              </Link>
-              <p className="truncate text-sm text-text-muted">@{profile.username}</p>
-            </div>
-            <FollowButton
-              targetId={profile.id}
-              username={profile.username}
-              signedIn
-              isSelf={false}
-              isFollowing={false}
-              size="small"
-            />
-          </li>
+            profile={profile}
+            signedIn
+            isSelf={false}
+            isFollowing={false}
+            showBio={false}
+          />
         ))}
       </ul>
     </section>

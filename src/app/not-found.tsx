@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui";
 
 export default function NotFound() {
   return (
@@ -7,12 +7,12 @@ export default function NotFound() {
       <p className="text-sm text-text-secondary">
         We couldn&rsquo;t find what you were looking for.
       </p>
-      <Link
-        href="/search"
-        className="inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-ink transition-colors hover:bg-accent-hover"
-      >
-        Search music
-      </Link>
+      <div className="flex flex-wrap justify-center gap-2">
+        <ButtonLink href="/search">Search music</ButtonLink>
+        <ButtonLink href="/" variant="secondary">
+          Go home
+        </ButtonLink>
+      </div>
     </main>
   );
 }
