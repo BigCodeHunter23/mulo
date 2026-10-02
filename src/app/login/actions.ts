@@ -52,10 +52,7 @@ function friendlyError(message: string) {
   return "Something went wrong on our side. Please try again in a minute.";
 }
 
-export async function login(
-  _prev: AuthState,
-  formData: FormData,
-): Promise<AuthState> {
+export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const input = loginInput.safeParse({
     email: field(formData, "email"),
     password: field(formData, "password"),
@@ -71,10 +68,7 @@ export async function login(
   redirect(safeRedirectPath(field(formData, "next")) ?? "/");
 }
 
-export async function signup(
-  _prev: AuthState,
-  formData: FormData,
-): Promise<AuthState> {
+export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const input = signupInput.safeParse({
     email: field(formData, "email"),
     password: field(formData, "password"),

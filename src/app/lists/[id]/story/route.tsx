@@ -24,7 +24,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .filter((item) => item.releases)
     .sort((a, b) => a.position - b.position);
   const shown = items.slice(0, SHOWN);
-  const covers = await Promise.all(shown.map((item) => loadImage(coverSrc(item.releases!.cover_art_url, 250))));
+  const covers = await Promise.all(
+    shown.map((item) => loadImage(coverSrc(item.releases!.cover_art_url, 250))),
+  );
   const name = list.profiles?.display_name || list.profiles?.username || "Someone";
 
   return storyResponse({
@@ -48,15 +50,31 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 50 }}>
           {shown.map((item, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", marginTop: i === 0 ? 0 : 26 }}>
+            <div
+              key={i}
+              style={{ display: "flex", alignItems: "center", marginTop: i === 0 ? 0 : 26 }}
+            >
               {list.ranked && (
-                <div style={{ display: "flex", width: 90, fontSize: 64, fontWeight: 800, color: OG.accent }}>
+                <div
+                  style={{
+                    display: "flex",
+                    width: 90,
+                    fontSize: 64,
+                    fontWeight: 800,
+                    color: OG.accent,
+                  }}
+                >
                   {String(i + 1)}
                 </div>
               )}
               <Tile src={covers[i]} size={170} radius={16} />
               <div
-                style={{ display: "flex", flexDirection: "column", marginLeft: 36, width: list.ranked ? 590 : 680 }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  marginLeft: 36,
+                  width: list.ranked ? 590 : 680,
+                }}
               >
                 <div style={{ display: "flex", fontSize: 46, fontWeight: 800, color: OG.text }}>
                   {short(item.releases!.title, 24)}
@@ -69,7 +87,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           ))}
         </div>
         {items.length > SHOWN && (
-          <div style={{ display: "flex", marginTop: 36, fontSize: 36, fontWeight: 500, color: OG.muted }}>
+          <div
+            style={{
+              display: "flex",
+              marginTop: 36,
+              fontSize: 36,
+              fontWeight: 500,
+              color: OG.muted,
+            }}
+          >
             {`+ ${items.length - SHOWN} more on MULO`}
           </div>
         )}

@@ -75,7 +75,9 @@ function summarise(row: SummaryRow): ListSummary {
     ranked: row.ranked,
     updatedAt: row.updated_at,
     count: items.length,
-    covers: items.flatMap((item) => (item.releases?.cover_art_url ? [item.releases.cover_art_url] : [])).slice(0, 4),
+    covers: items
+      .flatMap((item) => (item.releases?.cover_art_url ? [item.releases.cover_art_url] : []))
+      .slice(0, 4),
     owner: owner(row.profiles),
   };
 }
@@ -179,12 +181,10 @@ export async function getMyListsFor(
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(100);
-  return (data ?? []).map(
-    (list) => ({
-      id: list.id,
-      title: list.title,
-      has: list.list_items.some((item) => item.release_mbid === releaseMbid),
-      full: list.list_items.length >= LIST_LIMIT,
-    }),
-  );
+  return (data ?? []).map((list) => ({
+    id: list.id,
+    title: list.title,
+    has: list.list_items.some((item) => item.release_mbid === releaseMbid),
+    full: list.list_items.length >= LIST_LIMIT,
+  }));
 }

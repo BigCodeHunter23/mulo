@@ -20,7 +20,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
   const title = `${card.profile.name} has rated ${card.count} albums`;
   const description = `${card.profile.name}'s ${card.count} albums on MULO, and the ones they rate highest.`;
-  return { title, description, openGraph: { type: "website", siteName: "MULO", title, description } };
+  return {
+    title,
+    description,
+    openGraph: { type: "website", siteName: "MULO", title, description },
+  };
 }
 
 /**

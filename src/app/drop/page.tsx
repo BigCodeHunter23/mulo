@@ -29,7 +29,11 @@ export async function generateMetadata(): Promise<Metadata> {
 function Spread({ spread, yours }: { spread: number[]; yours: number | null }) {
   const most = Math.max(1, ...spread);
   return (
-    <div className="flex h-40 items-end gap-1.5 sm:gap-2" role="img" aria-label="How everybody scored it">
+    <div
+      className="flex h-40 items-end gap-1.5 sm:gap-2"
+      role="img"
+      aria-label="How everybody scored it"
+    >
       {spread.map((count, i) => {
         const score = i + 1;
         const mine = score === yours;
@@ -106,7 +110,11 @@ export default async function DropPage() {
           {/* The sleeve, with the record sliding out from behind it */}
           <div className="relative mt-8 h-56 w-56 sm:h-72 sm:w-72">
             <div className="drop-record absolute inset-0">
-              <RecordDisc cover={release?.cover_art_url ?? null} className="h-full w-full" spinning />
+              <RecordDisc
+                cover={release?.cover_art_url ?? null}
+                className="h-full w-full"
+                spinning
+              />
             </div>
             <div className="drop-sleeve artwork relative h-full w-full overflow-hidden rounded-lg shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)]">
               {cover && (
@@ -134,10 +142,18 @@ export default async function DropPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-10 sm:px-6">
         <p className="mb-6 text-center text-sm text-text-secondary">
           Everybody on MULO is rating this one this week.{" "}
-          {revealed ? "Here's how it's landing." : "Give it your score to see how everyone else did."}
+          {revealed
+            ? "Here's how it's landing."
+            : "Give it your score to see how everyone else did."}
         </p>
 
-        <RatingForm key={mbid} kind="album" mbid={mbid} signedIn={Boolean(user)} existing={ownRating} />
+        <RatingForm
+          key={mbid}
+          kind="album"
+          mbid={mbid}
+          signedIn={Boolean(user)}
+          existing={ownRating}
+        />
 
         {/* The record itself, so nobody has to leave the page to remember how
             it goes. The first visit of a week fetches the tracklist from
@@ -175,12 +191,18 @@ export default async function DropPage() {
               {/* A blurred stand-in, so it's plain something's waiting there */}
               <div aria-hidden="true" className="flex h-40 items-end gap-2 p-4 blur-md">
                 {[2, 3, 5, 8, 12, 9, 6, 4, 2, 1].map((h, i) => (
-                  <div key={i} className="flex-1 rounded-t-md bg-score-overall/50" style={{ height: `${h * 8}%` }} />
+                  <div
+                    key={i}
+                    className="flex-1 rounded-t-md bg-score-overall/50"
+                    style={{ height: `${h * 8}%` }}
+                  />
                 ))}
               </div>
               <div className="absolute inset-0 flex items-center justify-center bg-bg/40">
                 <p className="rounded-full border border-border-strong bg-surface-raised/90 px-4 py-2 text-sm text-text">
-                  {user ? "Rate it above to see the spread" : "Log in and rate it to see the spread"}
+                  {user
+                    ? "Rate it above to see the spread"
+                    : "Log in and rate it to see the spread"}
                 </p>
               </div>
             </div>
@@ -190,7 +212,12 @@ export default async function DropPage() {
         {revealed && takes.length > 0 && (
           <section className="mt-12">
             <SectionHeading>The best takes</SectionHeading>
-            <ReviewList reviews={takes} kind="album" signedIn={Boolean(user)} reactions={reactions} />
+            <ReviewList
+              reviews={takes}
+              kind="album"
+              signedIn={Boolean(user)}
+              reactions={reactions}
+            />
           </section>
         )}
       </main>
@@ -220,9 +247,7 @@ async function DropTracklist({
   return (
     <section className="mt-12">
       <SectionHeading
-        action={
-          <span className="text-xs tabular-nums text-text-muted">{tracks.length} songs</span>
-        }
+        action={<span className="text-xs tabular-nums text-text-muted">{tracks.length} songs</span>}
       >
         Tracklist
       </SectionHeading>

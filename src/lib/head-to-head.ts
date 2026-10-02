@@ -193,23 +193,27 @@ export async function getHeadToHead(otherUserId: string): Promise<HeadToHead | n
           .in("mbid", [...new Set(albumIds)])
       : Promise.resolve({ data: [] }),
     artistIds.length
-      ? supabase.from("artists").select("mbid, name, image_url").in("mbid", [...new Set(artistIds)])
+      ? supabase
+          .from("artists")
+          .select("mbid, name, image_url")
+          .in("mbid", [...new Set(artistIds)])
       : Promise.resolve({ data: [] }),
   ]);
 
   const releaseById = new Map(
-    ((releases.data ?? []) as {
-      mbid: string;
-      title: string;
-      artist_credit: string | null;
-      cover_art_url: string | null;
-    }[]).map((r) => [r.mbid, r]),
+    (
+      (releases.data ?? []) as {
+        mbid: string;
+        title: string;
+        artist_credit: string | null;
+        cover_art_url: string | null;
+      }[]
+    ).map((r) => [r.mbid, r]),
   );
   const artistById = new Map(
-    ((artists.data ?? []) as { mbid: string; name: string; image_url: string | null }[]).map((a) => [
-      a.mbid,
-      a,
-    ]),
+    ((artists.data ?? []) as { mbid: string; name: string; image_url: string | null }[]).map(
+      (a) => [a.mbid, a],
+    ),
   );
 
   function describe(pair: Pair): Clash | null {

@@ -22,7 +22,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     Number.isSafeInteger(id)
       ? createPublicClient()
           .from("lists")
-          .select("title, ranked, profiles ( username, display_name ), list_items ( position, releases ( cover_art_url ) )")
+          .select(
+            "title, ranked, profiles ( username, display_name ), list_items ( position, releases ( cover_art_url ) )",
+          )
           .eq("id", id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -38,67 +40,90 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const name = list.profiles?.display_name || list.profiles?.username || "Someone";
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        padding: "64px 72px",
+        background: OG.bg,
+        fontFamily: "Inter",
+      }}
+    >
       <div
         style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          padding: "64px 72px",
-          background: OG.bg,
-          fontFamily: "Inter",
+          fontSize: 24,
+          fontWeight: 500,
+          color: OG.muted,
+          letterSpacing: "0.15em",
         }}
       >
-        <div style={{ display: "flex", fontSize: 24, fontWeight: 500, color: OG.muted, letterSpacing: "0.15em" }}>
-          {`${list.ranked ? "A RANKED LIST" : "A LIST"} BY ${name.toUpperCase()} · ${items.length} ALBUMS`}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            marginTop: 12,
-            fontSize: 60,
-            fontWeight: 800,
-            color: OG.text,
-            letterSpacing: "-0.03em",
-            lineHeight: 1.05,
-          }}
-        >
-          {short(list.title, 40)}
-        </div>
-        <div style={{ display: "flex", marginTop: 44 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={{ position: "relative", display: "flex", marginLeft: i === 0 ? 0 : 24 }}>
-              {covers[i] ? (
-                <img src={covers[i]!} alt="" width={240} height={240} style={{ borderRadius: 16, objectFit: "cover" }} />
-              ) : (
-                <div style={{ display: "flex", width: 240, height: 240, borderRadius: 16, background: OG.surface }} />
-              )}
-              {list.ranked && covers[i] && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: 10,
-                    display: "flex",
-                    padding: "2px 12px",
-                    borderRadius: 10,
-                    background: "rgba(11,11,14,0.85)",
-                    fontSize: 28,
-                    fontWeight: 800,
-                    color: OG.accent,
-                  }}
-                >
-                  {String(i + 1)}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <Wordmark />
+        {`${list.ranked ? "A RANKED LIST" : "A LIST"} BY ${name.toUpperCase()} · ${items.length} ALBUMS`}
       </div>
-    ),
+      <div
+        style={{
+          display: "flex",
+          marginTop: 12,
+          fontSize: 60,
+          fontWeight: 800,
+          color: OG.text,
+          letterSpacing: "-0.03em",
+          lineHeight: 1.05,
+        }}
+      >
+        {short(list.title, 40)}
+      </div>
+      <div style={{ display: "flex", marginTop: 44 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{ position: "relative", display: "flex", marginLeft: i === 0 ? 0 : 24 }}
+          >
+            {covers[i] ? (
+              <img
+                src={covers[i]!}
+                alt=""
+                width={240}
+                height={240}
+                style={{ borderRadius: 16, objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  width: 240,
+                  height: 240,
+                  borderRadius: 16,
+                  background: OG.surface,
+                }}
+              />
+            )}
+            {list.ranked && covers[i] && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: 10,
+                  display: "flex",
+                  padding: "2px 12px",
+                  borderRadius: 10,
+                  background: "rgba(11,11,14,0.85)",
+                  fontSize: 28,
+                  fontWeight: 800,
+                  color: OG.accent,
+                }}
+              >
+                {String(i + 1)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Wordmark />
+    </div>,
     { ...size, fonts },
   );
 }

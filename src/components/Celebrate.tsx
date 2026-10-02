@@ -20,7 +20,11 @@ const COLOURS = ["#f5c518", "#f2803f", "#f4f4f6"];
  * A burst of sparks from the centre of whatever holds it, which needs to be
  * positioned. Purely decorative, and gone for anyone who prefers less motion.
  */
-export function Sparks({ count = 16, reach = 120, delay = 0.45 }: {
+export function Sparks({
+  count = 16,
+  reach = 120,
+  delay = 0.45,
+}: {
   count?: number;
   /** How far they fly, in pixels. */
   reach?: number;

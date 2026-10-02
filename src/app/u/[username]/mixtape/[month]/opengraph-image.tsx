@@ -45,166 +45,160 @@ export default async function Image({
   const rated = tape.albums + tape.songs + tape.artists;
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          padding: "64px 72px",
-          background: OG.bg,
-          fontFamily: "Inter",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center" }}>
-          {avatar ? (
-            <img
-              src={avatar}
-              alt=""
-              width={80}
-              height={80}
-              style={{ borderRadius: 40, objectFit: "cover" }}
-            />
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                background: OG.surface,
-              }}
-            />
-          )}
-          <div style={{ display: "flex", flexDirection: "column", marginLeft: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 24,
-                fontWeight: 500,
-                color: OG.muted,
-                letterSpacing: "0.15em",
-              }}
-            >
-              {`${name.toUpperCase()}'S MIXTAPE`}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 52,
-                fontWeight: 800,
-                color: OG.text,
-                letterSpacing: "-0.03em",
-              }}
-            >
-              {monthLabel(month)}
-            </div>
-          </div>
-        </div>
-
-        {picks.length === 0 ? (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        padding: "64px 72px",
+        background: OG.bg,
+        fontFamily: "Inter",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center" }}>
+        {avatar ? (
+          <img
+            src={avatar}
+            alt=""
+            width={80}
+            height={80}
+            style={{ borderRadius: 40, objectFit: "cover" }}
+          />
+        ) : (
           <div
             style={{
               display: "flex",
-              marginTop: 60,
-              fontSize: 44,
+              width: 80,
+              height: 80,
+              borderRadius: 40,
+              background: OG.surface,
+            }}
+          />
+        )}
+        <div style={{ display: "flex", flexDirection: "column", marginLeft: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 24,
               fontWeight: 500,
-              color: OG.secondary,
+              color: OG.muted,
+              letterSpacing: "0.15em",
             }}
           >
-            Nothing rated this month yet
+            {`${name.toUpperCase()}'S MIXTAPE`}
           </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "flex-start", marginTop: 48 }}>
-            {picks.map((pick, i) => {
-              const image = covers[i];
-              const round = pick.key.startsWith("artist-");
-
-              return (
-                <div
-                  key={pick.key}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    width: 232,
-                    marginLeft: i === 0 ? 0 : 24,
-                  }}
-                >
-                  {image ? (
-                    <img
-                      src={image}
-                      alt=""
-                      width={200}
-                      height={200}
-                      style={{
-                        borderRadius: round ? 100 : 16,
-                        objectFit: "cover",
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        display: "flex",
-                        width: 200,
-                        height: 200,
-                        borderRadius: round ? 100 : 16,
-                        background: OG.surface,
-                      }}
-                    />
-                  )}
-                  <div
-                    style={{
-                      display: "flex",
-                      marginTop: 16,
-                      fontSize: 22,
-                      fontWeight: 500,
-                      color: OG.text,
-                      textAlign: "center",
-                    }}
-                  >
-                    {short(pick.title, 18)}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      marginTop: 4,
-                      fontSize: 24,
-                      fontWeight: 800,
-                      color: OG.gold,
-                    }}
-                  >
-                    {String(pick.score)}
-                  </div>
-                </div>
-              );
-            })}
+          <div
+            style={{
+              display: "flex",
+              fontSize: 52,
+              fontWeight: 800,
+              color: OG.text,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {monthLabel(month)}
           </div>
-        )}
+        </div>
+      </div>
 
+      {picks.length === 0 ? (
         <div
           style={{
             display: "flex",
-            marginTop: 44,
-            fontSize: 28,
+            marginTop: 60,
+            fontSize: 44,
             fontWeight: 500,
             color: OG.secondary,
           }}
         >
-          {rated > 0
-            ? `${rated} rated${
-                tape.average !== null
-                  ? ` · ${tape.average.toFixed(1)} average`
-                  : ""
-              }`
-            : "Rating music on MULO"}
+          Nothing rated this month yet
         </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-start", marginTop: 48 }}>
+          {picks.map((pick, i) => {
+            const image = covers[i];
+            const round = pick.key.startsWith("artist-");
 
-        <Wordmark />
+            return (
+              <div
+                key={pick.key}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  width: 232,
+                  marginLeft: i === 0 ? 0 : 24,
+                }}
+              >
+                {image ? (
+                  <img
+                    src={image}
+                    alt=""
+                    width={200}
+                    height={200}
+                    style={{
+                      borderRadius: round ? 100 : 16,
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      width: 200,
+                      height: 200,
+                      borderRadius: round ? 100 : 16,
+                      background: OG.surface,
+                    }}
+                  />
+                )}
+                <div
+                  style={{
+                    display: "flex",
+                    marginTop: 16,
+                    fontSize: 22,
+                    fontWeight: 500,
+                    color: OG.text,
+                    textAlign: "center",
+                  }}
+                >
+                  {short(pick.title, 18)}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    marginTop: 4,
+                    fontSize: 24,
+                    fontWeight: 800,
+                    color: OG.gold,
+                  }}
+                >
+                  {String(pick.score)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          marginTop: 44,
+          fontSize: 28,
+          fontWeight: 500,
+          color: OG.secondary,
+        }}
+      >
+        {rated > 0
+          ? `${rated} rated${tape.average !== null ? ` · ${tape.average.toFixed(1)} average` : ""}`
+          : "Rating music on MULO"}
       </div>
-    ),
+
+      <Wordmark />
+    </div>,
     { ...size, fonts },
   );
 }

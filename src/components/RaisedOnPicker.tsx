@@ -71,15 +71,7 @@ function lineupPick(mbid: string, eraId: string | null, sceneId: string | null) 
   return match;
 }
 
-function DecadeTile({
-  era,
-  mine,
-  onClick,
-}: {
-  era: Era;
-  mine: boolean;
-  onClick: () => void;
-}) {
+function DecadeTile({ era, mine, onClick }: { era: Era; mine: boolean; onClick: () => void }) {
   const covers = era.scenes.slice(0, 3).map((scene) => scene.albums[0]);
 
   return (
@@ -363,7 +355,10 @@ export default function RaisedOnPicker({
                 className="group block w-full text-left active:scale-[0.97]"
               >
                 <span className="artwork relative block aspect-square overflow-hidden rounded-xl ring-2 ring-transparent transition group-hover:ring-accent/60">
-                  <Cover url={album.cover} className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]" />
+                  <Cover
+                    url={album.cover}
+                    className="h-full w-full transition-transform duration-300 group-hover:scale-[1.04]"
+                  />
                   {initial?.mbid === album.mbid && (
                     <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-ink">
                       Your record

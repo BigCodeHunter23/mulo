@@ -134,8 +134,7 @@ function columnsBlock(columns, mode, indent) {
       const alwaysGenerated = col.identity === "a" || col.generated === "s";
       if (mode === "Row") return `${pad}${key(col.column)}: ${type}`;
       if (alwaysGenerated) return `${pad}${key(col.column)}?: never`;
-      const optional =
-        mode === "Update" || col.nullable || col.has_default || col.identity === "d";
+      const optional = mode === "Update" || col.nullable || col.has_default || col.identity === "d";
       return `${pad}${key(col.column)}${optional ? "?" : ""}: ${type}`;
     })
     .join("\n");
@@ -154,7 +153,10 @@ function functionBlock(fn) {
   const firstDefault = fn.nargs - fn.defaults;
   const args = inputs.length
     ? `{\n${inputs
-        .map((arg, i) => `          ${key(arg.name)}${i >= firstDefault ? "?" : ""}: ${tsType(arg.type)}`)
+        .map(
+          (arg, i) =>
+            `          ${key(arg.name)}${i >= firstDefault ? "?" : ""}: ${tsType(arg.type)}`,
+        )
         .join("\n")}\n        }`
     : "never";
   let returns;

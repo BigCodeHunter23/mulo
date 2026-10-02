@@ -28,8 +28,7 @@ type ReleaseRow = {
   artists: { name: string } | { name: string }[] | null;
 };
 
-const ALBUM_SELECT =
-  "mbid, title, artist_credit, cover_art_url, release_date, artists ( name )";
+const ALBUM_SELECT = "mbid, title, artist_credit, cover_art_url, release_date, artists ( name )";
 
 function toAlbum(row: ReleaseRow): AlbumSummary {
   const joined = Array.isArray(row.artists) ? row.artists[0] : row.artists;
@@ -96,11 +95,12 @@ async function topRated(limit: number): Promise<TopRated[]> {
   const { data: rows } = await supabase
     .from("releases")
     .select(ALBUM_SELECT)
-    .in("mbid", ranked.map((r) => r.mbid));
+    .in(
+      "mbid",
+      ranked.map((r) => r.mbid),
+    );
 
-  const albums = new Map(
-    (rows ?? []).map((row) => [row.mbid, toAlbum(row)]),
-  );
+  const albums = new Map((rows ?? []).map((row) => [row.mbid, toAlbum(row)]));
 
   return ranked.flatMap((r) => {
     const album = albums.get(r.mbid);
@@ -171,9 +171,7 @@ export async function artistsToExplore(limit = 10): Promise<ArtistSummary[]> {
 /** Albums out in the last few months, newest first. */
 export async function newReleases(limit = 10): Promise<AlbumSummary[]> {
   const today = new Date();
-  const since = new Date(today.getTime() - 180 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const since = new Date(today.getTime() - 180 * 86_400_000).toISOString().slice(0, 10);
 
   const { data } = await createPublicClient()
     .from("releases")
@@ -197,10 +195,7 @@ const GENRE_DEPTH = 6;
  * MULO has already cached, so there's no extra call out to MusicBrainz, and
  * the order rotates hourly so the same five names aren't always the answer.
  */
-export async function similarArtists(
-  mbid: string,
-  limit = 6,
-): Promise<ArtistSummary[]> {
+export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSummary[]> {
   const supabase = createPublicClient();
 
   const { data: own } = await supabase
@@ -282,9 +277,10 @@ export async function similarArtists(
     .neq("image_url", "");
 
   const known = new Map(
-    ((artists ?? []) as (ArtistSummary & { popularity: number | null })[]).map(
-      (artist) => [artist.mbid, artist],
-    ),
+    ((artists ?? []) as (ArtistSummary & { popularity: number | null })[]).map((artist) => [
+      artist.mbid,
+      artist,
+    ]),
   );
 
   const best = ranked.flatMap((entry) => {
@@ -292,19 +288,14 @@ export async function similarArtists(
     return artist ? [{ ...artist, score: entry.score }] : [];
   });
 
-  best.sort(
-    (a, b) => b.score - a.score || (b.popularity ?? 0) - (a.popularity ?? 0),
-  );
+  best.sort((a, b) => b.score - a.score || (b.popularity ?? 0) - (a.popularity ?? 0));
 
   // The closest few always lead, so the suggestions are believable; the rest
   // of the row rotates through the near misses, so coming back shows fresh
   // faces rather than the same six every time.
   const pool = best.slice(0, limit * 2);
   const lead = Math.ceil(limit / 2);
-  const shown = [
-    ...pool.slice(0, lead),
-    ...rotate(pool.slice(lead), 7).slice(0, limit - lead),
-  ];
+  const shown = [...pool.slice(0, lead), ...rotate(pool.slice(lead), 7).slice(0, limit - lead)];
 
   return shown.map(({ mbid: id, name, image_url }) => ({ mbid: id, name, image_url }));
 }

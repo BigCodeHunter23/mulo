@@ -10,7 +10,15 @@ const ICON = "h-6 w-6";
 
 function HomeIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={ICON}
+      fill={active ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+    >
       <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
     </svg>
   );
@@ -18,7 +26,15 @@ function HomeIcon({ active }: { active: boolean }) {
 
 function DiscoverIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={ICON}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="m15.5 8.5-2 5-5 2 2-5z" fill={active ? "currentColor" : "none"} />
     </svg>
@@ -27,16 +43,39 @@ function DiscoverIcon({ active }: { active: boolean }) {
 
 function StackIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={ICON}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+    >
       <rect x="6.5" y="3" width="11" height="6" rx="1.5" />
-      <rect x="4" y="9.5" width="16" height="11.5" rx="1.5" fill={active ? "currentColor" : "none"} />
+      <rect
+        x="4"
+        y="9.5"
+        width="16"
+        height="11.5"
+        rx="1.5"
+        fill={active ? "currentColor" : "none"}
+      />
     </svg>
   );
 }
 
 function VersusIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={ICON}
+      fill={active ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+    >
       <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
     </svg>
   );
@@ -44,7 +83,15 @@ function VersusIcon({ active }: { active: boolean }) {
 
 function PersonIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={ICON} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={ICON}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
     </svg>
@@ -89,7 +136,11 @@ export default function MobileNav({
           <HomeIcon active={home} />
           Home
         </Link>
-        <Link href="/discover" aria-current={discover ? "page" : undefined} className={tab(discover)}>
+        <Link
+          href="/discover"
+          aria-current={discover ? "page" : undefined}
+          className={tab(discover)}
+        >
           <DiscoverIcon active={discover} />
           Discover
         </Link>

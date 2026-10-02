@@ -61,10 +61,7 @@ const TRY_AGAIN: RatingResult = {
 function failure(error: DbError): RatingResult {
   // Ratings belong to a profile, so an account without a username yet can't
   // save one. Say so plainly rather than showing a database error.
-  if (
-    error.code === "23503" &&
-    `${error.details ?? ""} ${error.message}`.includes("profiles")
-  ) {
+  if (error.code === "23503" && `${error.details ?? ""} ${error.message}`.includes("profiles")) {
     return {
       ok: false,
       error: "Pick a username before rating.",
@@ -85,9 +82,7 @@ function valid(kind: unknown, mbid: unknown, releaseMbid?: unknown): kind is Rat
 
 /** Refresh the page the rating was made on, and "My ratings". */
 function refresh(kind: RatingKind, mbid: string, releaseMbid?: string) {
-  revalidatePath(
-    kind === "artist" ? `/artist/${mbid}` : `/album/${releaseMbid ?? mbid}`,
-  );
+  revalidatePath(kind === "artist" ? `/artist/${mbid}` : `/album/${releaseMbid ?? mbid}`);
   revalidatePath("/ratings");
 }
 
@@ -118,11 +113,17 @@ export async function rate(
     kind === "album"
       ? await supabase
           .from("ratings")
-          .upsert({ user_id: user.id, release_mbid: mbid, score }, { onConflict: "user_id,release_mbid" })
+          .upsert(
+            { user_id: user.id, release_mbid: mbid, score },
+            { onConflict: "user_id,release_mbid" },
+          )
       : kind === "artist"
         ? await supabase
             .from("artist_ratings")
-            .upsert({ user_id: user.id, artist_mbid: mbid, score }, { onConflict: "user_id,artist_mbid" })
+            .upsert(
+              { user_id: user.id, artist_mbid: mbid, score },
+              { onConflict: "user_id,artist_mbid" },
+            )
         : await supabase.from("song_ratings").upsert(
             // valid() has already insisted on the album for a song.
             { user_id: user.id, song_mbid: mbid, release_mbid: releaseMbid!, score },
@@ -245,11 +246,7 @@ export async function removeRating(
 
   const { table, column } = RATING_TABLES[kind];
   const supabase = await createClient();
-  const { error } = await supabase
-    .from(table)
-    .delete()
-    .eq("user_id", user.id)
-    .eq(column, mbid);
+  const { error } = await supabase.from(table).delete().eq("user_id", user.id).eq(column, mbid);
 
   if (error) return failure(error);
 

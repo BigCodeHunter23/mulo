@@ -56,16 +56,12 @@ export async function copyCoverToStorage(mbid: string) {
   if (error) return;
 
   // Both sizes share an extension, so one can be swapped for the other.
-  const smallFile =
-    small.status === "ok" && small.type === large.type ? small : large;
+  const smallFile = small.status === "ok" && small.type === large.type ? small : large;
   await bucket.upload(`${mbid}/250.${ext}`, smallFile.data, {
     contentType: smallFile.type,
     upsert: true,
   });
 
   const { data } = bucket.getPublicUrl(`${mbid}/500.${ext}`);
-  await admin
-    .from("releases")
-    .update({ cover_art_url: data.publicUrl })
-    .eq("mbid", mbid);
+  await admin.from("releases").update({ cover_art_url: data.publicUrl }).eq("mbid", mbid);
 }

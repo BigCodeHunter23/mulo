@@ -29,24 +29,21 @@ const TRY_AGAIN: SaveResult = {
  * Saves the whole ranked list at once: the order is the list, so the old rows
  * go and the new ones take their place, numbered from the top.
  */
-export async function saveTopPicks(
-  kind: PickKind,
-  mbids: string[],
-): Promise<SaveResult> {
+export async function saveTopPicks(kind: PickKind, mbids: string[]): Promise<SaveResult> {
   if (!input.safeParse({ kind, mbids }).success) return TRY_AGAIN;
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to save your list." };
   if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
 
-  const picks = [...new Set(mbids.filter((mbid) => mbidSchema.safeParse(mbid).success))].slice(0, 10);
+  const picks = [...new Set(mbids.filter((mbid) => mbidSchema.safeParse(mbid).success))].slice(
+    0,
+    10,
+  );
   const table = TABLES[kind];
   const supabase = await createClient();
 
-  const { error: clearError } = await supabase
-    .from(table)
-    .delete()
-    .eq("user_id", user.id);
+  const { error: clearError } = await supabase.from(table).delete().eq("user_id", user.id);
   if (clearError) return TRY_AGAIN;
 
   if (picks.length > 0) {
@@ -54,10 +51,14 @@ export async function saveTopPicks(
       kind === "artist"
         ? await supabase
             .from("top_artists")
-            .insert(picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, artist_mbid: mbid })))
+            .insert(
+              picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, artist_mbid: mbid })),
+            )
         : await supabase
             .from("top_albums")
-            .insert(picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, release_mbid: mbid })));
+            .insert(
+              picks.map((mbid, i) => ({ user_id: user.id, position: i + 1, release_mbid: mbid })),
+            );
     if (error) return TRY_AGAIN;
   }
 

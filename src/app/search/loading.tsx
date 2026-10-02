@@ -7,10 +7,7 @@ export default function Loading() {
       <SkeletonHeading className="mb-5 w-24" />
       <div className="overflow-hidden rounded-xl border border-border">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="border-b border-border px-4 py-3.5 last:border-b-0"
-          >
+          <div key={i} className="border-b border-border px-4 py-3.5 last:border-b-0">
             <SkeletonLine className="w-1/2" />
           </div>
         ))}

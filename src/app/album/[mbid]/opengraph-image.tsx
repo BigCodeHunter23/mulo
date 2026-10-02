@@ -11,11 +11,7 @@ export const contentType = "image/png";
  * The card shown when an album link is pasted into a message or social post:
  * cover, title, artist and MULO's overall score.
  */
-export default async function Image({
-  params,
-}: {
-  params: Promise<{ mbid: string }>;
-}) {
+export default async function Image({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   const supabase = createPublicClient();
 
@@ -43,111 +39,109 @@ export default async function Image({
   const titleSize = title.length > 36 ? 56 : title.length > 20 ? 68 : 84;
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          padding: 80,
-          background: OG.bg,
-          fontFamily: "Inter",
-        }}
-      >
-        {cover ? (
-          <img
-            src={cover}
-            alt=""
-            width={470}
-            height={470}
-            style={{ borderRadius: 24, objectFit: "cover" }}
-          />
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              width: 470,
-              height: 470,
-              borderRadius: 24,
-              background: OG.surface,
-            }}
-          />
-        )}
-
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        padding: 80,
+        background: OG.bg,
+        fontFamily: "Inter",
+      }}
+    >
+      {cover ? (
+        <img
+          src={cover}
+          alt=""
+          width={470}
+          height={470}
+          style={{ borderRadius: 24, objectFit: "cover" }}
+        />
+      ) : (
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            marginLeft: 64,
-            paddingBottom: 40,
+            width: 470,
+            height: 470,
+            borderRadius: 24,
+            background: OG.surface,
+          }}
+        />
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          marginLeft: 64,
+          paddingBottom: 40,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 24,
+            fontWeight: 500,
+            color: OG.muted,
+            letterSpacing: "0.15em",
           }}
         >
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 500,
-              color: OG.muted,
-              letterSpacing: "0.15em",
-            }}
-          >
-            ALBUM
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              fontSize: titleSize,
-              fontWeight: 800,
-              color: OG.text,
-              letterSpacing: "-0.035em",
-              lineHeight: 1.05,
-            }}
-          >
-            {title}
-          </div>
-          <div
-            style={{
-              marginTop: 20,
-              fontSize: 34,
-              fontWeight: 500,
-              color: OG.secondary,
-            }}
-          >
-            {[artist, year].filter(Boolean).join(" · ")}
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", marginTop: 44 }}>
-            <Star size={44} color={average !== null ? OG.gold : OG.muted} />
-            <div
-              style={{
-                marginLeft: 14,
-                fontSize: 52,
-                fontWeight: 800,
-                color: OG.text,
-              }}
-            >
-              {average !== null ? average.toFixed(1) : "—"}
-            </div>
-            <div
-              style={{
-                marginLeft: 18,
-                fontSize: 28,
-                fontWeight: 500,
-                color: OG.muted,
-              }}
-            >
-              {votes > 0
-                ? `${votes} rating${votes === 1 ? "" : "s"} on MULO`
-                : "Be the first to rate it"}
-            </div>
-          </div>
+          ALBUM
+        </div>
+        <div
+          style={{
+            marginTop: 16,
+            fontSize: titleSize,
+            fontWeight: 800,
+            color: OG.text,
+            letterSpacing: "-0.035em",
+            lineHeight: 1.05,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            marginTop: 20,
+            fontSize: 34,
+            fontWeight: 500,
+            color: OG.secondary,
+          }}
+        >
+          {[artist, year].filter(Boolean).join(" · ")}
         </div>
 
-        <Wordmark />
+        <div style={{ display: "flex", alignItems: "center", marginTop: 44 }}>
+          <Star size={44} color={average !== null ? OG.gold : OG.muted} />
+          <div
+            style={{
+              marginLeft: 14,
+              fontSize: 52,
+              fontWeight: 800,
+              color: OG.text,
+            }}
+          >
+            {average !== null ? average.toFixed(1) : "—"}
+          </div>
+          <div
+            style={{
+              marginLeft: 18,
+              fontSize: 28,
+              fontWeight: 500,
+              color: OG.muted,
+            }}
+          >
+            {votes > 0
+              ? `${votes} rating${votes === 1 ? "" : "s"} on MULO`
+              : "Be the first to rate it"}
+          </div>
+        </div>
       </div>
-    ),
+
+      <Wordmark />
+    </div>,
     { ...size, fonts },
   );
 }

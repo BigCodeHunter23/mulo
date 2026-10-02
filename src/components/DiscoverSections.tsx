@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import {
-  artistsToExplore,
-  mostPlayedAlbums,
-  newReleases,
-  topRatedOnMulo,
-} from "@/lib/discover";
+import { artistsToExplore, mostPlayedAlbums, newReleases, topRatedOnMulo } from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -22,13 +17,7 @@ import HoldTip from "@/components/HoldTip";
 import { SearchPrompt } from "@/components/SiteSearch";
 import { getRecentLists } from "@/lib/lists";
 import { SkeletonLine, SkeletonRows } from "@/components/Skeleton";
-import {
-  ALBUM_GRID,
-  ALBUM_ITEM,
-  ARTIST_GRID,
-  ARTIST_ITEM,
-  SectionHeading,
-} from "@/components/ui";
+import { ALBUM_GRID, ALBUM_ITEM, ARTIST_GRID, ARTIST_ITEM, SectionHeading } from "@/components/ui";
 
 /**
  * The browsable parts of MULO, shared by the Discover page and the home page.

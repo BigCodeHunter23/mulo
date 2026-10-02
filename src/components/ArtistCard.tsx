@@ -23,10 +23,7 @@ export default function ArtistCard({
   const src = artistPhotoSrc(imageUrl, 300);
 
   return (
-    <Link
-      href={`/artist/${mbid}`}
-      className="group flex flex-col items-center gap-2.5 text-center"
-    >
+    <Link href={`/artist/${mbid}`} className="group flex flex-col items-center gap-2.5 text-center">
       <div className="artwork aspect-square w-full overflow-hidden rounded-full transition-transform duration-200 group-hover:scale-[1.03] group-active:scale-[0.97]">
         <CoverImage
           src={src}

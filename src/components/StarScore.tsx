@@ -48,11 +48,7 @@ export function Score({
     <div className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-1.5">
         <Star className={`${star} ${has ? style.color : "text-text-muted/40"}`} />
-        <span
-          className={`display-sm tabular-nums ${num} ${
-            has ? "text-text" : "text-text-muted"
-          }`}
-        >
+        <span className={`display-sm tabular-nums ${num} ${has ? "text-text" : "text-text-muted"}`}>
           {has ? value.toFixed(1) : "—"}
         </span>
       </div>
@@ -96,8 +92,7 @@ export default function StarScore({
           isn't blank is fair, passing it off as MULO's own crowd is not. */}
       {seeded && (
         <p className="mt-2 text-center text-[11px] leading-snug text-text-muted sm:text-left">
-          Includes a starting score from MusicBrainz, which fades out as MULO
-          rates it.
+          Includes a starting score from MusicBrainz, which fades out as MULO rates it.
         </p>
       )}
     </div>

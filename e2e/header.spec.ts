@@ -16,7 +16,13 @@ test.describe("header on a wide screen", () => {
     await expect(header.getByRole("button", { name: "Your account" })).toHaveCount(0);
 
     const nav = header.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("link")).toHaveText(["Home", "Discover", "Charts", "Versus", "Lists"]);
+    await expect(nav.getByRole("link")).toHaveText([
+      "Home",
+      "Discover",
+      "Charts",
+      "Versus",
+      "Lists",
+    ]);
   });
 
   test("Join and Log in come back to this page", async ({ page }) => {

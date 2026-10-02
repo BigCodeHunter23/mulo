@@ -26,8 +26,8 @@ export default function WiderResults({
         <h2 className="display-sm text-lg text-text">More results</h2>
       </div>
       <p className="-mt-2 mb-4 text-xs text-text-muted">
-        From the wider music database. Open any of them to add it to MULO and be
-        the first to rate it.
+        From the wider music database. Open any of them to add it to MULO and be the first to rate
+        it.
       </p>
 
       {artists.length > 0 && (
@@ -60,7 +60,9 @@ export default function WiderResults({
                   )}
                 </span>
                 {album.year && (
-                  <span className="shrink-0 text-xs tabular-nums text-text-muted">{album.year}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-text-muted">
+                    {album.year}
+                  </span>
                 )}
               </Link>
             </li>

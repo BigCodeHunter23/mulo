@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import {
-  dayLabel,
-  getMatchupForDay,
-  getVersusView,
-  shiftDay,
-} from "@/lib/versus";
+import { dayLabel, getMatchupForDay, getVersusView, shiftDay } from "@/lib/versus";
 import { leader, shares, type VersusMatchup } from "@/lib/versus-shared";
 import VersusCard from "@/components/VersusCard";
 import VersusFaces from "@/components/VersusFaces";
@@ -63,9 +58,7 @@ async function Yesterday({ day }: { day: string }) {
           </span>
           {view.mine && (
             <span className="mt-0.5 block text-xs text-text-muted">
-              {view.mine === ahead
-                ? "You called it."
-                : `You picked ${matchup[view.mine].name}.`}
+              {view.mine === ahead ? "You called it." : `You picked ${matchup[view.mine].name}.`}
             </span>
           )}
         </span>
@@ -131,12 +124,7 @@ export default async function VersusScreen({ matchup }: { matchup: VersusMatchup
       </div>
 
       <Suspense fallback={null}>
-        <Takes
-          matchup={matchup}
-          mine={view.mine}
-          signedIn={view.signedIn}
-          closed={view.closed}
-        />
+        <Takes matchup={matchup} mine={view.mine} signedIn={view.signedIn} closed={view.closed} />
       </Suspense>
 
       {!view.closed && (

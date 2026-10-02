@@ -112,7 +112,8 @@ export default async function MyRatingsPage({
 
   // Album filters: a decade ("1990") and a genre family ("hip-hop"). They
   // only mean anything for albums, which carry a date and genre tags.
-  const decade = tab.kind === "album" && /^\d{4}$/.test(decadeParam ?? "") ? Number(decadeParam) : null;
+  const decade =
+    tab.kind === "album" && /^\d{4}$/.test(decadeParam ?? "") ? Number(decadeParam) : null;
   const genre =
     tab.kind === "album" && GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
 
@@ -190,9 +191,7 @@ export default async function MyRatingsPage({
         }
       >
         My ratings
-        {total > 0 && (
-          <span className="ml-2 text-sm font-normal text-text-muted">{total}</span>
-        )}
+        {total > 0 && <span className="ml-2 text-sm font-normal text-text-muted">{total}</span>}
       </SectionHeading>
 
       <nav
@@ -211,51 +210,60 @@ export default async function MyRatingsPage({
               }`}
             >
               {t.label}
-              <span className="text-xs tabular-nums text-text-muted">
-                {counts[t.kind]}
-              </span>
+              <span className="text-xs tabular-nums text-text-muted">{counts[t.kind]}</span>
             </Link>
           );
         })}
       </nav>
 
-      {tab.kind === "album" && albums.length > 1 && (decades.length > 1 || genresHeld.length > 1) && (
-        <div className="mb-8 flex flex-col gap-2.5">
-          {decades.length > 1 && (
-            <nav aria-label="Decade" className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-              {[null, ...decades].map((d) => (
-                <Link
-                  key={d ?? "all"}
-                  href={href("albums", { view: recent ? "recent" : undefined, decade: d })}
-                  aria-current={decade === d ? "page" : undefined}
-                  className={`${CHIP} ${decade === d ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {d === null ? "All decades" : `${String(d).slice(2)}s`}
-                </Link>
-              ))}
-            </nav>
-          )}
-          {genresHeld.length > 1 && (
-            <nav aria-label="Genre" className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-              {[null, ...genresHeld].map((family) => (
-                <Link
-                  key={family?.id ?? "all"}
-                  href={href("albums", { view: recent ? "recent" : undefined, genre: family?.id ?? null })}
-                  aria-current={genre === (family?.id ?? null) ? "page" : undefined}
-                  className={`${CHIP} ${genre === (family?.id ?? null) ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {family?.name ?? "All genres"}
-                </Link>
-              ))}
-            </nav>
-          )}
-          {(decade !== null || genre !== null) && (
-            <p className="text-xs text-text-muted">
-              {filteredAlbums.length} of {albums.length} albums
-            </p>
-          )}
-        </div>
-      )}
+      {tab.kind === "album" &&
+        albums.length > 1 &&
+        (decades.length > 1 || genresHeld.length > 1) && (
+          <div className="mb-8 flex flex-col gap-2.5">
+            {decades.length > 1 && (
+              <nav
+                aria-label="Decade"
+                className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+              >
+                {[null, ...decades].map((d) => (
+                  <Link
+                    key={d ?? "all"}
+                    href={href("albums", { view: recent ? "recent" : undefined, decade: d })}
+                    aria-current={decade === d ? "page" : undefined}
+                    className={`${CHIP} ${decade === d ? CHIP_ON : CHIP_OFF}`}
+                  >
+                    {d === null ? "All decades" : `${String(d).slice(2)}s`}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {genresHeld.length > 1 && (
+              <nav
+                aria-label="Genre"
+                className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+              >
+                {[null, ...genresHeld].map((family) => (
+                  <Link
+                    key={family?.id ?? "all"}
+                    href={href("albums", {
+                      view: recent ? "recent" : undefined,
+                      genre: family?.id ?? null,
+                    })}
+                    aria-current={genre === (family?.id ?? null) ? "page" : undefined}
+                    className={`${CHIP} ${genre === (family?.id ?? null) ? CHIP_ON : CHIP_OFF}`}
+                  >
+                    {family?.name ?? "All genres"}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {(decade !== null || genre !== null) && (
+              <p className="text-xs text-text-muted">
+                {filteredAlbums.length} of {albums.length} albums
+              </p>
+            )}
+          </div>
+        )}
 
       {counts[tab.kind] === 0 ? (
         <EmptyState
@@ -266,9 +274,7 @@ export default async function MyRatingsPage({
       ) : openBand ? (
         <>
           <div className="mb-5 flex items-baseline gap-3">
-            <span className="display text-3xl tabular-nums text-score-you">
-              {openBand}
-            </span>
+            <span className="display text-3xl tabular-nums text-score-you">{openBand}</span>
             <span className="text-sm text-text-muted">
               {shown.length} {tab.noun}
             </span>
@@ -288,9 +294,7 @@ export default async function MyRatingsPage({
           {byScore(all).map(([score, list]) => (
             <section key={score}>
               <div className="mb-4 flex items-baseline gap-3">
-                <span className="display text-2xl tabular-nums text-score-you">
-                  {score}
-                </span>
+                <span className="display text-2xl tabular-nums text-score-you">{score}</span>
                 <span className="text-sm text-text-muted">
                   {list.length} {tab.noun}
                 </span>
@@ -434,18 +438,11 @@ function SongItems({ ratings }: { ratings: SongRating[] }) {
               <span className="artwork h-11 w-11 shrink-0 overflow-hidden rounded-md">
                 {cover && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={cover}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-text">
-                  {rating.song.title}
-                </span>
+                <span className="block truncate text-sm text-text">{rating.song.title}</span>
                 <span className="block truncate text-xs text-text-muted">
                   {rating.release.title}
                   {rating.release.artist && ` · ${rating.release.artist.name}`}

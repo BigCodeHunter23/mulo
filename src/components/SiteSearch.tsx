@@ -452,7 +452,11 @@ export default function SiteSearch() {
     }
     function onKeyDown(event: KeyboardEvent) {
       const slash =
-        event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !typingIn(event.target);
+        event.key === "/" &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !typingIn(event.target);
       const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
       if (!slash && !commandK) return;
       event.preventDefault();

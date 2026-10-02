@@ -40,9 +40,7 @@ export default function PersonRow({
         </Link>
         <p className="truncate text-sm text-text-muted">@{profile.username}</p>
         {showBio && profile.bio && (
-          <p className="mt-1 line-clamp-1 text-sm text-text-secondary">
-            {profile.bio}
-          </p>
+          <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{profile.bio}</p>
         )}
       </div>
 

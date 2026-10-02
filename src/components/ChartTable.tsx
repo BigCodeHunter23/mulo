@@ -25,15 +25,7 @@ function Rank({ rank }: { rank: number }) {
   );
 }
 
-function Art({
-  src,
-  alt,
-  round,
-}: {
-  src: string | null;
-  alt: string;
-  round: boolean;
-}) {
+function Art({ src, alt, round }: { src: string | null; alt: string; round: boolean }) {
   return (
     <div
       className={`artwork h-14 w-14 shrink-0 overflow-hidden sm:h-16 sm:w-16 ${
@@ -48,22 +40,14 @@ function Art({
   );
 }
 
-export default function ChartTable({
-  chart,
-  progress,
-}: {
-  chart: Chart;
-  progress: ChartProgress;
-}) {
+export default function ChartTable({ chart, progress }: { chart: Chart; progress: ChartProgress }) {
   const artists = chart.kind === "artists";
 
   return (
     <ol className="flex flex-col divide-y divide-border/70 border-y border-border/70">
       {chart.entries.map((entry) => {
         const yours = progress.yours.get(entry.mbid);
-        const src = artists
-          ? artistPhotoSrc(entry.coverUrl, 300)
-          : coverSrc(entry.coverUrl, 250);
+        const src = artists ? artistPhotoSrc(entry.coverUrl, 300) : coverSrc(entry.coverUrl, 250);
         const detail = [entry.subtitle, entry.year].filter(Boolean).join(" · ");
 
         return (
@@ -79,9 +63,7 @@ export default function ChartTable({
                 <p className="display-sm line-clamp-1 text-sm text-text transition-colors group-hover:text-accent sm:text-base">
                   {entry.title}
                 </p>
-                {detail && (
-                  <p className="mt-0.5 truncate text-xs text-text-muted">{detail}</p>
-                )}
+                {detail && <p className="mt-0.5 truncate text-xs text-text-muted">{detail}</p>}
                 <p className="mt-1 text-[11px] text-text-muted/80">
                   {entry.votes} {entry.votes === 1 ? "rating" : "ratings"}
                 </p>

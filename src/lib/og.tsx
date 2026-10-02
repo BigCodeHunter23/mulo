@@ -26,15 +26,12 @@ async function fetchInter(weight: 500 | 800): Promise<ArrayBuffer | null> {
   try {
     // Asked without a browser user agent, Google Fonts serves TrueType, which
     // the image renderer can read. Browsers get WOFF2, which it can't.
-    const response = await fetch(
-      `https://fonts.googleapis.com/css2?family=Inter:wght@${weight}`,
-      { signal: AbortSignal.timeout(5000) },
-    );
+    const response = await fetch(`https://fonts.googleapis.com/css2?family=Inter:wght@${weight}`, {
+      signal: AbortSignal.timeout(5000),
+    });
     const css = await response.text();
 
-    const url = css.match(
-      /src: url\((.+?)\) format\('(?:opentype|truetype)'\)/,
-    )?.[1];
+    const url = css.match(/src: url\((.+?)\) format\('(?:opentype|truetype)'\)/)?.[1];
     if (!url) return null;
 
     const font = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -70,7 +67,6 @@ export async function ogFonts(): Promise<OgFont[] | undefined> {
   return fonts.length > 0 ? fonts : undefined;
 }
 
-
 const COMMONS_FILE =
   /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+)/;
 
@@ -93,9 +89,7 @@ function commonsPngCopies(url: string) {
  * Fetches an image and inlines it, so one slow or missing picture degrades to
  * a placeholder instead of failing the whole preview.
  */
-export async function loadImage(
-  url: string | null | undefined,
-): Promise<string | null> {
+export async function loadImage(url: string | null | undefined): Promise<string | null> {
   if (!url) return null;
 
   // Record avatars are stored as paths on this site.
@@ -149,56 +143,54 @@ export function Wordmark() {
 /** The plain MULO card, used when there's nothing more specific to show. */
 export function brandCard(fonts: OgFont[] | undefined) {
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: 88,
+        background: OG.bg,
+        fontFamily: "Inter",
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: 88,
-          background: OG.bg,
-          fontFamily: "Inter",
+          fontSize: 46,
+          fontWeight: 800,
+          color: OG.accent,
+          letterSpacing: "-0.03em",
         }}
       >
-        <div
-          style={{
-            fontSize: 46,
-            fontWeight: 800,
-            color: OG.accent,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          MULO
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            marginTop: 30,
-            fontSize: 80,
-            fontWeight: 800,
-            color: OG.text,
-            letterSpacing: "-0.035em",
-            lineHeight: 1.05,
-          }}
-        >
-          <span>Every record,</span>
-          <span style={{ color: OG.accent }}>rated by people you trust.</span>
-        </div>
-        <div
-          style={{
-            marginTop: 34,
-            fontSize: 30,
-            fontWeight: 500,
-            color: OG.secondary,
-          }}
-        >
-          Rate and review the music you listen to.
-        </div>
+        MULO
       </div>
-    ),
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          marginTop: 30,
+          fontSize: 80,
+          fontWeight: 800,
+          color: OG.text,
+          letterSpacing: "-0.035em",
+          lineHeight: 1.05,
+        }}
+      >
+        <span>Every record,</span>
+        <span style={{ color: OG.accent }}>rated by people you trust.</span>
+      </div>
+      <div
+        style={{
+          marginTop: 34,
+          fontSize: 30,
+          fontWeight: 500,
+          color: OG.secondary,
+        }}
+      >
+        Rate and review the music you listen to.
+      </div>
+    </div>,
     { width: 1200, height: 630, fonts },
   );
 }

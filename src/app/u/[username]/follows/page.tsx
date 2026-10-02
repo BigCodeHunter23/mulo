@@ -27,15 +27,11 @@ export async function generateMetadata({
   const direction = directionOf(show);
 
   return {
-    title:
-      direction === "following"
-        ? `Who ${username} follows`
-        : `${username}'s followers`,
+    title: direction === "following" ? `Who ${username} follows` : `${username}'s followers`,
   };
 }
 
-const TAB =
-  "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors";
+const TAB = "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors";
 const ON = "border-accent bg-accent-subtle text-accent";
 const OFF =
   "border-border bg-surface text-text-secondary hover:border-border-strong hover:text-text";

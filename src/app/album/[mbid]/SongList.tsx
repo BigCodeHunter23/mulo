@@ -37,8 +37,7 @@ const mean = (scores: FriendScore[]) =>
   scores.reduce((sum, friend) => sum + friend.score, 0) / scores.length;
 
 /** One person's score is a whole number, so don't dress it up as an average. */
-const score = (value: number) =>
-  Number.isInteger(value) ? String(value) : value.toFixed(1);
+const score = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
 
 /** Two heads: says "the people you follow" where there's no room for faces. */
 function CrewIcon() {
@@ -120,9 +119,7 @@ export default function SongList({
 }) {
   const [own, setOwn] = useState(initialOwn);
   const [open, setOpen] = useState<string | null>(null);
-  const [error, setError] = useState<{ text: string; needsProfile?: boolean } | null>(
-    null,
-  );
+  const [error, setError] = useState<{ text: string; needsProfile?: boolean } | null>(null);
   const [, startTransition] = useTransition();
   const { celebrate, overlay } = useBadgeUnlock();
 
@@ -177,9 +174,7 @@ export default function SongList({
     });
     if (rated.length === 0) return null;
 
-    const crew = new Set(
-      rated.flatMap((song) => song.scores.map((friend) => friend.username)),
-    );
+    const crew = new Set(rated.flatMap((song) => song.scores.map((friend) => friend.username)));
 
     let pick: { title: string; mbid: string; average: number } | null = null;
     let clash: { title: string; mbid: string; gap: number; mine: number; theirs: number } | null =
@@ -227,9 +222,7 @@ export default function SongList({
             {highlights.people} {highlights.people === 1 ? "person" : "people"} you follow
           </span>{" "}
           {highlights.people === 1 ? "has" : "have"} scored{" "}
-          {highlights.songs === tracks.length
-            ? "the whole record"
-            : `${highlights.songs} of these`}
+          {highlights.songs === tracks.length ? "the whole record" : `${highlights.songs} of these`}
           .
           {highlights.pick && (
             <>
@@ -398,11 +391,7 @@ export default function SongList({
                               href={`/u/${friend.username}`}
                               className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text"
                             >
-                              <Avatar
-                                url={friend.avatar_url}
-                                name={friend.name}
-                                size="sm"
-                              />
+                              <Avatar url={friend.avatar_url} name={friend.name} size="sm" />
                               <span className="min-w-0 flex-1 truncate">{friend.name}</span>
                               <span className="w-7 shrink-0 rounded-md bg-score-friends/15 py-0.5 text-center text-xs font-bold tabular-nums text-score-friends">
                                 {friend.score}

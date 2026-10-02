@@ -55,7 +55,10 @@ describe("0016 and 0017 over existing data", () => {
   });
 
   it("hold new writes to the rules even while old rows aren't", async () => {
-    await refuses(db, `update public.profiles set avatar_url = 'https://evil.example/x.png' where id = '${U(3)}'`);
+    await refuses(
+      db,
+      `update public.profiles set avatar_url = 'https://evil.example/x.png' where id = '${U(3)}'`,
+    );
     await refuses(db, `update public.profiles set username = 'no spaces' where id = '${U(3)}'`);
     await refuses(db, `update public.profiles set bio = repeat('x', 301) where id = '${U(3)}'`);
     await db.exec(
@@ -71,7 +74,10 @@ describe("0016 and 0017 over existing data", () => {
     await db.exec(migrationSql("0016_profile_and_content_rules.sql"));
     expect(await hasIndex("profiles_username_lower_key")).toBe(true);
     expect(await validated("profiles_avatar_url_source")).toBe(true);
-    await refuses(db, `insert into auth.users (id) values ('${U(4)}'); insert into public.profiles (id, username) values ('${U(4)}', 'ALEX')`);
+    await refuses(
+      db,
+      `insert into auth.users (id) values ('${U(4)}'); insert into public.profiles (id, username) values ('${U(4)}', 'ALEX')`,
+    );
   });
 
   it("accept a report with a known reason and refuse a made-up one", async () => {
@@ -92,12 +98,12 @@ describe("0016 and 0017 over existing data", () => {
           [subject],
         )
       ).rows[0].allowed;
-    expect([await hit("1.2.3.4"), await hit("1.2.3.4"), await hit("1.2.3.4"), await hit("1.2.3.4")]).toEqual([
-      true,
-      true,
-      true,
-      false,
-    ]);
+    expect([
+      await hit("1.2.3.4"),
+      await hit("1.2.3.4"),
+      await hit("1.2.3.4"),
+      await hit("1.2.3.4"),
+    ]).toEqual([true, true, true, false]);
     expect(await hit("5.6.7.8")).toBe(true);
   });
 
@@ -119,9 +125,12 @@ describe("every migration from 0008 on", () => {
   afterAll(() => db?.close());
 
   // 0001 to 0007 predate the rule and aren't safe to repeat.
-  it.each(migrationFiles().filter((name) => name >= "0008"))("%s is safe to run twice", async (name) => {
-    await db.exec(migrationSql(name));
-  });
+  it.each(migrationFiles().filter((name) => name >= "0008"))(
+    "%s is safe to run twice",
+    async (name) => {
+      await db.exec(migrationSql(name));
+    },
+  );
 });
 
 describe("0018 score totals", () => {
@@ -156,7 +165,8 @@ describe("0018 score totals", () => {
   });
   afterAll(() => db?.close());
 
-  const rows = async <T,>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const rows = async <T>(sql: string, params: unknown[] = []) =>
+    (await db.query<T>(sql, params)).rows;
 
   it("count every rating on an album, past a thousand", async () => {
     const [album] = await rows<{ total: number; votes: number; average: number }>(
@@ -178,37 +188,44 @@ describe("0018 score totals", () => {
     expect(
       await rows("select mbid, votes::int, average from public.score_totals('artist')"),
     ).toEqual([{ mbid: ARTIST, votes: 2, average: 8 }]);
-    expect(await rows("select mbid, votes::int from public.score_totals('song', $1)", [[SONG]])).toEqual([
-      { mbid: SONG, votes: 2 },
-    ]);
-    expect(await rows("select mbid from public.score_totals('album') order by mbid")).toHaveLength(2);
+    expect(
+      await rows("select mbid, votes::int from public.score_totals('song', $1)", [[SONG]]),
+    ).toEqual([{ mbid: SONG, votes: 2 }]);
+    expect(await rows("select mbid from public.score_totals('album') order by mbid")).toHaveLength(
+      2,
+    );
   });
 
   it("give chart rows with the artist joined, and songs on the album first rated on", async () => {
     expect(
-      await rows("select mbid, title, artist_name, votes::int from public.album_chart_rows() order by votes desc"),
+      await rows(
+        "select mbid, title, artist_name, votes::int from public.album_chart_rows() order by votes desc",
+      ),
     ).toEqual([
       { mbid: ALBUM, title: "First", artist_name: "The Band", votes: 1500 },
       { mbid: OTHER_ALBUM, title: "Second", artist_name: "The Band", votes: 1 },
     ]);
-    expect(await rows("select mbid, release_mbid, total::int, votes::int from public.song_chart_rows()")).toEqual([
-      { mbid: SONG, release_mbid: OTHER_ALBUM, total: 10, votes: 2 },
-    ]);
+    expect(
+      await rows("select mbid, release_mbid, total::int, votes::int from public.song_chart_rows()"),
+    ).toEqual([{ mbid: SONG, release_mbid: OTHER_ALBUM, total: 10, votes: 2 }]);
     expect(await rows("select name, total::int from public.artist_chart_rows()")).toEqual([
       { name: "The Band", total: 16 },
     ]);
   });
 
   it("rank an artist's songs", async () => {
-    expect(await rows("select title, release_title, average, votes::int from public.artist_top_songs($1)", [ARTIST])).toEqual([
-      { title: "Opener", release_title: "Second", average: 5, votes: 2 },
-    ]);
+    expect(
+      await rows(
+        "select title, release_title, average, votes::int from public.artist_top_songs($1)",
+        [ARTIST],
+      ),
+    ).toEqual([{ title: "Opener", release_title: "Second", average: 5, votes: 2 }]);
   });
 
   it("count somebody's ratings of every kind", async () => {
-    expect(await rows("select ratings::int, average from public.profile_rating_stats($1)", [U(1)])).toEqual([
-      { ratings: 4, average: (6 + 10 + 9 + 4) / 4 },
-    ]);
+    expect(
+      await rows("select ratings::int, average from public.profile_rating_stats($1)", [U(1)]),
+    ).toEqual([{ ratings: 4, average: (6 + 10 + 9 + 4) / 4 }]);
   });
 
   it("rank heavy rotation by people, and count who was active", async () => {

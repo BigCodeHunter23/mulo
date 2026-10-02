@@ -31,51 +31,57 @@ export async function storyResponse({
 }) {
   const fonts = await ogFonts();
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        padding: "150px 90px 130px",
+        background: `linear-gradient(180deg, #1c1410 0%, ${OG.bg} 45%, ${OG.bg} 100%)`,
+        fontFamily: "Inter",
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          padding: "150px 90px 130px",
-          background: `linear-gradient(180deg, #1c1410 0%, ${OG.bg} 45%, ${OG.bg} 100%)`,
-          fontFamily: "Inter",
+          fontSize: 30,
+          fontWeight: 800,
+          color: OG.accent,
+          letterSpacing: "0.25em",
         }}
       >
+        {kicker.toUpperCase()}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          marginTop: 40,
+          marginBottom: 40,
+          justifyContent: center ? "center" : "flex-start",
+        }}
+      >
+        {children}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", fontSize: 30, fontWeight: 500, color: OG.muted }}>
+          Rate it on MULO
+        </div>
         <div
           style={{
             display: "flex",
-            fontSize: 30,
+            fontSize: 72,
             fontWeight: 800,
             color: OG.accent,
-            letterSpacing: "0.25em",
+            letterSpacing: "-0.03em",
           }}
         >
-          {kicker.toUpperCase()}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            marginTop: 40,
-            marginBottom: 40,
-            justifyContent: center ? "center" : "flex-start",
-          }}
-        >
-          {children}
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", fontSize: 30, fontWeight: 500, color: OG.muted }}>
-            Rate it on MULO
-          </div>
-          <div style={{ display: "flex", fontSize: 72, fontWeight: 800, color: OG.accent, letterSpacing: "-0.03em" }}>
-            MULO
-          </div>
+          MULO
         </div>
       </div>
-    ),
+    </div>,
     {
       ...STORY,
       fonts,
@@ -100,6 +106,8 @@ export function Tile({
   return src ? (
     <img src={src} alt="" width={size} height={size} style={{ borderRadius, objectFit: "cover" }} />
   ) : (
-    <div style={{ display: "flex", width: size, height: size, borderRadius, background: OG.surface }} />
+    <div
+      style={{ display: "flex", width: size, height: size, borderRadius, background: OG.surface }}
+    />
   );
 }

@@ -48,9 +48,7 @@ export default function StreakFlame({
         {streak.days}
         <span className="ml-1 font-normal text-text-secondary">day streak</span>
       </span>
-      {atRisk && (
-        <span className="text-xs text-score-overall">&middot; keep it going today</span>
-      )}
+      {atRisk && <span className="text-xs text-score-overall">&middot; keep it going today</span>}
     </div>
   );
 }

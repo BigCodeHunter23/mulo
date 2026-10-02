@@ -3,14 +3,26 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { addToList, deleteList, moveInList, removeFromList, setListNote } from "@/app/lists/actions";
+import {
+  addToList,
+  deleteList,
+  moveInList,
+  removeFromList,
+  setListNote,
+} from "@/app/lists/actions";
 import type { ListItem } from "@/lib/lists";
 import { coverSrc } from "@/lib/cover-url";
 import { buttonClass, fieldClass } from "@/components/ui";
 import ListForm from "../ListForm";
 import { haptic } from "@/lib/haptics";
 
-type Found = { mbid: string; title: string; artist: string | null; cover_art_url: string | null; year: string | null };
+type Found = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover_art_url: string | null;
+  year: string | null;
+};
 
 /**
  * A list's albums. Anyone sees them in order with their notes; the owner also
@@ -103,11 +115,17 @@ export default function ListItems({
         </div>
       )}
 
-      {error && <p role="alert" className="mb-4 text-sm text-score-you">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-4 text-sm text-score-you">
+          {error}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-text-secondary">
-          {editable ? "No albums yet. Search below to add the first." : "No albums on this list yet."}
+          {editable
+            ? "No albums yet. Search below to add the first."
+            : "No albums on this list yet."}
         </p>
       ) : (
         <ol className={`flex flex-col gap-2 ${pending ? "opacity-70" : ""}`}>
@@ -123,12 +141,20 @@ export default function ListItems({
                   <span className="artwork block h-14 w-14 overflow-hidden rounded-md sm:h-16 sm:w-16">
                     {item.cover && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={coverSrc(item.cover, 250) ?? item.cover} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <img
+                        src={coverSrc(item.cover, 250) ?? item.cover}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
                     )}
                   </span>
                 </Link>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/album/${item.mbid}`} className="block truncate font-medium text-text hover:text-accent">
+                  <Link
+                    href={`/album/${item.mbid}`}
+                    className="block truncate font-medium text-text hover:text-accent"
+                  >
                     {item.title}
                   </Link>
                   <p className="truncate text-sm text-text-muted">
@@ -183,7 +209,11 @@ export default function ListItems({
                     className={fieldClass}
                   />
                   <div className="flex gap-2">
-                    <button type="submit" disabled={pending} className={buttonClass({ size: "sm" })}>
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className={buttonClass({ size: "sm" })}
+                    >
                       Save note
                     </button>
                     <button
@@ -284,7 +314,9 @@ function AddAlbums({
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
         const body = (await response.json()) as { albums?: Found[] };
         setFound(body.albums ?? []);
       } catch {
@@ -315,11 +347,18 @@ function AddAlbums({
           {results.map((album) => {
             const has = listed.has(album.mbid);
             return (
-              <li key={album.mbid} className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0">
+              <li
+                key={album.mbid}
+                className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+              >
                 <span className="artwork block h-10 w-10 shrink-0 overflow-hidden rounded">
                   {album.cover_art_url && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={coverSrc(album.cover_art_url, 250) ?? album.cover_art_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={coverSrc(album.cover_art_url, 250) ?? album.cover_art_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">

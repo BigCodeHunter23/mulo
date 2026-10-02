@@ -13,7 +13,13 @@ export type MilestoneCard = {
   };
   average: number | null;
   /** Their highest-scored albums, for the cover row. */
-  top: { mbid: string; title: string; artist: string | null; cover: string | null; score: number }[];
+  top: {
+    mbid: string;
+    title: string;
+    artist: string | null;
+    cover: string | null;
+    score: number;
+  }[];
 };
 
 /**

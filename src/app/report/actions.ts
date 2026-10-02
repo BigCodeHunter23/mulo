@@ -30,10 +30,7 @@ const reportInput = z
     "Couldn't send that report. Please try again.",
   );
 
-export async function submitReport(
-  _prev: ReportState,
-  formData: FormData,
-): Promise<ReportState> {
+export async function submitReport(_prev: ReportState, formData: FormData): Promise<ReportState> {
   const user = await getCurrentUser();
   if (!user) return { error: "Log in to report something." };
 

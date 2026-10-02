@@ -16,13 +16,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { username, artist: mbid } = await params;
   const artist = await getCachedArtist(mbid);
   const title = artist ? `${username}'s ${artist.name} ranking` : "Ranking";
-  return { title, description: `Every ${artist?.name ?? ""} album, ranked by ${username} on MULO.` };
+  return {
+    title,
+    description: `Every ${artist?.name ?? ""} album, ranked by ${username} on MULO.`,
+  };
 }
 
 function Cover({ album, className }: { album: RankedAlbum; className: string }) {
   const src = coverSrc(album.cover, 500);
   return (
-    <div className={`artwork overflow-hidden rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.9)] ${className}`}>
+    <div
+      className={`artwork overflow-hidden rounded-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.9)] ${className}`}
+    >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={album.title} className="h-full w-full object-cover" />
@@ -156,7 +161,9 @@ export default async function RankingPage({ params }: { params: Params }) {
                       </span>
                       {album.year && <span className="text-xs text-text-muted">{album.year}</span>}
                     </span>
-                    <span className="display-sm text-lg tabular-nums text-score-you">{album.score}</span>
+                    <span className="display-sm text-lg tabular-nums text-score-you">
+                      {album.score}
+                    </span>
                   </Link>
                 </li>
               ))}

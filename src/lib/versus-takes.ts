@@ -32,7 +32,9 @@ export async function getTakes(matchupId: number): Promise<Takes> {
 
   const { data, error } = await supabase
     .from("versus_takes")
-    .select("id, body, created_at, user_id, profiles!inner ( id, username, display_name, avatar_url )")
+    .select(
+      "id, body, created_at, user_id, profiles!inner ( id, username, display_name, avatar_url )",
+    )
     .eq("matchup_id", matchupId)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -79,8 +81,7 @@ export async function getTakes(matchupId: number): Promise<Takes> {
   return {
     available: true,
     takes: takes.sort(
-      (a, b) =>
-        b.reactions.love - b.reactions.dislike - (a.reactions.love - a.reactions.dislike),
+      (a, b) => b.reactions.love - b.reactions.dislike - (a.reactions.love - a.reactions.dislike),
     ),
   };
 }

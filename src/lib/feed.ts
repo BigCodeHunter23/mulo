@@ -175,46 +175,40 @@ async function loadFeed(
   ]);
 
   const items: FeedItem[] = [
-    ...(albumResult.data ?? []).map(
-      (row): FeedItem => ({
-        kind: "album",
-        key: `album-${row.id}`,
-        ratingId: row.id,
-        reaction: NO_REACTIONS,
-        created_at: row.created_at,
-        author: row.profiles,
-        score: row.score,
-        review: row.review,
-        release: toAlbum(row.releases),
-      }),
-    ),
-    ...(artistResult.data ?? []).map(
-      (row): FeedItem => ({
-        kind: "artist",
-        key: `artist-${row.id}`,
-        ratingId: row.id,
-        reaction: NO_REACTIONS,
-        created_at: row.created_at,
-        author: row.profiles,
-        score: row.score,
-        review: row.review,
-        artist: row.artists,
-      }),
-    ),
+    ...(albumResult.data ?? []).map((row): FeedItem => ({
+      kind: "album",
+      key: `album-${row.id}`,
+      ratingId: row.id,
+      reaction: NO_REACTIONS,
+      created_at: row.created_at,
+      author: row.profiles,
+      score: row.score,
+      review: row.review,
+      release: toAlbum(row.releases),
+    })),
+    ...(artistResult.data ?? []).map((row): FeedItem => ({
+      kind: "artist",
+      key: `artist-${row.id}`,
+      ratingId: row.id,
+      reaction: NO_REACTIONS,
+      created_at: row.created_at,
+      author: row.profiles,
+      score: row.score,
+      review: row.review,
+      artist: row.artists,
+    })),
     ...groupSongs(songResult.data ?? []),
-    ...(pickResult.data ?? []).map(
-      (row): FeedItem => ({
-        kind: "pick",
-        key: `pick-${row.id}`,
-        ratingId: row.id,
-        reaction: NO_REACTIONS,
-        created_at: row.created_at,
-        author: row.profiles,
-        matchup: toMatchup(row.versus_matchups),
-        pick: sideKey(row.pick),
-        revealed: false,
-      }),
-    ),
+    ...(pickResult.data ?? []).map((row): FeedItem => ({
+      kind: "pick",
+      key: `pick-${row.id}`,
+      ratingId: row.id,
+      reaction: NO_REACTIONS,
+      created_at: row.created_at,
+      author: row.profiles,
+      matchup: toMatchup(row.versus_matchups),
+      pick: sideKey(row.pick),
+      revealed: false,
+    })),
   ];
 
   const visible = items
@@ -272,10 +266,7 @@ async function loadFeed(
 }
 
 /** Ratings from the people a user follows. */
-export async function getFollowingFeed(
-  userId: string,
-  limit = 50,
-): Promise<FeedItem[]> {
+export async function getFollowingFeed(userId: string, limit = 50): Promise<FeedItem[]> {
   const followingIds = await getFollowingIds(userId);
   if (followingIds.length === 0) return [];
   return loadFeed(followingIds, limit, userId);
@@ -287,9 +278,6 @@ export async function getGlobalFeed(limit = 30): Promise<FeedItem[]> {
 }
 
 /** Everything one person has rated, for their public profile. */
-export async function getUserFeed(
-  userId: string,
-  limit = 50,
-): Promise<FeedItem[]> {
+export async function getUserFeed(userId: string, limit = 50): Promise<FeedItem[]> {
   return loadFeed([userId], limit);
 }

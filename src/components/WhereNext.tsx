@@ -23,9 +23,7 @@ export default async function WhereNext({
 
   return (
     <section className="mt-16">
-      <SectionHeading
-        action={<span className="text-xs text-text-muted">Keep going</span>}
-      >
+      <SectionHeading action={<span className="text-xs text-text-muted">Keep going</span>}>
         More like {name}
       </SectionHeading>
       <ul className={ARTIST_GRID}>

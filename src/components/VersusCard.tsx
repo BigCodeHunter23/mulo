@@ -35,7 +35,11 @@ function VsMark({ className = "" }: { className?: string }) {
 function Count({ value }: { value: number }) {
   return (
     <>
-      <span aria-hidden="true" className="count-up" style={{ "--count": value } as React.CSSProperties} />
+      <span
+        aria-hidden="true"
+        className="count-up"
+        style={{ "--count": value } as React.CSSProperties}
+      />
       <span className="sr-only">{value}</span>
     </>
   );
@@ -49,9 +53,7 @@ function PickedBy({ artist, people }: { artist: string; people: VersusPerson[] }
       <p className="truncate text-[11px] font-medium uppercase tracking-wider text-text-muted">
         Picked {artist}
       </p>
-      {people.length === 0 && (
-        <p className="mt-2 text-sm text-text-muted">Nobody you follow</p>
-      )}
+      {people.length === 0 && <p className="mt-2 text-sm text-text-muted">Nobody you follow</p>}
       <ul className="mt-2 flex flex-col gap-2">
         {shown.map((person) => {
           const name = person.display_name || person.username;
@@ -69,9 +71,7 @@ function PickedBy({ artist, people }: { artist: string; people: VersusPerson[] }
         })}
       </ul>
       {people.length > shown.length && (
-        <p className="mt-2 text-xs text-text-muted">
-          and {people.length - shown.length} more
-        </p>
+        <p className="mt-2 text-xs text-text-muted">and {people.length - shown.length} more</p>
       )}
     </div>
   );
@@ -95,9 +95,7 @@ function Faces({ people }: { people: VersusPerson[] }) {
         ))}
       </span>
       {people.length > shown.length && (
-        <span className="ml-1.5 text-[11px] text-text-muted">
-          +{people.length - shown.length}
-        </span>
+        <span className="ml-1.5 text-[11px] text-text-muted">+{people.length - shown.length}</span>
       )}
     </span>
   );
@@ -164,9 +162,7 @@ export default function VersusCard({
   view: VersusView;
   compact?: boolean;
 }) {
-  const [picked, setPicked] = useState<{ mine: VersusSideKey; tally: VersusTally } | null>(
-    null,
-  );
+  const [picked, setPicked] = useState<{ mine: VersusSideKey; tally: VersusTally } | null>(null);
   const [choosing, setChoosing] = useState<VersusSideKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -203,7 +199,14 @@ export default function VersusCard({
 
     const body = compact ? (
       <>
-        <Photo artist={artist} compact mine={isMine} faded={faded} hover={canPick} punch={isMine && picked !== null} />
+        <Photo
+          artist={artist}
+          compact
+          mine={isMine}
+          faded={faded}
+          hover={canPick}
+          punch={isMine && picked !== null}
+        />
         <span className="display-sm mt-2 block w-full truncate text-sm text-text">
           {artist.name}
         </span>
@@ -313,7 +316,10 @@ export default function VersusCard({
 
   let status: string | null = null;
   if (split && closed) {
-    status = split.total === 0 ? "Nobody picked this one" : `${split.total} ${split.total === 1 ? "pick" : "picks"}`;
+    status =
+      split.total === 0
+        ? "Nobody picked this one"
+        : `${split.total} ${split.total === 1 ? "pick" : "picks"}`;
   } else if (split) {
     status = `${split.total} ${split.total === 1 ? "pick" : "picks"} so far · Locked in`;
   } else if (canPick && view.friendsPicked > 0) {
@@ -414,7 +420,11 @@ export default function VersusCard({
             >
               {src && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt="" className="h-full w-full scale-125 object-cover blur-2xl saturate-150" />
+                <img
+                  src={src}
+                  alt=""
+                  className="h-full w-full scale-125 object-cover blur-2xl saturate-150"
+                />
               )}
             </span>
           );
@@ -422,9 +432,7 @@ export default function VersusCard({
       </div>
 
       <div className="relative mx-auto max-w-xl">
-        <p className="display truncate text-center text-lg text-text sm:text-xl">
-          {matchup.title}
-        </p>
+        <p className="display truncate text-center text-lg text-text sm:text-xl">{matchup.title}</p>
         {matchup.tagline && (
           <p className="truncate text-center text-xs text-text-muted">{matchup.tagline}</p>
         )}

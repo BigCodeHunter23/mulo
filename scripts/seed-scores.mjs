@@ -47,8 +47,7 @@ const supabase = createClient(
 );
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const log = (...parts) =>
-  console.log(new Date().toISOString().slice(11, 19), ...parts);
+const log = (...parts) => console.log(new Date().toISOString().slice(11, 19), ...parts);
 
 // MusicBrainz allows about one request a second and answers 503 when busy.
 let lastRequest = 0;
@@ -125,9 +124,7 @@ async function backfill(kind) {
 
     if (error) {
       if (error.message?.includes("seed_source")) {
-        log(
-          `Run migration 0014_seed_ratings.sql first — ${table} has no seed columns yet.`,
-        );
+        log(`Run migration 0014_seed_ratings.sql first — ${table} has no seed columns yet.`);
         process.exit(1);
       }
       throw error;
@@ -146,10 +143,7 @@ async function backfill(kind) {
         log(`  ${name}: ${problem.message}`);
         // Leave it unmarked so a later run tries again, but step past it here
         // rather than asking for the same batch forever.
-        await supabase
-          .from(table)
-          .update({ seed_source: "retry" })
-          .eq("mbid", row.mbid);
+        await supabase.from(table).update({ seed_source: "retry" }).eq("mbid", row.mbid);
         continue;
       }
 
@@ -157,10 +151,7 @@ async function backfill(kind) {
       if (!seed) {
         // Remember that we looked, so a rerun doesn't ask MusicBrainz again
         // for a record it has no useful rating for.
-        await supabase
-          .from(table)
-          .update({ seed_source: "none" })
-          .eq("mbid", row.mbid);
+        await supabase.from(table).update({ seed_source: "none" }).eq("mbid", row.mbid);
         skipped += 1;
       } else {
         await supabase.from(table).update(seed).eq("mbid", row.mbid);

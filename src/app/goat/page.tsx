@@ -44,8 +44,8 @@ export default async function GoatPage({
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-8 sm:px-6">
       <h1 className="display text-3xl text-text sm:text-4xl">Select your GOAT</h1>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
-        Your top ten, ranked. Number one wears the crown. The list shows on your
-        profile, and in the preview when you send someone your link.
+        Your top ten, ranked. Number one wears the crown. The list shows on your profile, and in the
+        preview when you send someone your link.
       </p>
 
       <nav

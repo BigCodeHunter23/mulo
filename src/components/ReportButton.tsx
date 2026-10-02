@@ -14,11 +14,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={buttonClass({ size: "sm" })}
-    >
+    <button type="submit" disabled={pending} className={buttonClass({ size: "sm" })}>
       {pending ? "Sending…" : "Send report"}
     </button>
   );
@@ -49,15 +45,10 @@ export default function ReportButton({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState<ReportState, FormData>(
-    submitReport,
-    {},
-  );
+  const [state, formAction] = useActionState<ReportState, FormData>(submitReport, {});
 
   if (!signedIn) {
-    return (
-      <LoginLink className={quietLink}>{label}</LoginLink>
-    );
+    return <LoginLink className={quietLink}>{label}</LoginLink>;
   }
 
   if (state.message) {
@@ -77,31 +68,17 @@ export default function ReportButton({
       action={formAction}
       className="mt-2 flex w-full min-w-[15rem] flex-col gap-3 rounded-lg border border-border bg-surface-raised p-3 text-left"
     >
-      {ratingId !== undefined && (
-        <input type="hidden" name="rating_id" value={ratingId} />
-      )}
+      {ratingId !== undefined && <input type="hidden" name="rating_id" value={ratingId} />}
       {artistRatingId !== undefined && (
         <input type="hidden" name="artist_rating_id" value={artistRatingId} />
       )}
-      {profileId !== undefined && (
-        <input type="hidden" name="profile_id" value={profileId} />
-      )}
-      {takeId !== undefined && (
-        <input type="hidden" name="versus_take_id" value={takeId} />
-      )}
+      {profileId !== undefined && <input type="hidden" name="profile_id" value={profileId} />}
+      {takeId !== undefined && <input type="hidden" name="versus_take_id" value={takeId} />}
       {listId !== undefined && <input type="hidden" name="list_id" value={listId} />}
 
-      <p className="text-sm font-medium text-text">
-        What&rsquo;s wrong with this?
-      </p>
+      <p className="text-sm font-medium text-text">What&rsquo;s wrong with this?</p>
 
-      <select
-        name="reason"
-        required
-        defaultValue=""
-        aria-label="Reason"
-        className={fieldClass}
-      >
+      <select name="reason" required defaultValue="" aria-label="Reason" className={fieldClass}>
         <option value="" disabled>
           Choose a reason
         </option>
@@ -125,11 +102,7 @@ export default function ReportButton({
 
       <div className="flex items-center gap-3">
         <SubmitButton />
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className={quietLink}
-        >
+        <button type="button" onClick={() => setOpen(false)} className={quietLink}>
           Cancel
         </button>
       </div>

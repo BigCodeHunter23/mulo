@@ -16,19 +16,14 @@ export type Review = {
  * Written reviews of an album or an artist, newest first. Ratings without
  * text are skipped; songs don't take reviews.
  */
-export async function getReviews(
-  kind: "album" | "artist",
-  mbid: string,
-): Promise<Review[]> {
+export async function getReviews(kind: "album" | "artist", mbid: string): Promise<Review[]> {
   const supabase = await createClient();
   const { column } = RATING_TABLES[kind];
   const table = reviewedTable(kind);
 
   const { data } = await supabase
     .from(table)
-    .select(
-      "id, score, review, created_at, profiles!inner ( username, display_name, avatar_url )",
-    )
+    .select("id, score, review, created_at, profiles!inner ( username, display_name, avatar_url )")
     .eq(column, mbid)
     .not("review", "is", null)
     .order("created_at", { ascending: false })

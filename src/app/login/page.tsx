@@ -29,7 +29,11 @@ export default async function LoginPage({
       <AuthForm
         initialMode={mode === "signup" ? "signup" : "login"}
         next={next}
-        notice={notice && Object.hasOwn(NOTICES, notice) ? NOTICES[notice as keyof typeof NOTICES] : undefined}
+        notice={
+          notice && Object.hasOwn(NOTICES, notice)
+            ? NOTICES[notice as keyof typeof NOTICES]
+            : undefined
+        }
       />
     </div>
   );

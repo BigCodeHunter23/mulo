@@ -152,9 +152,7 @@ export async function getStack(
   // rap"), and either can be the one that matches a family.
   const sceneGenres = new Set(
     familiesFor(
-      [raised?.scene?.id, raised?.scene?.name].filter(
-        (value): value is string => Boolean(value),
-      ),
+      [raised?.scene?.id, raised?.scene?.name].filter((value): value is string => Boolean(value)),
     ),
   );
 
@@ -195,7 +193,9 @@ export async function getStack(
   const scored = pool
     .filter((row) => !rated.has(row.mbid))
     .filter(
-      (row) => !filter.genre || (row.artist_mbid !== null && artistGenre.get(row.artist_mbid) === filter.genre),
+      (row) =>
+        !filter.genre ||
+        (row.artist_mbid !== null && artistGenre.get(row.artist_mbid) === filter.genre),
     )
 
     .map((row, index) => {
@@ -419,4 +419,3 @@ function spread(scored: Scored[], limit: number): Scored[] {
 
   return taken;
 }
-

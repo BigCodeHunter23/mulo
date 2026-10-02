@@ -57,13 +57,7 @@ function Art({
  * then the rest. The list rises into place from the bottom, so the eye ends
  * up on number one.
  */
-export default function TopPicks({
-  picks,
-  kind,
-}: {
-  picks: TopPick[];
-  kind: PickKind;
-}) {
+export default function TopPicks({ picks, kind }: { picks: TopPick[]; kind: PickKind }) {
   if (picks.length === 0) return null;
 
   const round = kind === "artist";
@@ -98,9 +92,7 @@ export default function TopPicks({
         >
           {first.title}
         </Link>
-        {first.subtitle && (
-          <span className="mt-0.5 text-sm text-text-muted">{first.subtitle}</span>
-        )}
+        {first.subtitle && <span className="mt-0.5 text-sm text-text-muted">{first.subtitle}</span>}
       </div>
 
       {runnersUp.length > 0 && (
@@ -120,9 +112,7 @@ export default function TopPicks({
                   eager
                 />
               </Link>
-              <span className="mt-2 text-xs font-bold tabular-nums text-text-muted">
-                {i + 2}
-              </span>
+              <span className="mt-2 text-xs font-bold tabular-nums text-text-muted">{i + 2}</span>
               <Link
                 href={href(pick)}
                 className="line-clamp-2 text-sm text-text transition-colors hover:text-accent"
@@ -150,9 +140,7 @@ export default function TopPicks({
                   {i + 4}
                 </span>
                 <Art pick={pick} round={round} size="h-8 w-8" />
-                <span className="min-w-0 flex-1 truncate text-sm text-text">
-                  {pick.title}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-text">{pick.title}</span>
               </Link>
             </li>
           ))}

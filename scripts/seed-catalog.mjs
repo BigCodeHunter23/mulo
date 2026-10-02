@@ -32,8 +32,7 @@ const supabase = createClient(
 );
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const log = (...parts) =>
-  console.log(new Date().toISOString().slice(11, 19), ...parts);
+const log = (...parts) => console.log(new Date().toISOString().slice(11, 19), ...parts);
 
 // MusicBrainz allows about one request a second and answers 503 when busy.
 let lastRequest = 0;
@@ -77,16 +76,17 @@ async function getJson(url) {
   }
 }
 
-const coverArtUrl = (id) =>
-  `https://coverartarchive.org/release-group/${id}/front-500`;
+const coverArtUrl = (id) => `https://coverartarchive.org/release-group/${id}/front-500`;
 
 const isStudioAlbum = (group) =>
-  group["primary-type"] === "Album" &&
-  (group["secondary-types"] ?? []).length === 0;
+  group["primary-type"] === "Album" && (group["secondary-types"] ?? []).length === 0;
 
 /** The artist credit as printed on the release, e.g. "JAY-Z & Kanye West". */
 const creditText = (credit = []) =>
-  credit.map((c) => `${c.name}${c.joinphrase ?? ""}`).join("").trim() || null;
+  credit
+    .map((c) => `${c.name}${c.joinphrase ?? ""}`)
+    .join("")
+    .trim() || null;
 
 /** Listen counts from ListenBrainz, most-played first. */
 async function listenCounts(kind, wanted) {
@@ -114,9 +114,7 @@ async function listenCounts(kind, wanted) {
 
 /** Photo and Wikipedia summary, reached through the artist's Wikidata link. */
 async function wikidataExtras(qid) {
-  const entity = await getJson(
-    `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
-  );
+  const entity = await getJson(`https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`);
   const data = entity?.entities?.[qid];
   if (!data) return { imageUrl: null, bio: null };
 
@@ -161,15 +159,11 @@ async function seedArtist(mbid, popularity, albumListens) {
     ?.url?.resource?.split("/")
     .pop();
   const extras =
-    qid && /^Q\d+$/.test(qid)
-      ? await wikidataExtras(qid)
-      : { imageUrl: null, bio: null };
+    qid && /^Q\d+$/.test(qid) ? await wikidataExtras(qid) : { imageUrl: null, bio: null };
 
   // Name plus aliases, so "Kanye West" still finds the artist now called Ye.
   const searchNames = [
-    ...new Set(
-      [artist.name, ...(artist.aliases ?? []).map((a) => a.name)].filter(Boolean),
-    ),
+    ...new Set([artist.name, ...(artist.aliases ?? []).map((a) => a.name)].filter(Boolean)),
   ].join(" | ");
 
   const { error: artistError } = await supabase.from("artists").upsert({
@@ -198,7 +192,10 @@ async function seedArtist(mbid, popularity, albumListens) {
     const { data: present } = await supabase
       .from("releases")
       .select("mbid")
-      .in("mbid", albums.map((g) => g.id));
+      .in(
+        "mbid",
+        albums.map((g) => g.id),
+      );
     const presentIds = new Set((present ?? []).map((r) => r.mbid));
 
     const fresh = albums
@@ -281,9 +278,8 @@ function standardEdition(editions) {
   };
 
   return (
-    (groups[0] ?? []).sort(
-      (a, b) => place(a) - place(b) || date(a).localeCompare(date(b)),
-    )[0] ?? null
+    (groups[0] ?? []).sort((a, b) => place(a) - place(b) || date(a).localeCompare(date(b)))[0] ??
+    null
   );
 }
 
@@ -362,9 +358,7 @@ async function seedAlbumDetails(group, listens) {
     return await seedTracklist(group.id);
   }
 
-  const full = await musicbrainz(
-    `/release-group/${group.id}?inc=artist-credits+genres&fmt=json`,
-  );
+  const full = await musicbrainz(`/release-group/${group.id}?inc=artist-credits+genres&fmt=json`);
   if (!full) return "not found in MusicBrainz";
 
   const credit = full["artist-credit"]?.length
@@ -462,12 +456,39 @@ async function fillTracklists() {
  *   node --env-file=.env.local scripts/seed-catalog.mjs --genres=house,techno --per-genre=40
  */
 const GENRES = [
-  "house", "deep house", "tech house", "progressive house", "techno",
-  "melodic techno", "trance", "drum and bass", "dubstep", "uk garage",
-  "electro house", "edm", "ambient", "downtempo", "disco", "nu disco",
-  "synthwave", "country", "reggae", "dancehall", "afrobeats", "latin",
-  "reggaeton", "k-pop", "jazz", "soul", "neo soul", "blues", "folk",
-  "classical", "indie rock", "psychedelic rock", "metal",
+  "house",
+  "deep house",
+  "tech house",
+  "progressive house",
+  "techno",
+  "melodic techno",
+  "trance",
+  "drum and bass",
+  "dubstep",
+  "uk garage",
+  "electro house",
+  "edm",
+  "ambient",
+  "downtempo",
+  "disco",
+  "nu disco",
+  "synthwave",
+  "country",
+  "reggae",
+  "dancehall",
+  "afrobeats",
+  "latin",
+  "reggaeton",
+  "k-pop",
+  "jazz",
+  "soul",
+  "neo soul",
+  "blues",
+  "folk",
+  "classical",
+  "indie rock",
+  "psychedelic rock",
+  "metal",
 ];
 
 const VARIOUS_ARTISTS = "89ad4ac3-39f7-470e-963a-56509c546377";
@@ -531,7 +552,10 @@ async function prepareArtist(id, listens, label, albumCount = 3) {
     .from("releases")
     .select("mbid, title, popularity")
     .eq("artist_mbid", id);
-  const albumPlays = await popularity("albums", (albums ?? []).map((a) => a.mbid));
+  const albumPlays = await popularity(
+    "albums",
+    (albums ?? []).map((a) => a.mbid),
+  );
   for (const album of albums ?? []) {
     const count = albumPlays.get(album.mbid);
     if (count && count !== album.popularity) {
@@ -595,7 +619,9 @@ async function fillTopArtists() {
     for (const row of data ?? []) have.add(row.mbid);
   }
   const todo = ids.filter((id) => !have.has(id));
-  log(`ListenBrainz top ${ids.length} artists: ${have.size} already in MULO, preparing ${todo.length}`);
+  log(
+    `ListenBrainz top ${ids.length} artists: ${have.size} already in MULO, preparing ${todo.length}`,
+  );
 
   let failed = 0;
   let n = 0;
@@ -668,7 +694,9 @@ async function fillDetails() {
       // genres, the credit, the date, and the starting score.
       let full = null;
       try {
-        full = await musicbrainz(`/release-group/${release.mbid}?inc=genres+artist-credits+ratings&fmt=json`);
+        full = await musicbrainz(
+          `/release-group/${release.mbid}?inc=genres+artist-credits+ratings&fmt=json`,
+        );
       } catch (problem) {
         log(`Details ${done} ${release.title} failed: ${problem.message}`);
         continue;

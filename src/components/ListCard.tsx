@@ -3,7 +3,13 @@ import type { ListSummary } from "@/lib/lists";
 import { coverSrc } from "@/lib/cover-url";
 
 /** A list at a glance: four covers in a square, its name, whose, and how long. */
-export default function ListCard({ list, showOwner = true }: { list: ListSummary; showOwner?: boolean }) {
+export default function ListCard({
+  list,
+  showOwner = true,
+}: {
+  list: ListSummary;
+  showOwner?: boolean;
+}) {
   const tiles = [0, 1, 2, 3].map((i) => list.covers[i] ?? null);
 
   return (
@@ -15,7 +21,13 @@ export default function ListCard({ list, showOwner = true }: { list: ListSummary
         {tiles.map((cover, i) =>
           cover ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={coverSrc(cover, 250) ?? cover} alt="" loading="lazy" className="h-full w-full object-cover" />
+            <img
+              key={i}
+              src={coverSrc(cover, 250) ?? cover}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span key={i} className="bg-surface-hover" />
           ),
@@ -31,7 +43,9 @@ export default function ListCard({ list, showOwner = true }: { list: ListSummary
           {showOwner ? ` · by ${list.owner.name}` : ""}
         </span>
         {list.description && (
-          <span className="mt-1 line-clamp-1 block text-sm text-text-secondary">{list.description}</span>
+          <span className="mt-1 line-clamp-1 block text-sm text-text-secondary">
+            {list.description}
+          </span>
         )}
       </span>
     </Link>

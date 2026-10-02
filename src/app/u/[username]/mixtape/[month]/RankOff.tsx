@@ -93,15 +93,18 @@ export default function RankOff({
     setHit(index);
 
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(() => {
-      setHit(null);
-      if (challenger >= contenders.length - 1) {
-        setWinner(contenders[index]);
-        return;
-      }
-      setChampion(index);
-      setChallenger(challenger + 1);
-    }, calm ? 0 : 320);
+    setTimeout(
+      () => {
+        setHit(null);
+        if (challenger >= contenders.length - 1) {
+          setWinner(contenders[index]);
+          return;
+        }
+        setChampion(index);
+        setChallenger(challenger + 1);
+      },
+      calm ? 0 : 320,
+    );
   }
 
   function crown() {
@@ -221,7 +224,10 @@ export default function RankOff({
                     {winner.title}
                   </p>
                   {winner.subtitle && (
-                    <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.25s" }}>
+                    <p
+                      className="winner-rise text-sm text-text-muted"
+                      style={{ animationDelay: "0.25s" }}
+                    >
                       {winner.subtitle}
                     </p>
                   )}

@@ -93,17 +93,12 @@ function Disc({ cover, size }: { cover: string | null; size: number }) {
  * Somebody's Raised On album as a picture disc, for their avatar. The same
  * record looks the same for everyone, so each size is made once and cached.
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ mbid: string }> },
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   if (!UUID.test(mbid)) return new Response("Not found", { status: 404 });
 
   const asked = Number(new URL(request.url).searchParams.get("s"));
-  const size: RecordSize = RECORD_SIZES.includes(asked as RecordSize)
-    ? (asked as RecordSize)
-    : 512;
+  const size: RecordSize = RECORD_SIZES.includes(asked as RecordSize) ? (asked as RecordSize) : 512;
 
   const { data: release } = await createPublicClient()
     .from("releases")

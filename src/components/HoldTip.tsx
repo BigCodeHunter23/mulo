@@ -38,9 +38,12 @@ export default function HoldTip() {
 
   return (
     <div className="step-in flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/[0.07] px-4 py-3 text-sm text-text-secondary">
-      <span aria-hidden="true" className="text-lg">👆</span>
+      <span aria-hidden="true" className="text-lg">
+        👆
+      </span>
       <p className="flex-1">
-        <span className="font-medium text-text">Tip:</span> press and hold any album cover to rate it without leaving the page.
+        <span className="font-medium text-text">Tip:</span> press and hold any album cover to rate
+        it without leaving the page.
       </p>
       <button
         type="button"

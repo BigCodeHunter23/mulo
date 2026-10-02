@@ -128,9 +128,7 @@ export default async function HeadToHeadPage({
             `You and ${them} have ${head?.shared ?? 0} of ${MINIMUM} in common. ` +
             `Once you get there, this fills up with where you agree and where you really don't.`
           }
-          action={
-            <ButtonLink href="/stack">Rate some records</ButtonLink>
-          }
+          action={<ButtonLink href="/stack">Rate some records</ButtonLink>}
         />
       ) : (
         <div className="flex flex-col gap-10">
@@ -180,9 +178,7 @@ export default async function HeadToHeadPage({
 
           {head.fromThem.length > 0 && (
             <section>
-              <SectionHeading>
-                {`They rate these highly. You haven't rated them.`}
-              </SectionHeading>
+              <SectionHeading>{`They rate these highly. You haven't rated them.`}</SectionHeading>
               <ul className="-mx-2 flex flex-col">
                 {head.fromThem.map((item) => (
                   <SpotRow key={item.href} item={item} />

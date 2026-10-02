@@ -25,10 +25,7 @@ function SaveButton() {
 }
 
 export default function ProfileForm({ profile }: { profile: Profile | null }) {
-  const [state, formAction] = useActionState<ProfileState, FormData>(
-    saveProfile,
-    {},
-  );
+  const [state, formAction] = useActionState<ProfileState, FormData>(saveProfile, {});
 
   // A photo waiting to be cropped, then the small cropped version that is
   // actually uploaded, with a preview of it.

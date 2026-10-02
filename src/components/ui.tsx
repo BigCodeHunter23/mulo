@@ -23,8 +23,7 @@ const BUTTON_BASE =
 
 const VARIANTS = {
   primary: "bg-accent font-semibold text-ink hover:bg-accent-hover",
-  secondary:
-    "border border-border-strong bg-surface-raised text-text hover:bg-surface-hover",
+  secondary: "border border-border-strong bg-surface-raised text-text hover:bg-surface-hover",
   ghost: "text-text-secondary hover:text-text hover:bg-surface-raised",
 } as const;
 
@@ -89,13 +88,7 @@ export function Field({
   );
 }
 
-export function Notice({
-  tone,
-  children,
-}: {
-  tone: "info" | "error";
-  children: React.ReactNode;
-}) {
+export function Notice({ tone, children }: { tone: "info" | "error"; children: React.ReactNode }) {
   const styles =
     tone === "error"
       ? "border-score-you/30 bg-score-you/10 text-error-soft"
@@ -125,11 +118,7 @@ export function EmptyState({
   return (
     <div className="rounded-xl border border-dashed border-border bg-surface/40 px-6 py-12 text-center">
       <p className="display-sm text-base text-text">{title}</p>
-      {body && (
-        <p className="mx-auto mt-1.5 max-w-sm text-sm text-text-secondary">
-          {body}
-        </p>
-      )}
+      {body && <p className="mx-auto mt-1.5 max-w-sm text-sm text-text-secondary">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

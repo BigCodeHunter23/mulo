@@ -87,7 +87,8 @@ export default function AlbumCard({
         }}
         onPointerMove={(event) => {
           const start = hold.current;
-          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > SLOP) cancel();
+          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > SLOP)
+            cancel();
         }}
         onPointerUp={cancel}
         onPointerCancel={cancel}

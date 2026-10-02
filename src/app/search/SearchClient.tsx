@@ -65,9 +65,7 @@ function saveRecent(list: string[]) {
 function remember(query: string) {
   const q = query.trim();
   if (q.length < 2) return;
-  const others = parseRecent(readRecent()).filter(
-    (item) => item.toLowerCase() !== q.toLowerCase(),
-  );
+  const others = parseRecent(readRecent()).filter((item) => item.toLowerCase() !== q.toLowerCase());
   saveRecent([q, ...others].slice(0, 6));
 }
 
@@ -114,11 +112,7 @@ export default function SearchClient({
       lastSearched.current = q;
       // Keep the address in step without reloading, so a search can be
       // refreshed or shared.
-      window.history.replaceState(
-        null,
-        "",
-        q ? `/search?q=${encodeURIComponent(q)}` : "/search",
-      );
+      window.history.replaceState(null, "", q ? `/search?q=${encodeURIComponent(q)}` : "/search");
 
       if (q.length < 2) {
         setResults(EMPTY);
@@ -231,48 +225,48 @@ export default function SearchClient({
         className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 -mx-4 mb-8 bg-bg/90 px-4 pb-3 pt-1 backdrop-blur-xl sm:static sm:mx-0 sm:mb-10 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
       >
         <div className="relative">
-        <svg
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-        </svg>
-        <input
-          ref={input}
-          type="search"
-          inputMode="search"
-          enterKeyHint="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Artists, albums, songs"
-          aria-label="Search artists, albums and songs"
-          className={`${fieldClass} h-12 rounded-xl pl-12 pr-24 text-base sm:text-base [&::-webkit-search-cancel-button]:hidden`}
-        />
-        <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          {loading && <span className="text-xs text-text-muted">Searching…</span>}
-          {query && (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                input.current?.focus();
-              }}
-              aria-label="Clear search"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-text-muted transition-colors hover:bg-surface-raised hover:text-text"
-            >
-              ×
-            </button>
-          )}
-        </span>
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+          </svg>
+          <input
+            ref={input}
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Artists, albums, songs"
+            aria-label="Search artists, albums and songs"
+            className={`${fieldClass} h-12 rounded-xl pl-12 pr-24 text-base sm:text-base [&::-webkit-search-cancel-button]:hidden`}
+          />
+          <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            {loading && <span className="text-xs text-text-muted">Searching…</span>}
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  input.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-text-muted transition-colors hover:bg-surface-raised hover:text-text"
+              >
+                ×
+              </button>
+            )}
+          </span>
         </div>
       </form>
 
@@ -295,7 +289,9 @@ export default function SearchClient({
               <ul className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
                 {viewed.map((item) => {
                   const src =
-                    item.kind === "artist" ? artistPhotoSrc(item.image, 200) : coverSrc(item.image, 250);
+                    item.kind === "artist"
+                      ? artistPhotoSrc(item.image, 200)
+                      : coverSrc(item.image, 250);
                   return (
                     <li key={`${item.kind}-${item.mbid}`} className="w-20 shrink-0">
                       <Link href={`/${item.kind}/${item.mbid}`} className="group block">
@@ -397,101 +393,102 @@ export default function SearchClient({
 
       {q.length >= 2 && (
         // Opening a result counts as searching for it.
-        <div onClickCapture={(event) => {
-          if ((event.target as HTMLElement).closest("a")) remember(q);
-        }}>
+        <div
+          onClickCapture={(event) => {
+            if ((event.target as HTMLElement).closest("a")) remember(q);
+          }}
+        >
+          {results.artists.length > 0 && (
+            <section className="mb-12">
+              <SectionHeading>Artists</SectionHeading>
+              <ul className="grid grid-cols-3 gap-x-4 gap-y-6 sm:grid-cols-4 lg:grid-cols-8">
+                {results.artists.map((artist, i) => (
+                  <li key={artist.mbid}>
+                    <ArtistCard
+                      mbid={artist.mbid}
+                      name={artist.name}
+                      imageUrl={artist.image_url}
+                      friends={friends.artists[artist.mbid]}
+                      eager={i < 4}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-      {results.artists.length > 0 && (
-        <section className="mb-12">
-          <SectionHeading>Artists</SectionHeading>
-          <ul className="grid grid-cols-3 gap-x-4 gap-y-6 sm:grid-cols-4 lg:grid-cols-8">
-            {results.artists.map((artist, i) => (
-              <li key={artist.mbid}>
-                <ArtistCard
-                  mbid={artist.mbid}
-                  name={artist.name}
-                  imageUrl={artist.image_url}
-                  friends={friends.artists[artist.mbid]}
-                  eager={i < 4}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          {results.albums.length > 0 && (
+            <section className="mb-12">
+              <SectionHeading>Albums</SectionHeading>
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-4">
+                {results.albums.map((album, i) => (
+                  <li key={album.mbid}>
+                    <AlbumCard
+                      mbid={album.mbid}
+                      title={album.title}
+                      artist={album.artist}
+                      year={album.year}
+                      coverUrl={album.cover_art_url}
+                      friends={friends.albums[album.mbid]}
+                      eager={i < 4}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-      {results.albums.length > 0 && (
-        <section className="mb-12">
-          <SectionHeading>Albums</SectionHeading>
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-4">
-            {results.albums.map((album, i) => (
-              <li key={album.mbid}>
-                <AlbumCard
-                  mbid={album.mbid}
-                  title={album.title}
-                  artist={album.artist}
-                  year={album.year}
-                  coverUrl={album.cover_art_url}
-                  friends={friends.albums[album.mbid]}
-                  eager={i < 4}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          {results.songs.length > 0 && (
+            <section className="mb-12">
+              <SectionHeading>Songs</SectionHeading>
+              <ol className="overflow-hidden rounded-xl border border-border">
+                {results.songs.map((song, i) => {
+                  const cover = coverSrc(song.cover_art_url, 250);
 
-      {results.songs.length > 0 && (
-        <section className="mb-12">
-          <SectionHeading>Songs</SectionHeading>
-          <ol className="overflow-hidden rounded-xl border border-border">
-            {results.songs.map((song, i) => {
-              const cover = coverSrc(song.cover_art_url, 250);
+                  return (
+                    <li key={song.mbid} className={i % 2 ? "bg-surface/40" : ""}>
+                      <Link
+                        href={`/album/${song.albumMbid}`}
+                        className="group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-surface-hover"
+                      >
+                        <span className="artwork h-11 w-11 shrink-0 overflow-hidden rounded-md">
+                          {cover && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={cover}
+                              alt=""
+                              loading={i < 4 ? "eager" : "lazy"}
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-text transition-colors group-hover:text-accent">
+                            {song.title}
+                          </span>
+                          <span className="block truncate text-xs text-text-muted">
+                            {song.album}
+                            {song.artist && ` · ${song.artist}`}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-text-muted transition-colors group-hover:text-text">
+                          Rate it →
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
 
-              return (
-                <li key={song.mbid} className={i % 2 ? "bg-surface/40" : ""}>
-                  <Link
-                    href={`/album/${song.albumMbid}`}
-                    className="group flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-surface-hover"
-                  >
-                    <span className="artwork h-11 w-11 shrink-0 overflow-hidden rounded-md">
-                      {cover && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={cover}
-                          alt=""
-                          loading={i < 4 ? "eager" : "lazy"}
-                          className="h-full w-full object-cover"
-                        />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-text transition-colors group-hover:text-accent">
-                        {song.title}
-                      </span>
-                      <span className="block truncate text-xs text-text-muted">
-                        {song.album}
-                        {song.artist && ` · ${song.artist}`}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-xs text-text-muted transition-colors group-hover:text-text">
-                      Rate it →
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
-
-      {/* Not a dead end: whatever MULO hasn't got yet is on its way below. */}
-      {nothing && (
-        <p className="mb-8 text-sm text-text-secondary">
-          Nobody&rsquo;s rated &ldquo;{q}&rdquo; on MULO yet &mdash; here&rsquo;s
-          everything else we found.
-        </p>
-      )}
+          {/* Not a dead end: whatever MULO hasn't got yet is on its way below. */}
+          {nothing && (
+            <p className="mb-8 text-sm text-text-secondary">
+              Nobody&rsquo;s rated &ldquo;{q}&rdquo; on MULO yet &mdash; here&rsquo;s everything
+              else we found.
+            </p>
+          )}
         </div>
       )}
 

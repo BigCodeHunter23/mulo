@@ -129,7 +129,10 @@ function siteMean(tallies: Tally[]): number {
  * its totals, counted by the database. They're read a page at a time, since
  * there can be more rated things than the API returns at once.
  */
-function logged<Row>(result: { data: Row[]; error: { message: string; code?: string } | null }): Row[] {
+function logged<Row>(result: {
+  data: Row[];
+  error: { message: string; code?: string } | null;
+}): Row[] {
   if (result.error) {
     logQueryError("charts", result.error, "0018");
     // Thrown rather than charted as empty, so a failed read is never cached.
@@ -200,11 +203,7 @@ export async function getChart(
   }
 }
 
-async function albumChart(
-  supabase: Client,
-  genre: string | null,
-  limit: number,
-): Promise<Chart> {
+async function albumChart(supabase: Client, genre: string | null, limit: number): Promise<Chart> {
   const rows = tallied(
     logged(
       await readAll((from, to) => supabase.rpc("album_chart_rows").order("mbid").range(from, to)),
@@ -213,9 +212,7 @@ async function albumChart(
   const site = siteMean(rows.map((row) => row.tally));
   if (rows.length === 0) return blank("albums", genre, site);
 
-  const main = genre
-    ? await getArtistGenres()
-    : new Map<string, string | null>();
+  const main = genre ? await getArtistGenres() : new Map<string, string | null>();
 
   const scored = rows
     .filter((row) => inGenre(main, row.artist_mbid, genre))
@@ -233,11 +230,7 @@ async function albumChart(
   return finish("albums", genre, scored, site, limit);
 }
 
-async function songChart(
-  supabase: Client,
-  genre: string | null,
-  limit: number,
-): Promise<Chart> {
+async function songChart(supabase: Client, genre: string | null, limit: number): Promise<Chart> {
   // A song carries no genre of its own. It borrows the album it was first
   // rated on, which is also where its cover and artist line come from.
   const rows = tallied(
@@ -248,9 +241,7 @@ async function songChart(
   const site = siteMean(rows.map((row) => row.tally));
   if (rows.length === 0) return blank("songs", genre, site);
 
-  const main = genre
-    ? await getArtistGenres()
-    : new Map<string, string | null>();
+  const main = genre ? await getArtistGenres() : new Map<string, string | null>();
 
   const scored = rows
     .filter((row) => inGenre(main, row.artist_mbid, genre))
@@ -269,11 +260,7 @@ async function songChart(
   return finish("songs", genre, scored, site, limit);
 }
 
-async function artistChart(
-  supabase: Client,
-  genre: string | null,
-  limit: number,
-): Promise<Chart> {
+async function artistChart(supabase: Client, genre: string | null, limit: number): Promise<Chart> {
   // An artist carries no genre tags of their own: their main genre is worked
   // out from whatever their records are tagged with.
   const [result, main] = await Promise.all([

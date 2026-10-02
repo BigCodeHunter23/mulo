@@ -5,9 +5,18 @@
  * artist and title almost always lands on the record at the top.
  */
 const SERVICES = [
-  { name: "Spotify", url: (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}` },
-  { name: "Apple Music", url: (q: string) => `https://music.apple.com/search?term=${encodeURIComponent(q)}` },
-  { name: "YouTube Music", url: (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}` },
+  {
+    name: "Spotify",
+    url: (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Apple Music",
+    url: (q: string) => `https://music.apple.com/search?term=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "YouTube Music",
+    url: (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`,
+  },
 ] as const;
 
 export default function ListenOn({
@@ -21,7 +30,9 @@ export default function ListenOn({
 }) {
   const query = artist ? `${artist} ${title}` : title;
   return (
-    <div className={`flex flex-wrap items-center justify-center gap-1.5 sm:justify-start ${className}`}>
+    <div
+      className={`flex flex-wrap items-center justify-center gap-1.5 sm:justify-start ${className}`}
+    >
       <span className="mr-1 text-xs text-text-muted">Listen on</span>
       {SERVICES.map((service) => (
         <a

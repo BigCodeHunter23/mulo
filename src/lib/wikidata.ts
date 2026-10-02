@@ -36,9 +36,7 @@ type WikidataEntity = {
  *
  * Every step is optional: plenty of artists have no Wikidata entry at all.
  */
-export async function getArtistExtras(
-  wikidataQid: string,
-): Promise<ArtistExtras> {
+export async function getArtistExtras(wikidataQid: string): Promise<ArtistExtras> {
   const entity = await getJson<{ entities: Record<string, WikidataEntity> }>(
     `https://www.wikidata.org/wiki/Special:EntityData/${wikidataQid}.json`,
   );
@@ -58,9 +56,7 @@ export async function getArtistExtras(
 
   if (title) {
     const summary = await getJson<{ extract?: string }>(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
-        title,
-      )}`,
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
     );
     bio = summary?.extract?.trim() || null;
   }

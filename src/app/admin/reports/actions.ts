@@ -14,7 +14,11 @@ type Status = z.infer<typeof statusSchema>;
  * who removed what. Failures are logged too: these run from plain forms, so
  * there is nobody waiting on the page to tell.
  */
-function record(admin: { id: string; email: string | null }, action: string, error: { message: string } | null) {
+function record(
+  admin: { id: string; email: string | null },
+  action: string,
+  error: { message: string } | null,
+) {
   if (error) console.error(`[admin] ${action} failed for ${admin.email}:`, error.message);
   else console.info(`[admin] ${admin.email} (${admin.id}) ${action}`);
 }
@@ -37,7 +41,10 @@ export async function setReportStatus(reportId: number, status: Status) {
 export async function removeReview(kind: "album" | "artist", ratingId: number) {
   const admin = await requireAdmin();
   if (!admin) return;
-  if (!z.enum(["album", "artist"]).safeParse(kind).success || !rowIdSchema.safeParse(ratingId).success) {
+  if (
+    !z.enum(["album", "artist"]).safeParse(kind).success ||
+    !rowIdSchema.safeParse(ratingId).success
+  ) {
     return;
   }
 
@@ -48,7 +55,11 @@ export async function removeReview(kind: "album" | "artist", ratingId: number) {
   const { error } = await db.from(table).update({ review: null }).eq("id", ratingId);
   record(admin, `removed the review on ${kind} rating ${ratingId}`, error);
   if (!error) {
-    await db.from("reports").update({ status: "reviewed" }).eq(column, ratingId).eq("status", "open");
+    await db
+      .from("reports")
+      .update({ status: "reviewed" })
+      .eq(column, ratingId)
+      .eq("status", "open");
   }
 
   revalidatePath("/admin/reports");

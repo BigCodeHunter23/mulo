@@ -96,10 +96,7 @@ function joinedName(row: AlbumRow) {
  * MusicBrainz's search is. Close matches come first; among equally close
  * matches, the more-played record wins.
  */
-export async function searchCatalog(
-  rawQuery: string,
-  limit = 8,
-): Promise<SearchResults> {
+export async function searchCatalog(rawQuery: string, limit = 8): Promise<SearchResults> {
   const query = rawQuery.trim().slice(0, 80);
   if (query.length < 2) return { artists: [], albums: [], songs: [] };
 
@@ -137,9 +134,7 @@ export async function searchCatalog(
       // An alias match counts for slightly less than the artist's own name.
       rank: Math.min(
         matchRank(row.name, query),
-        ...(row.search_names ?? "")
-          .split(" | ")
-          .map((name) => matchRank(name, query) + 0.5),
+        ...(row.search_names ?? "").split(" | ").map((name) => matchRank(name, query) + 0.5),
       ),
     }))
     .sort((a, b) => a.rank - b.rank || (b.row.popularity ?? 0) - (a.row.popularity ?? 0));
@@ -161,10 +156,7 @@ export async function searchCatalog(
     : { data: [] };
 
   const seen = new Set<string>();
-  const albums = [
-    ...(albumResult.data ?? []),
-    ...(byArtist.data ?? []),
-  ]
+  const albums = [...(albumResult.data ?? []), ...(byArtist.data ?? [])]
     .filter((row) => (seen.has(row.mbid) ? false : (seen.add(row.mbid), true)))
     .map((row) => ({
       row,
@@ -187,16 +179,14 @@ export async function searchCatalog(
     const row = { ...track, song_mbid: track.song_mbid };
     const rank = matchRank(row.title, query);
     const current = bestSongs.get(row.song_mbid);
-    const morePopular =
-      (row.releases.popularity ?? 0) > (current?.row.releases.popularity ?? 0);
+    const morePopular = (row.releases.popularity ?? 0) > (current?.row.releases.popularity ?? 0);
     if (!current || rank < current.rank || (rank === current.rank && morePopular)) {
       bestSongs.set(row.song_mbid, { row, rank });
     }
   }
   const songs = [...bestSongs.values()].sort(
     (a, b) =>
-      a.rank - b.rank ||
-      (b.row.releases.popularity ?? 0) - (a.row.releases.popularity ?? 0),
+      a.rank - b.rank || (b.row.releases.popularity ?? 0) - (a.row.releases.popularity ?? 0),
   );
 
   return {

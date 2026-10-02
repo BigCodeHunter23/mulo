@@ -69,7 +69,9 @@ export async function allow(bucket: Bucket, subject: string): Promise<boolean> {
     if (error) {
       if (error.code === "PGRST202" || error.code === "42883") {
         limiterMissing = true;
-        console.warn("[rate-limit] rate_limit_hit() not found; run migration 0017. Allowing everything.");
+        console.warn(
+          "[rate-limit] rate_limit_hit() not found; run migration 0017. Allowing everything.",
+        );
       } else {
         console.error("[rate-limit] check failed, allowing:", error.message);
       }

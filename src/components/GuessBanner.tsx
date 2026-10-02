@@ -19,7 +19,10 @@ export default function GuessBanner() {
           Ten records. How well do you know the crowd?
         </span>
       </span>
-      <span aria-hidden="true" className="text-xl text-text-muted transition-transform group-hover:translate-x-1">
+      <span
+        aria-hidden="true"
+        className="text-xl text-text-muted transition-transform group-hover:translate-x-1"
+      >
         &rarr;
       </span>
     </Link>

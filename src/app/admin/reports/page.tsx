@@ -221,7 +221,10 @@ export default async function ReportsInbox({
                         @{rating.profiles?.username ?? "unknown"}&rsquo;s{" "}
                         <span className="tabular-nums text-score-you">{rating.score}/10</span> for{" "}
                         {subject ? (
-                          <Link href={subject.href} className="font-medium text-text hover:text-accent">
+                          <Link
+                            href={subject.href}
+                            className="font-medium text-text hover:text-accent"
+                          >
                             {subject.title}
                           </Link>
                         ) : (
@@ -230,7 +233,9 @@ export default async function ReportsInbox({
                       </p>
                       <blockquote className="mt-2 border-l-2 border-border-strong pl-3 text-text">
                         {rating.review ?? (
-                          <span className="text-text-muted">No review text (already removed, or never written)</span>
+                          <span className="text-text-muted">
+                            No review text (already removed, or never written)
+                          </span>
                         )}
                       </blockquote>
                     </>
@@ -239,7 +244,9 @@ export default async function ReportsInbox({
                   )}
 
                   {report.detail && (
-                    <p className="mt-2 text-xs italic text-text-muted">&ldquo;{report.detail}&rdquo;</p>
+                    <p className="mt-2 text-xs italic text-text-muted">
+                      &ldquo;{report.detail}&rdquo;
+                    </p>
                   )}
                 </div>
 
@@ -267,20 +274,29 @@ export default async function ReportsInbox({
                   )}
                   {report.status !== "reviewed" && (
                     <form action={setReportStatus.bind(null, report.id, "reviewed")}>
-                      <button type="submit" className={buttonClass({ variant: "secondary", size: "sm" })}>
+                      <button
+                        type="submit"
+                        className={buttonClass({ variant: "secondary", size: "sm" })}
+                      >
                         Mark reviewed
                       </button>
                     </form>
                   )}
                   {report.status === "open" ? (
                     <form action={setReportStatus.bind(null, report.id, "dismissed")}>
-                      <button type="submit" className={buttonClass({ variant: "ghost", size: "sm" })}>
+                      <button
+                        type="submit"
+                        className={buttonClass({ variant: "ghost", size: "sm" })}
+                      >
                         Dismiss
                       </button>
                     </form>
                   ) : (
                     <form action={setReportStatus.bind(null, report.id, "open")}>
-                      <button type="submit" className={buttonClass({ variant: "ghost", size: "sm" })}>
+                      <button
+                        type="submit"
+                        className={buttonClass({ variant: "ghost", size: "sm" })}
+                      >
                         Reopen
                       </button>
                     </form>

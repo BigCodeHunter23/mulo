@@ -5,12 +5,7 @@ import { SectionHeading } from "@/components/ui";
 
 function Bolt() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-4 w-4 text-accent"
-      fill="currentColor"
-    >
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 text-accent" fill="currentColor">
       <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
     </svg>
   );
@@ -20,10 +15,7 @@ function Heading() {
   return (
     <SectionHeading
       action={
-        <Link
-          href="/versus"
-          className="text-xs text-text-muted transition-colors hover:text-text"
-        >
+        <Link href="/versus" className="text-xs text-text-muted transition-colors hover:text-text">
           More →
         </Link>
       }

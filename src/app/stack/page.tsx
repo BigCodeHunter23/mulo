@@ -53,15 +53,11 @@ export default async function StackPage({
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <header className="mb-8 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-          The Stack
-        </p>
-        <h1 className="display mt-2 text-3xl text-text sm:text-4xl">
-          Rate what you know
-        </h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">The Stack</p>
+        <h1 className="display mt-2 text-3xl text-text sm:text-4xl">Rate what you know</h1>
         <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
-          Records picked for you, one at a time. Score the ones you know, wave
-          off the ones you don&rsquo;t.
+          Records picked for you, one at a time. Score the ones you know, wave off the ones you
+          don&rsquo;t.
         </p>
         <div className="mt-4 flex justify-center empty:hidden">
           <StreakFlame streak={streak} isSelf />

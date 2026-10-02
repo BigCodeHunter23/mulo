@@ -48,18 +48,25 @@ export default async function TasteTwin({ userId }: { userId: string }) {
             {twin.agreement.yours === twin.agreement.theirs ? (
               <>
                 You both gave{" "}
-                <Link href={twin.agreement.href} className="font-medium text-text hover:text-accent">
+                <Link
+                  href={twin.agreement.href}
+                  className="font-medium text-text hover:text-accent"
+                >
                   {twin.agreement.title}
                 </Link>{" "}
                 a <span className="font-semibold text-score-overall">{twin.agreement.yours}</span>.
               </>
             ) : (
               <>
-                <Link href={twin.agreement.href} className="font-medium text-text hover:text-accent">
+                <Link
+                  href={twin.agreement.href}
+                  className="font-medium text-text hover:text-accent"
+                >
                   {twin.agreement.title}
                 </Link>
                 : you <span className="font-semibold text-score-you">{twin.agreement.yours}</span>,
-                them <span className="font-semibold text-score-friends">{twin.agreement.theirs}</span>.
+                them{" "}
+                <span className="font-semibold text-score-friends">{twin.agreement.theirs}</span>.
               </>
             )}
           </p>

@@ -44,15 +44,7 @@ function readBest(): number | null {
 }
 
 /** A number that counts up from where you guessed to where it really is. */
-function CountTo({
-  from,
-  to,
-  decimals = 1,
-}: {
-  from: number;
-  to: number;
-  decimals?: number;
-}) {
+function CountTo({ from, to, decimals = 1 }: { from: number; to: number; decimals?: number }) {
   const [value, setValue] = useState(from);
 
   useEffect(() => {
@@ -86,9 +78,7 @@ export default function GuessGame({
   const [total, setTotal] = useState(0);
   const [bullseyes, setBullseyes] = useState(0);
   // Read once, when the game starts; a new best is written when it ends.
-  const [best] = useState<number | null>(() =>
-    typeof window === "undefined" ? null : readBest(),
-  );
+  const [best] = useState<number | null>(() => (typeof window === "undefined" ? null : readBest()));
 
   const album = albums[round];
   const done = round >= albums.length;
@@ -175,7 +165,10 @@ export default function GuessGame({
         <span className="tabular-nums">{total} points</span>
       </div>
 
-      <div key={album.mbid} className="stack-cover artwork relative mt-5 aspect-square w-full max-w-[14rem] overflow-hidden rounded-xl shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] sm:max-w-[17rem]">
+      <div
+        key={album.mbid}
+        className="stack-cover artwork relative mt-5 aspect-square w-full max-w-[14rem] overflow-hidden rounded-xl shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] sm:max-w-[17rem]"
+      >
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt={album.title} className="h-full w-full object-cover" />
@@ -238,7 +231,10 @@ export default function GuessGame({
             {bullseye ? "Bullseye! " : ""}+{points} points
           </p>
           <div className="mt-4 flex gap-3">
-            <Link href={`/album/${album.mbid}`} className={`${buttonClass({ variant: "secondary" })} flex-1`}>
+            <Link
+              href={`/album/${album.mbid}`}
+              className={`${buttonClass({ variant: "secondary" })} flex-1`}
+            >
               Rate it
             </Link>
             <button type="button" onClick={next} autoFocus className={`${buttonClass()} flex-1`}>

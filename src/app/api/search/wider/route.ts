@@ -40,9 +40,7 @@ export async function GET(request: NextRequest) {
         // one served from the cache is a request MusicBrainz doesn't have to
         // answer. A failed one must never be kept: it once meant a search that
         // hit a busy moment kept failing for everybody for up to an hour.
-        "Cache-Control": failed
-          ? "no-store"
-          : "public, s-maxage=300, stale-while-revalidate=3600",
+        "Cache-Control": failed ? "no-store" : "public, s-maxage=300, stale-while-revalidate=3600",
       },
     },
   );

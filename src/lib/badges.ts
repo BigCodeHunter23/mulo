@@ -110,15 +110,8 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
         .from("follows")
         .select("*", { count: "exact", head: true })
         .eq("follower_id", userId),
-      supabase
-        .from("profiles")
-        .select("created_at, raised_on_mbid")
-        .eq("id", userId)
-        .maybeSingle(),
-      supabase
-        .from("top_albums")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId),
+      supabase.from("profiles").select("created_at, raised_on_mbid").eq("id", userId).maybeSingle(),
+      supabase.from("top_albums").select("*", { count: "exact", head: true }).eq("user_id", userId),
       supabase
         .from("top_artists")
         .select("*", { count: "exact", head: true })
@@ -250,18 +243,12 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
 
   const { data: catalogueRows } =
     candidates.length > 0
-      ? await supabase
-          .from("releases")
-          .select("mbid, artist_mbid")
-          .in("artist_mbid", candidates)
+      ? await supabase.from("releases").select("mbid, artist_mbid").in("artist_mbid", candidates)
       : { data: [] };
 
   const albumsByArtist = new Map<string, string[]>();
   for (const row of (catalogueRows ?? []) as { mbid: string; artist_mbid: string }[]) {
-    albumsByArtist.set(row.artist_mbid, [
-      ...(albumsByArtist.get(row.artist_mbid) ?? []),
-      row.mbid,
-    ]);
+    albumsByArtist.set(row.artist_mbid, [...(albumsByArtist.get(row.artist_mbid) ?? []), row.mbid]);
   }
 
   const trackAlbums = [
@@ -306,10 +293,7 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
     if (songIds.length >= FULL_ALBUM && songIds.every((mbid) => songScores.has(mbid))) {
       earned.add("track-by-track");
     }
-    if (
-      songIds.length >= NO_SKIPS &&
-      songIds.every((mbid) => (songScores.get(mbid) ?? 0) >= 8)
-    ) {
+    if (songIds.length >= NO_SKIPS && songIds.every((mbid) => (songScores.get(mbid) ?? 0) >= 8)) {
       earned.add("no-skips");
     }
   }

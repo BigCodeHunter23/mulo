@@ -19,8 +19,7 @@ function bounds(image: HTMLImageElement, zoom: number) {
   return { width, height, minX: STAGE - width, minY: STAGE - height };
 }
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 /**
  * Crops a photo to the circle people will see, then shrinks it to a small
@@ -40,9 +39,7 @@ export default function AvatarCropper({
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [place, setPlace] = useState<Placement>({ x: 0, y: 0, zoom: 1 });
-  const drag = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(
-    null,
-  );
+  const drag = useRef<{ pointerX: number; pointerY: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,10 +142,7 @@ export default function AvatarCropper({
           setError("Couldn't prepare that photo. Try another.");
           return;
         }
-        onDone(
-          new File([blob], "avatar.jpg", { type: "image/jpeg" }),
-          URL.createObjectURL(blob),
-        );
+        onDone(new File([blob], "avatar.jpg", { type: "image/jpeg" }), URL.createObjectURL(blob));
       },
       "image/jpeg",
       0.88,
@@ -204,7 +198,11 @@ export default function AvatarCropper({
         style={{ maxWidth: STAGE }}
       />
 
-      {error && <p role="alert" className="text-center text-sm text-score-you">{error}</p>}
+      {error && (
+        <p role="alert" className="text-center text-sm text-score-you">
+          {error}
+        </p>
+      )}
 
       <div className="flex gap-3">
         <button

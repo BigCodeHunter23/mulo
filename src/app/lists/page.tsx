@@ -23,7 +23,8 @@ export default async function ListsPage() {
         <div>
           <h1 className="display text-4xl text-text">Lists</h1>
           <p className="mt-2 text-sm text-text-secondary">
-            Best debuts, Sunday mornings, the albums that raised you: put them in order and share them.
+            Best debuts, Sunday mornings, the albums that raised you: put them in order and share
+            them.
           </p>
         </div>
         <ButtonLink href={user ? "/lists/new" : loginPath("/lists/new")}>New list</ButtonLink>

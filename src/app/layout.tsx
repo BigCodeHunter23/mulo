@@ -50,7 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Header />
         {children}
         {/* Room for the phone tab bar, so it never covers the end of a page. */}
-        <div aria-hidden="true" className="h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0 sm:hidden" />
+        <div
+          aria-hidden="true"
+          className="h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0 sm:hidden"
+        />
       </body>
     </html>
   );

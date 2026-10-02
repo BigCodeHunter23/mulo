@@ -32,7 +32,9 @@ function parse(raw: string): Viewed[] {
   try {
     const list = JSON.parse(raw);
     return Array.isArray(list)
-      ? list.filter((item) => item && typeof item.mbid === "string" && typeof item.title === "string")
+      ? list.filter(
+          (item) => item && typeof item.mbid === "string" && typeof item.title === "string",
+        )
       : [];
   } catch {
     return [];

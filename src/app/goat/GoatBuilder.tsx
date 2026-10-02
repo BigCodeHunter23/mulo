@@ -79,15 +79,7 @@ function answer(ranking: Ranking, currentWins: boolean) {
   };
 }
 
-function Art({
-  item,
-  round,
-  size,
-}: {
-  item: PickItem;
-  round: boolean;
-  size: string;
-}) {
+function Art({ item, round, size }: { item: PickItem; round: boolean; size: string }) {
   return (
     <span
       className={`artwork block shrink-0 overflow-hidden ${size} ${
@@ -218,7 +210,10 @@ export default function GoatBuilder({
     setError(null);
 
     startTransition(async () => {
-      const result = await saveTopPicks(kind, next.map((item) => item.mbid));
+      const result = await saveTopPicks(
+        kind,
+        next.map((item) => item.mbid),
+      );
       if (result.ok) setSaved("Saved");
       else {
         setItems(previous);
@@ -250,32 +245,30 @@ export default function GoatBuilder({
 
     // Let the winner flex before the next pair comes in.
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(() => {
-      setHit(null);
-      const { next, order } = answer(ranking, currentWins);
-      if (order) {
-        setRanking(null);
-        commit(order);
-        setCrowned(order);
-      } else {
-        setRanking(next);
-      }
-    }, calm ? 0 : 320);
+    setTimeout(
+      () => {
+        setHit(null);
+        const { next, order } = answer(ranking, currentWins);
+        if (order) {
+          setRanking(null);
+          commit(order);
+          setCrowned(order);
+        } else {
+          setRanking(next);
+        }
+      },
+      calm ? 0 : 320,
+    );
   }
 
   if (ranking) {
     const rival = ranking.sorted[Math.floor((ranking.lo + ranking.hi) / 2)];
-    const progress = Math.min(
-      100,
-      Math.round((ranking.done / Math.max(ranking.total, 1)) * 100),
-    );
+    const progress = Math.min(100, Math.round((ranking.done / Math.max(ranking.total, 1)) * 100));
 
     return (
       <div>
         <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="display-sm text-lg text-text">
-            Which do you rate higher?
-          </h2>
+          <h2 className="display-sm text-lg text-text">Which do you rate higher?</h2>
           <button
             type="button"
             onClick={() => setRanking(null)}
@@ -315,9 +308,7 @@ export default function GoatBuilder({
                 {item.title}
               </span>
               {item.subtitle && (
-                <span className="-mt-2 line-clamp-1 text-xs text-text-muted">
-                  {item.subtitle}
-                </span>
+                <span className="-mt-2 line-clamp-1 text-xs text-text-muted">{item.subtitle}</span>
               )}
             </button>
           ))}
@@ -370,11 +361,17 @@ export default function GoatBuilder({
                 </span>
               </div>
 
-              <p className="winner-rise display mt-6 text-3xl text-text" style={{ animationDelay: "0.25s" }}>
+              <p
+                className="winner-rise display mt-6 text-3xl text-text"
+                style={{ animationDelay: "0.25s" }}
+              >
                 {crowned[0].title}
               </p>
               {crowned[0].subtitle && (
-                <p className="winner-rise text-sm text-text-muted" style={{ animationDelay: "0.3s" }}>
+                <p
+                  className="winner-rise text-sm text-text-muted"
+                  style={{ animationDelay: "0.3s" }}
+                >
                   {crowned[0].subtitle}
                 </p>
               )}
@@ -388,7 +385,9 @@ export default function GoatBuilder({
                       style={{ "--delay": `${0.7 + i * 0.12}s` } as React.CSSProperties}
                     >
                       <Art item={item} round={round} size="h-16 w-16" />
-                      <span className="text-xs font-bold tabular-nums text-text-muted">{i + 2}</span>
+                      <span className="text-xs font-bold tabular-nums text-text-muted">
+                        {i + 2}
+                      </span>
                       <span className="line-clamp-1 text-xs text-text-secondary">{item.title}</span>
                     </li>
                   ))}
@@ -402,8 +401,18 @@ export default function GoatBuilder({
                   text={`My number one: ${crowned[0].title}.`}
                   label="Share it"
                 />
-                <StoryButton src={`/u/${username}/goat/story?kind=${kind}&v=${crowned.slice(0, 5).map((pick) => pick.mbid.slice(0, 6)).join("")}`} filename="my-goat" />
-                <button type="button" onClick={() => setCrowned(null)} className={buttonClass({ size: "sm" })}>
+                <StoryButton
+                  src={`/u/${username}/goat/story?kind=${kind}&v=${crowned
+                    .slice(0, 5)
+                    .map((pick) => pick.mbid.slice(0, 6))
+                    .join("")}`}
+                  filename="my-goat"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCrowned(null)}
+                  className={buttonClass({ size: "sm" })}
+                >
                   Done
                 </button>
               </div>
@@ -434,12 +443,15 @@ export default function GoatBuilder({
         </div>
       </div>
 
-      {error && <p role="alert" className="mb-4 text-sm text-score-you">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-4 text-sm text-score-you">
+          {error}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-surface/40 px-5 py-8 text-center text-sm text-text-secondary">
-          Nothing picked yet. Search below, or tap one of your highest-rated{" "}
-          {noun}.
+          Nothing picked yet. Search below, or tap one of your highest-rated {noun}.
         </p>
       ) : (
         <ol className="overflow-hidden rounded-xl border border-border">
@@ -461,9 +473,7 @@ export default function GoatBuilder({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-text">{item.title}</span>
                 {item.subtitle && (
-                  <span className="block truncate text-xs text-text-muted">
-                    {item.subtitle}
-                  </span>
+                  <span className="block truncate text-xs text-text-muted">{item.subtitle}</span>
                 )}
               </span>
               <span className="flex shrink-0 items-center gap-1">
@@ -509,7 +519,15 @@ export default function GoatBuilder({
             label="Share your GOAT"
           />
         )}
-        {items.length > 0 && <StoryButton src={`/u/${username}/goat/story?kind=${kind}&v=${items.slice(0, 5).map((pick) => pick.mbid.slice(0, 6)).join("")}`} filename="my-goat" />}
+        {items.length > 0 && (
+          <StoryButton
+            src={`/u/${username}/goat/story?kind=${kind}&v=${items
+              .slice(0, 5)
+              .map((pick) => pick.mbid.slice(0, 6))
+              .join("")}`}
+            filename="my-goat"
+          />
+        )}
         <Link
           href={`/u/${username}`}
           className="text-xs text-text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
@@ -558,9 +576,7 @@ export default function GoatBuilder({
         )}
 
         {!full && searchingByName && !searching && showing.length === 0 && (
-          <p className="mt-5 text-xs text-text-muted">
-            Nothing on MULO matches that yet.
-          </p>
+          <p className="mt-5 text-xs text-text-muted">Nothing on MULO matches that yet.</p>
         )}
 
         {!full && showing.length > 0 && (

@@ -14,10 +14,7 @@ export default async function CoverWall() {
 
   if (covers.length < 10) return null;
 
-  const rows = [
-    covers.filter((_, i) => i % 2 === 0),
-    covers.filter((_, i) => i % 2 === 1),
-  ];
+  const rows = [covers.filter((_, i) => i % 2 === 0), covers.filter((_, i) => i % 2 === 1)];
 
   return (
     <div
@@ -25,7 +22,10 @@ export default async function CoverWall() {
       className="-mx-4 flex flex-col gap-3 overflow-hidden py-2 [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)] sm:-mx-6"
     >
       {rows.map((row, r) => (
-        <div key={r} className={`flex w-max gap-3 ${r === 0 ? "marquee" : "marquee marquee-reverse"}`}>
+        <div
+          key={r}
+          className={`flex w-max gap-3 ${r === 0 ? "marquee" : "marquee marquee-reverse"}`}
+        >
           {/* Twice over, so the loop has no seam. */}
           {[...row, ...row].map((cover, i) => (
             // eslint-disable-next-line @next/next/no-img-element

@@ -20,7 +20,9 @@ export default async function Header() {
   const user = await getCurrentUser();
 
   const { data: profile } = user
-    ? await (await createClient())
+    ? await (
+        await createClient()
+      )
         .from("profiles")
         .select("username, display_name, avatar_url")
         .eq("id", user.id)
@@ -66,7 +68,9 @@ export default async function Header() {
               <>
                 {/* On phones, Log in is in the tab bar. */}
                 <span className="hidden sm:block">
-                  <LoginLink className={buttonClass({ variant: "ghost", size: "sm" })}>Log in</LoginLink>
+                  <LoginLink className={buttonClass({ variant: "ghost", size: "sm" })}>
+                    Log in
+                  </LoginLink>
                 </span>
                 <span className="shrink-0">
                   <LoginLink mode="signup" className={buttonClass({ size: "sm" })}>
@@ -80,11 +84,7 @@ export default async function Header() {
       </header>
 
       <MobileNav
-        profile={
-          user
-            ? { href: profileHref, avatarUrl: profile?.avatar_url ?? null, name }
-            : null
-        }
+        profile={user ? { href: profileHref, avatarUrl: profile?.avatar_url ?? null, name } : null}
       />
     </>
   );

@@ -7,10 +7,7 @@ import { emailSchema, field, firstError } from "@/lib/validation";
 
 export type ResetState = { error?: string; message?: string };
 
-export async function requestReset(
-  _prev: ResetState,
-  formData: FormData,
-): Promise<ResetState> {
+export async function requestReset(_prev: ResetState, formData: FormData): Promise<ResetState> {
   const email = emailSchema.safeParse(field(formData, "email"));
   if (!email.success) return { error: firstError(email.error) };
   if (!(await allowAddress("reset"))) {
@@ -37,7 +34,6 @@ export async function requestReset(
   // Say the same thing either way, so this can't be used to find out which
   // email addresses have accounts.
   return {
-    message:
-      "If an account exists for that address, a reset link is on its way. Check your inbox.",
+    message: "If an account exists for that address, a reset link is on its way. Check your inbox.",
   };
 }

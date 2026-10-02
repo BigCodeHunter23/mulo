@@ -29,10 +29,7 @@ export type SetProgress = {
 };
 
 /** How many of an artist's albums somebody has rated. */
-export async function getSetProgress(
-  userId: string,
-  albumMbids: string[],
-): Promise<SetProgress> {
+export async function getSetProgress(userId: string, albumMbids: string[]): Promise<SetProgress> {
   if (albumMbids.length === 0) return { total: 0, rated: 0, remaining: [] };
 
   const supabase = await createClient();
@@ -124,9 +121,7 @@ export async function getRanking(
     }))
     // Best first; a tie goes to the older record, as the one that had to
     // hold its place for longer.
-    .sort(
-      (a, b) => b.score - a.score || (a.year ?? "9999").localeCompare(b.year ?? "9999"),
-    );
+    .sort((a, b) => b.score - a.score || (a.year ?? "9999").localeCompare(b.year ?? "9999"));
 
   return { ranked, total: albums.length };
 }

@@ -171,23 +171,13 @@ export const GENRE_FAMILIES: GenreFamily[] = [
     id: "pop",
     name: "Pop",
     match: ["pop"],
-    tiers: ladder("pop", [
-      "Chart Watcher",
-      "Hook Collector",
-      "Pop Historian",
-      "Pop Royalty",
-    ]),
+    tiers: ladder("pop", ["Chart Watcher", "Hook Collector", "Pop Historian", "Pop Royalty"]),
   },
   {
     id: "rock",
     name: "Rock",
     match: ["rock", "grunge", "britpop", "shoegaze"],
-    tiers: ladder("rock", [
-      "Garage Regular",
-      "Amp Stack",
-      "Rock Historian",
-      "Rock Immortal",
-    ]),
+    tiers: ladder("rock", ["Garage Regular", "Amp Stack", "Rock Historian", "Rock Immortal"]),
   },
   {
     id: "soul",
@@ -222,12 +212,7 @@ export const GENRE_FAMILIES: GenreFamily[] = [
     id: "country",
     name: "Country",
     match: ["country", "bluegrass", "americana"],
-    tiers: ladder("country", [
-      "Porch Sitter",
-      "Outlaw",
-      "Nashville Scholar",
-      "Country Legend",
-    ]),
+    tiers: ladder("country", ["Porch Sitter", "Outlaw", "Nashville Scholar", "Country Legend"]),
   },
   {
     id: "jazz",

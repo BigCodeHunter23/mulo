@@ -58,9 +58,7 @@ function Ladder({ ladder }: { ladder: BoardLadder }) {
           <Medal earned={ladder.tiers.some((tier) => tier.earned)} slug={ladder.id} />
           <span className="display-sm text-sm text-text">{ladder.name}</span>
         </span>
-        <span className="text-xs tabular-nums text-text-muted">
-          {ladder.rated} rated
-        </span>
+        <span className="text-xs tabular-nums text-text-muted">{ladder.rated} rated</span>
       </div>
       <ol className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {ladder.tiers.map((tier) => (
@@ -99,17 +97,14 @@ export default function BadgeBoardView({
   return (
     <>
       <header className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-          Badges
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Badges</p>
         <h1 className="display mt-2 text-4xl text-text sm:text-5xl">{heading}</h1>
         <p className="mt-2 text-sm text-text-secondary sm:text-base">{intro}</p>
 
         <div className="mt-5 max-w-sm">
           <div className="flex items-baseline justify-between gap-3 text-sm">
             <span className="display-sm text-text">
-              {board.earned}{" "}
-              <span className="text-text-muted">of {board.total} collected</span>
+              {board.earned} <span className="text-text-muted">of {board.total} collected</span>
             </span>
             <span className="text-xs tabular-nums text-text-muted">{percent}%</span>
           </div>
@@ -132,8 +127,7 @@ export default function BadgeBoardView({
             <SectionHeading
               action={
                 <span className="text-xs tabular-nums text-text-muted">
-                  {group.badges.filter((badge) => badge.earned).length}/
-                  {group.badges.length}
+                  {group.badges.filter((badge) => badge.earned).length}/{group.badges.length}
                 </span>
               }
             >
@@ -149,9 +143,7 @@ export default function BadgeBoardView({
 
         <section>
           <SectionHeading
-            action={
-              <span className="text-xs text-text-muted">Rated albums, by genre</span>
-            }
+            action={<span className="text-xs text-text-muted">Rated albums, by genre</span>}
           >
             Genres
           </SectionHeading>

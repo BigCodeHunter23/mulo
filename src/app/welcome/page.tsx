@@ -86,9 +86,7 @@ function Progress({ step }: { step: Step }) {
           >
             {i < current ? "✓" : i + 1}
           </span>
-          <span className={i === current ? "text-text" : "text-text-muted"}>
-            {LABELS[s]}
-          </span>
+          <span className={i === current ? "text-text" : "text-text-muted"}>{LABELS[s]}</span>
           {i < STEPS.length - 1 && (
             <span aria-hidden="true" className="mx-1 h-px w-6 bg-border sm:w-10" />
           )}
@@ -103,8 +101,8 @@ function ProfileStep() {
     <div className="mx-auto max-w-md">
       <h1 className="display text-3xl text-text">Welcome to MULO</h1>
       <p className="mt-2 text-sm text-text-secondary">
-        First, pick a username so people can find and follow you. You can add a
-        photo and a bio later.
+        First, pick a username so people can find and follow you. You can add a photo and a bio
+        later.
       </p>
       <div className="mt-7">
         <WelcomeProfileForm />
@@ -149,13 +147,12 @@ async function RateStep({ userId }: { userId: string }) {
   // new person sees leans on the decade and scene they picked a moment ago.
   // Somebody raised on nineties hip hop shouldn't be handed the same thirty
   // records as somebody raised on seventies rock.
-  const [artists, albums, { data: ratedArtists }, { data: ratedAlbums }] =
-    await Promise.all([
-      popularArtists(20),
-      getStack(userId, 30),
-      supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId),
-      supabase.from("ratings").select("release_mbid, score").eq("user_id", userId),
-    ]);
+  const [artists, albums, { data: ratedArtists }, { data: ratedAlbums }] = await Promise.all([
+    popularArtists(20),
+    getStack(userId, 30),
+    supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId),
+    supabase.from("ratings").select("release_mbid, score").eq("user_id", userId),
+  ]);
 
   const scores: Record<string, number> = {};
   for (const r of ratedArtists ?? []) scores[`artist:${r.artist_mbid}`] = r.score;
@@ -165,8 +162,8 @@ async function RateStep({ userId }: { userId: string }) {
     <div>
       <h1 className="display text-3xl text-text">Rate some music you know</h1>
       <p className="mt-2 max-w-xl text-sm text-text-secondary">
-        Tap an artist or an album, then a score out of 10. Skip anything you
-        don&rsquo;t know; ten or so is plenty to start.
+        Tap an artist or an album, then a score out of 10. Skip anything you don&rsquo;t know; ten
+        or so is plenty to start.
       </p>
       <div className="mt-8">
         <QuickRateGrid
@@ -190,10 +187,7 @@ async function RateStep({ userId }: { userId: string }) {
 }
 
 async function FollowStep({ userId }: { userId: string }) {
-  const [profiles, followingIds] = await Promise.all([
-    listProfiles(),
-    getFollowingIds(userId),
-  ]);
+  const [profiles, followingIds] = await Promise.all([listProfiles(), getFollowingIds(userId)]);
 
   const following = new Set(followingIds);
   const others = profiles.filter((p) => p.id !== userId);
@@ -202,8 +196,8 @@ async function FollowStep({ userId }: { userId: string }) {
     <div className="mx-auto max-w-2xl">
       <h1 className="display text-3xl text-text">Follow some people</h1>
       <p className="mt-2 text-sm text-text-secondary">
-        Their ratings fill your feed, and they make up the blue
-        &ldquo;Friends&rdquo; score on every album and artist.
+        Their ratings fill your feed, and they make up the blue &ldquo;Friends&rdquo; score on every
+        album and artist.
       </p>
 
       {others.length === 0 ? (

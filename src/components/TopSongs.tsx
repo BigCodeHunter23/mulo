@@ -22,19 +22,12 @@ export default function TopSongs({ songs }: { songs: TopSong[] }) {
               <span className="artwork h-10 w-10 shrink-0 overflow-hidden rounded-md">
                 {cover && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={cover}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
                 )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-text">{song.title}</span>
-                <span className="block truncate text-xs text-text-muted">
-                  {song.release.title}
-                </span>
+                <span className="block truncate text-xs text-text-muted">{song.release.title}</span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
                 <Score kind="overall" value={song.average} size="sm" showLabel={false} />

@@ -134,9 +134,7 @@ export function useBadgeUnlock() {
   );
 
   const overlay =
-    queue.length > 0 ? (
-      <BadgeUnlock badges={queue} onDone={() => setQueue([])} />
-    ) : null;
+    queue.length > 0 ? <BadgeUnlock badges={queue} onDone={() => setQueue([])} /> : null;
 
   return { celebrate, overlay };
 }
@@ -215,10 +213,19 @@ export default function BadgeUnlock({
                 text={`${badge.milestone} albums rated on MULO.`}
               />
               <StoryButton src={`${badge.url}/story`} filename={`mulo-${badge.milestone}-albums`} />
-              <Link href={badge.url} className={buttonClass({ variant: "secondary" })} onClick={onDone}>
+              <Link
+                href={badge.url}
+                className={buttonClass({ variant: "secondary" })}
+                onClick={onDone}
+              >
                 See the card
               </Link>
-              <button type="button" autoFocus onClick={next} className={buttonClass({ variant: "ghost" })}>
+              <button
+                type="button"
+                autoFocus
+                onClick={next}
+                className={buttonClass({ variant: "ghost" })}
+              >
                 {at + 1 < badges.length ? "Next" : "Nice"}
               </button>
             </div>
@@ -260,9 +267,7 @@ export default function BadgeUnlock({
           >
             {badge.name}
           </h2>
-          <p className="badge-unlock-copy mt-2 text-sm text-text-secondary">
-            {badge.description}
-          </p>
+          <p className="badge-unlock-copy mt-2 text-sm text-text-secondary">{badge.description}</p>
 
           {badges.length > 1 && (
             <p className="badge-unlock-copy mt-3 text-xs tabular-nums text-text-muted">
@@ -274,11 +279,7 @@ export default function BadgeUnlock({
             <button type="button" autoFocus onClick={next} className={buttonClass()}>
               {at + 1 < badges.length ? "Next" : "Nice"}
             </button>
-            <Link
-              href="/badges"
-              className={buttonClass({ variant: "secondary" })}
-              onClick={onDone}
-            >
+            <Link href="/badges" className={buttonClass({ variant: "secondary" })} onClick={onDone}>
               See the board
             </Link>
           </div>

@@ -13,7 +13,13 @@ function Vinyl() {
         <circle key={r} cx="50" cy="50" r={r} fill="none" stroke="#35353f" strokeWidth="1" />
       ))}
       <circle cx="50" cy="50" r="15" fill="currentColor" />
-      <path d="M50 38a12 12 0 0 1 12 12" fill="none" stroke="#0b0b0e" strokeWidth="2" opacity="0.35" />
+      <path
+        d="M50 38a12 12 0 0 1 12 12"
+        fill="none"
+        stroke="#0b0b0e"
+        strokeWidth="2"
+        opacity="0.35"
+      />
       <circle cx="50" cy="50" r="2.5" fill="#0b0b0e" />
     </svg>
   );

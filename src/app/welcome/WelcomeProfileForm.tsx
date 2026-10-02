@@ -16,10 +16,7 @@ function SubmitButton() {
 }
 
 export default function WelcomeProfileForm() {
-  const [state, formAction] = useActionState<ProfileState, FormData>(
-    saveProfile,
-    {},
-  );
+  const [state, formAction] = useActionState<ProfileState, FormData>(saveProfile, {});
 
   return (
     <form action={formAction} className="flex flex-col gap-5">

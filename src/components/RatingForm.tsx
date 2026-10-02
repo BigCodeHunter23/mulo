@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import {
-  rate,
-  removeRating,
-  saveReview,
-  type RatingResult,
-} from "@/app/ratings/actions";
+import { rate, removeRating, saveReview, type RatingResult } from "@/app/ratings/actions";
 import { useBadgeUnlock } from "@/components/BadgeUnlock";
 import LoginLink from "@/components/LoginLink";
 import { buttonClass, fieldClass } from "@/components/ui";
@@ -15,9 +10,7 @@ import { haptic } from "@/lib/haptics";
 import { promptFor, REVIEW_COMFORTABLE, REVIEW_MAX } from "@/lib/review-prompts";
 
 type Status =
-  | { tone: "saved"; text: string }
-  | { tone: "error"; text: string; needsProfile?: boolean }
-  | null;
+  { tone: "saved"; text: string } | { tone: "error"; text: string; needsProfile?: boolean } | null;
 
 const COPY = {
   album: { noun: "album" },
@@ -62,7 +55,9 @@ export default function RatingForm({
    * against a crowd of 8s says something, but nobody learns what unless they're
    * asked. This asks, once, right when it's fresh.
    */
-  const [hotTake, setHotTake] = useState<{ yours: number; crowd: number; count: number } | null>(null);
+  const [hotTake, setHotTake] = useState<{ yours: number; crowd: number; count: number } | null>(
+    null,
+  );
   const reviewBox = useRef<HTMLTextAreaElement>(null);
 
   // A success message fades after a moment; errors stay until acted on.
@@ -205,10 +200,7 @@ export default function RatingForm({
           {status.needsProfile && (
             <>
               {" "}
-              <Link
-                href="/profile"
-                className="font-medium underline underline-offset-4"
-              >
+              <Link href="/profile" className="font-medium underline underline-offset-4">
                 Pick one now
               </Link>
             </>
@@ -230,12 +222,9 @@ export default function RatingForm({
                 Hot take
               </p>
               <p className="relative mt-1.5 text-sm text-text">
-                You gave it a{" "}
-                <span className="font-semibold text-score-you">{hotTake.yours}</span>.{" "}
+                You gave it a <span className="font-semibold text-score-you">{hotTake.yours}</span>.{" "}
                 Everyone else here says{" "}
-                <span className="font-semibold text-score-overall">
-                  {hotTake.crowd.toFixed(1)}
-                </span>
+                <span className="font-semibold text-score-overall">{hotTake.crowd.toFixed(1)}</span>
                 .{" "}
                 {hotTake.yours < hotTake.crowd
                   ? "What are they hearing that you're not?"

@@ -29,11 +29,7 @@ type FetchOptions = {
   backoffMs?: number;
 };
 
-async function mbFetch<T>(
-  path: string,
-  options: FetchOptions = {},
-  attempt = 1,
-): Promise<T> {
+async function mbFetch<T>(path: string, options: FetchOptions = {}, attempt = 1): Promise<T> {
   const { retries = 4, timeoutMs, backoffMs = 2000 } = options;
 
   const response = await throttle(() =>
@@ -140,11 +136,13 @@ export type Seed = {
  * doubled. Returns nulls when there is nothing worth borrowing, which clears
  * any stale seed on a row rather than leaving one behind.
  */
-export function seedFrom(rating: MbRating | undefined): Seed | {
-  seed_score: null;
-  seed_votes: null;
-  seed_source: "none";
-} {
+export function seedFrom(rating: MbRating | undefined):
+  | Seed
+  | {
+      seed_score: null;
+      seed_votes: null;
+      seed_source: "none";
+    } {
   const value = rating?.value;
   const votes = rating?.["votes-count"] ?? 0;
 
@@ -192,10 +190,7 @@ function withDeadline<T>(work: Promise<T>): Promise<T> {
   return Promise.race([
     work,
     new Promise<T>((_, reject) =>
-      setTimeout(
-        () => reject(new Error("MusicBrainz took too long")),
-        SEARCH_DEADLINE_MS,
-      ),
+      setTimeout(() => reject(new Error("MusicBrainz took too long")), SEARCH_DEADLINE_MS),
     ),
   ]);
 }
@@ -241,9 +236,7 @@ export async function searchArtists(query: string): Promise<MbArtist[]> {
       SEARCH,
     ),
   );
-  return (data.artists ?? []).sort(
-    (a, b) => artistRelevance(b, query) - artistRelevance(a, query),
-  );
+  return (data.artists ?? []).sort((a, b) => artistRelevance(b, query) - artistRelevance(a, query));
 }
 
 /** Escape characters that would otherwise be Lucene query syntax. */
@@ -252,7 +245,8 @@ function escapeLucene(value: string) {
 }
 
 /** Tribute, karaoke and novelty acts nobody is searching for. */
-const NOVELTY = /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|string quartet|piano tribute|made famous by/i;
+const NOVELTY =
+  /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|string quartet|piano tribute|made famous by/i;
 
 /**
  * MusicBrainz ranks purely on text similarity with no notion of popularity,
@@ -262,9 +256,7 @@ const NOVELTY = /tribute|karaoke|cover band|8-bit|8 bit|lullaby|renditions|strin
 function relevance(group: MbReleaseGroup, query: string) {
   const q = query.toLowerCase().trim();
   const title = group.title.toLowerCase();
-  const artist = (
-    group["artist-credit"]?.[0]?.artist.name ?? ""
-  ).toLowerCase();
+  const artist = (group["artist-credit"]?.[0]?.artist.name ?? "").toLowerCase();
 
   let boost = 0;
   if (NOVELTY.test(artist) || NOVELTY.test(title)) boost -= 500;
@@ -281,9 +273,7 @@ function relevance(group: MbReleaseGroup, query: string) {
   return boost + (group.score ?? 0);
 }
 
-export async function searchReleaseGroups(
-  query: string,
-): Promise<MbReleaseGroup[]> {
+export async function searchReleaseGroups(query: string): Promise<MbReleaseGroup[]> {
   // Match the query against either the artist or the album title, and ask
   // only for albums so singles and EPs don't crowd out real records.
   const escaped = escapeLucene(query);
@@ -311,8 +301,7 @@ export async function getArtist(mbid: string): Promise<MbArtist> {
  * way through to a photo and a real biography.
  */
 export function wikidataQid(artist: MbArtist): string | null {
-  const url = artist.relations?.find((r) => r.type === "wikidata")?.url
-    ?.resource;
+  const url = artist.relations?.find((r) => r.type === "wikidata")?.url?.resource;
   if (!url) return null;
 
   const qid = url.split("/").pop();
@@ -327,9 +316,7 @@ const MAX_ALBUM_PAGES = 3;
  * with studio albums; anything carrying a secondary type isn't what people
  * mean by "an album", so those are dropped.
  */
-export async function getArtistReleaseGroups(
-  mbid: string,
-): Promise<MbReleaseGroup[]> {
+export async function getArtistReleaseGroups(mbid: string): Promise<MbReleaseGroup[]> {
   const albums: MbReleaseGroup[] = [];
 
   for (let page = 0; page < MAX_ALBUM_PAGES; page++) {
@@ -342,9 +329,7 @@ export async function getArtistReleaseGroups(
     );
 
     const groups = data["release-groups"] ?? [];
-    albums.push(
-      ...groups.filter((g) => (g["secondary-types"] ?? []).length === 0),
-    );
+    albums.push(...groups.filter((g) => (g["secondary-types"] ?? []).length === 0));
 
     if (groups.length < 100 || offset + 100 >= (data["release-group-count"] ?? 0)) {
       break;
@@ -355,9 +340,7 @@ export async function getArtistReleaseGroups(
 }
 
 export async function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {
-  return mbFetch<MbReleaseGroup>(
-    `/release-group/${mbid}?inc=artists+genres+ratings&fmt=json`,
-  );
+  return mbFetch<MbReleaseGroup>(`/release-group/${mbid}?inc=artists+genres+ratings&fmt=json`);
 }
 
 function trackCount(edition: MbEdition) {
@@ -396,9 +379,8 @@ function standardEdition(editions: MbEdition[]): MbEdition | null {
   };
 
   return (
-    (groups[0] ?? []).sort(
-      (a, b) => place(a) - place(b) || date(a).localeCompare(date(b)),
-    )[0] ?? null
+    (groups[0] ?? []).sort((a, b) => place(a) - place(b) || date(a).localeCompare(date(b)))[0] ??
+    null
   );
 }
 
@@ -406,9 +388,7 @@ function standardEdition(editions: MbEdition[]): MbEdition | null {
  * The tracklist of an album's standard edition, each track carrying the id
  * of its song. Two requests: the album's editions, then the chosen one.
  */
-export async function getTracklist(
-  releaseGroupMbid: string,
-): Promise<MbTrack[]> {
+export async function getTracklist(releaseGroupMbid: string): Promise<MbTrack[]> {
   const { releases = [] } = await mbFetch<{ releases?: MbEdition[] }>(
     `/release?release-group=${releaseGroupMbid}&inc=media&limit=100&fmt=json`,
   );

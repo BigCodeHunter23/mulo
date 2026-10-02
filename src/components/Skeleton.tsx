@@ -1,14 +1,10 @@
 /** Grey placeholder blocks used by the route-level loading screens. */
 export function SkeletonLine({ className = "" }: { className?: string }) {
-  return (
-    <div className={`h-3.5 animate-pulse rounded bg-surface-raised ${className}`} />
-  );
+  return <div className={`h-3.5 animate-pulse rounded bg-surface-raised ${className}`} />;
 }
 
 export function SkeletonHeading({ className = "" }: { className?: string }) {
-  return (
-    <div className={`h-6 animate-pulse rounded bg-surface-raised ${className}`} />
-  );
+  return <div className={`h-6 animate-pulse rounded bg-surface-raised ${className}`} />;
 }
 
 /** A feed or list row: square artwork with a few lines beside it. */

@@ -26,7 +26,10 @@ function itemsFor(username: string | null): Item[][] {
         { href: "/badges", label: "My badges" },
       ]
     : // No username yet means signup isn't finished; that's the one place to go.
-      [{ href: "/welcome", label: "Finish setting up" }, { href: "/ratings", label: "My ratings" }];
+      [
+        { href: "/welcome", label: "Finish setting up" },
+        { href: "/ratings", label: "My ratings" },
+      ];
   return [
     mine,
     [

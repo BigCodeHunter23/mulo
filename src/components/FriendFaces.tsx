@@ -33,9 +33,7 @@ export default function FriendFaces({
         ))}
       </span>
       {friends.length > SHOWN && (
-        <span className="text-[10px] tabular-nums text-text-muted">
-          +{friends.length - SHOWN}
-        </span>
+        <span className="text-[10px] tabular-nums text-text-muted">+{friends.length - SHOWN}</span>
       )}
     </span>
   );

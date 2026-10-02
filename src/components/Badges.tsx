@@ -31,11 +31,7 @@ export default function Badges({ badges, href }: { badges: Badge[]; href: string
           href={href}
           className="flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text"
         >
-          {rest > 0
-            ? `${rest} more`
-            : badges.length === 0
-              ? "Badges to collect"
-              : "All badges"}
+          {rest > 0 ? `${rest} more` : badges.length === 0 ? "Badges to collect" : "All badges"}
           <span aria-hidden="true">→</span>
         </Link>
       </li>

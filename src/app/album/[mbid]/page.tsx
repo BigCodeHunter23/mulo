@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import {
-  getCachedArtist,
-  getCachedRelease,
-  getCachedTracks,
-} from "@/lib/catalog";
+import { getCachedArtist, getCachedRelease, getCachedTracks } from "@/lib/catalog";
 import { getOwnRating, getScores, getSongScores } from "@/lib/ratings";
 import { getReviews } from "@/lib/reviews";
 import { getReactions } from "@/lib/reactions";
@@ -63,11 +59,7 @@ function totalRuntime(tracks: { duration_ms: number | null }[]) {
   return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-export default async function AlbumPage({
-  params,
-}: {
-  params: Promise<{ mbid: string }>;
-}) {
+export default async function AlbumPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
 
   const release = await getCachedRelease(mbid);
@@ -162,11 +154,7 @@ export default async function AlbumPage({
                   </div>
                 )}
 
-                <ListenOn
-                  artist={artist?.name ?? null}
-                  title={release.title}
-                  className="mt-4"
-                />
+                <ListenOn artist={artist?.name ?? null} title={release.title} className="mt-4" />
                 <div className="mt-3 flex justify-center sm:justify-start">
                   <AddToList releaseMbid={mbid} signedIn={signedIn} lists={myLists} />
                 </div>
@@ -260,9 +248,7 @@ async function Tracklist({
   signedIn: boolean;
 }) {
   const tracks = await getCachedTracks(releaseMbid);
-  const scores = await getSongScores(
-    tracks.flatMap((t) => (t.song_mbid ? [t.song_mbid] : [])),
-  );
+  const scores = await getSongScores(tracks.flatMap((t) => (t.song_mbid ? [t.song_mbid] : [])));
   const runtime = totalRuntime(tracks);
 
   return (
@@ -280,9 +266,7 @@ async function Tracklist({
       </SectionHeading>
 
       {tracks.length === 0 ? (
-        <p className="text-sm text-text-secondary">
-          No tracklist available for this album.
-        </p>
+        <p className="text-sm text-text-secondary">No tracklist available for this album.</p>
       ) : (
         <SongList
           key={releaseMbid}
@@ -306,10 +290,7 @@ function TracklistPlaceholder() {
       <SectionHeading>Tracklist</SectionHeading>
       <div className="space-y-4 rounded-xl border border-border p-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <SkeletonLine
-            key={i}
-            className={["w-2/3", "w-1/2", "w-3/5", "w-2/5"][i % 4]}
-          />
+          <SkeletonLine key={i} className={["w-2/3", "w-1/2", "w-3/5", "w-2/5"][i % 4]} />
         ))}
       </div>
     </>
@@ -318,7 +299,9 @@ function TracklistPlaceholder() {
 
 /** Lists this album is on, so one good list leads to the next. */
 async function OnLists({ releaseMbid }: { releaseMbid: string }) {
-  const lists = (await getListsWithAlbum(releaseMbid).catch(() => [])).filter((list) => list.count > 0);
+  const lists = (await getListsWithAlbum(releaseMbid).catch(() => [])).filter(
+    (list) => list.count > 0,
+  );
   if (lists.length === 0) return null;
 
   return (

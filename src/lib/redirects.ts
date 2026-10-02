@@ -38,10 +38,7 @@ export function safeRedirectPath(value: unknown): string | null {
  * A path with the query parameters that are set, so a page's filters survive
  * a trip through the login page. Empty and missing values are left out.
  */
-export function withQuery(
-  path: string,
-  query: Record<string, string | undefined | null>,
-): string {
+export function withQuery(path: string, query: Record<string, string | undefined | null>): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value) params.set(key, value);

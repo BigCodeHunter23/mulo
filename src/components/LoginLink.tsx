@@ -23,7 +23,11 @@ export default function LoginLink({
   const here = pathname.startsWith("/login") || pathname.startsWith("/auth") ? null : pathname;
 
   return (
-    <Link href={mode === "signup" ? signupPath(here) : loginPath(here)} className={className} {...rest}>
+    <Link
+      href={mode === "signup" ? signupPath(here) : loginPath(here)}
+      className={className}
+      {...rest}
+    >
       {children}
     </Link>
   );

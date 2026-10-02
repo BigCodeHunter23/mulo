@@ -185,9 +185,7 @@ export default function QuickRateGrid({
               >
                 {item.title}
               </p>
-              {item.subtitle && (
-                <p className="truncate text-xs text-text-muted">{item.subtitle}</p>
-              )}
+              {item.subtitle && <p className="truncate text-xs text-text-muted">{item.subtitle}</p>}
             </li>
           );
         })}

@@ -20,9 +20,15 @@ describe("fetchImage", () => {
 
   it("follows a redirect between allowed hosts", async () => {
     respond({
-      [COVER]: () => new Response(null, { status: 307, headers: { location: "https://archive.org/download/x.jpg" } }),
+      [COVER]: () =>
+        new Response(null, {
+          status: 307,
+          headers: { location: "https://archive.org/download/x.jpg" },
+        }),
       "https://archive.org/download/x.jpg": () =>
-        new Response(new Uint8Array([0xff, 0xd8, 0xff]), { headers: { "content-type": "image/jpeg" } }),
+        new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+          headers: { "content-type": "image/jpeg" },
+        }),
     });
     const image = await fetchImage(COVER);
     expect(image?.type).toBe("image/jpeg");
@@ -31,7 +37,8 @@ describe("fetchImage", () => {
 
   it("won't follow a redirect anywhere else", async () => {
     const calls = respond({
-      [COVER]: () => new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }),
+      [COVER]: () =>
+        new Response(null, { status: 302, headers: { location: "http://169.254.169.254/" } }),
     });
     expect(await fetchImage(COVER)).toBeNull();
     expect(calls).toEqual([COVER]);
@@ -44,21 +51,28 @@ describe("fetchImage", () => {
   });
 
   it("refuses SVG and anything that isn't a picture", async () => {
-    respond({ [COVER]: () => new Response("<svg/>", { headers: { "content-type": "image/svg+xml" } }) });
+    respond({
+      [COVER]: () => new Response("<svg/>", { headers: { "content-type": "image/svg+xml" } }),
+    });
     expect(await fetchImage(COVER)).toBeNull();
-    respond({ [COVER]: () => new Response("<html>", { headers: { "content-type": "text/html" } }) });
+    respond({
+      [COVER]: () => new Response("<html>", { headers: { "content-type": "text/html" } }),
+    });
     expect(await fetchImage(COVER)).toBeNull();
   });
 
   it("refuses anything too big, declared or not", async () => {
     respond({
       [COVER]: () =>
-        new Response("x", { headers: { "content-type": "image/png", "content-length": String(50 * 1024 * 1024) } }),
+        new Response("x", {
+          headers: { "content-type": "image/png", "content-length": String(50 * 1024 * 1024) },
+        }),
     });
     expect(await fetchImage(COVER)).toBeNull();
 
     respond({
-      [COVER]: () => new Response(new Uint8Array(6 * 1024 * 1024), { headers: { "content-type": "image/png" } }),
+      [COVER]: () =>
+        new Response(new Uint8Array(6 * 1024 * 1024), { headers: { "content-type": "image/png" } }),
     });
     expect(await fetchImage(COVER)).toBeNull();
   });

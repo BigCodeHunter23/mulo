@@ -59,7 +59,9 @@ export default function AddToList({
     setError(null);
     setLists((current) => current.map((l) => (l.id === list.id ? { ...l, has: next } : l)));
     startTransition(async () => {
-      const result = next ? await addToList(list.id, releaseMbid) : await removeFromList(list.id, releaseMbid);
+      const result = next
+        ? await addToList(list.id, releaseMbid)
+        : await removeFromList(list.id, releaseMbid);
       if (!result.ok) {
         setError(result.error);
         setLists((current) => current.map((l) => (l.id === list.id ? { ...l, has: !next } : l)));
@@ -94,13 +96,19 @@ export default function AddToList({
                       className="h-4 w-4 shrink-0"
                     />
                     <span className="min-w-0 flex-1 truncate">{list.title}</span>
-                    {list.full && !list.has && <span className="text-xs text-text-muted">Full</span>}
+                    {list.full && !list.has && (
+                      <span className="text-xs text-text-muted">Full</span>
+                    )}
                   </label>
                 </li>
               ))}
             </ul>
           )}
-          {error && <p role="alert" className="px-2 py-1 text-xs text-score-you">{error}</p>}
+          {error && (
+            <p role="alert" className="px-2 py-1 text-xs text-score-you">
+              {error}
+            </p>
+          )}
           <Link
             href={`/lists/new?add=${releaseMbid}`}
             className="mt-1 block rounded-lg px-2 py-2 text-sm font-medium text-accent hover:bg-surface-hover"

@@ -20,9 +20,7 @@ export type ProfileStats = {
   averageScore: number | null;
 };
 
-export async function getProfileByUsername(
-  username: string,
-): Promise<PublicProfile | null> {
+export async function getProfileByUsername(username: string): Promise<PublicProfile | null> {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -38,14 +36,8 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const supabase = await createClient();
 
   const [followers, following, ratings] = await Promise.all([
-    supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("following_id", userId),
-    supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("follower_id", userId),
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", userId),
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", userId),
     // Albums, artists and songs all count, totalled by the database
     // (migration 0018) so nobody's stats stop at a thousand ratings.
     supabase.rpc("profile_rating_stats", { p_user: userId }).maybeSingle(),
@@ -69,8 +61,7 @@ export async function getFollowState(
   const user = await getCurrentUser();
 
   if (!user) return { signedIn: false, isSelf: false, isFollowing: false };
-  if (user.id === targetUserId)
-    return { signedIn: true, isSelf: true, isFollowing: false };
+  if (user.id === targetUserId) return { signedIn: true, isSelf: true, isFollowing: false };
 
   const { data } = await supabase
     .from("follows")
@@ -89,7 +80,9 @@ export type Slice = { offset?: number; size?: number };
  * Everyone with a profile, newest first, a slice at a time. Asking for one
  * more than `size` is how a page knows whether there's another after it.
  */
-export async function listProfiles({ offset = 0, size = 200 }: Slice = {}): Promise<PublicProfile[]> {
+export async function listProfiles({ offset = 0, size = 200 }: Slice = {}): Promise<
+  PublicProfile[]
+> {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -119,9 +112,7 @@ export async function listFollows(
   // Following: rows where they are the follower, and we want whoever they
   // point at. Followers: rows where they are the one being pointed at.
   const [match, wanted] =
-    direction === "following"
-      ? ["follower_id", "following_id"]
-      : ["following_id", "follower_id"];
+    direction === "following" ? ["follower_id", "following_id"] : ["following_id", "follower_id"];
 
   const { data: links } = await supabase
     .from("follows")
@@ -133,9 +124,7 @@ export async function listFollows(
 
   // Which column is wanted depends on the direction, which the typed query
   // builder can't follow.
-  const ids = ((links ?? []) as unknown as Record<string, string>[]).map(
-    (row) => row[wanted],
-  );
+  const ids = ((links ?? []) as unknown as Record<string, string>[]).map((row) => row[wanted]);
   if (ids.length === 0) return [];
 
   const { data } = await supabase
@@ -146,9 +135,7 @@ export async function listFollows(
   // Keep the order the follows came back in — most recent first — which
   // fetching the profiles doesn't preserve.
   const byId = new Map((data ?? []).map((row) => [row.id, row]));
-  return ids
-    .map((id) => byId.get(id))
-    .filter((row): row is PublicProfile => Boolean(row));
+  return ids.map((id) => byId.get(id)).filter((row): row is PublicProfile => Boolean(row));
 }
 
 /**

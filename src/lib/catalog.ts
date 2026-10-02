@@ -44,8 +44,7 @@ export type Track = {
   song_mbid: string | null;
 };
 
-const RELEASE_COLUMNS =
-  "mbid, title, artist_mbid, release_date, cover_art_url, genres";
+const RELEASE_COLUMNS = "mbid, title, artist_mbid, release_date, cover_art_url, genres";
 
 /** Newest first, with undated entries last. */
 function byNewest(a: Release, b: Release) {
@@ -77,10 +76,7 @@ function withoutSeed<T extends Record<SeedColumn, unknown>>(row: T): Omit<T, See
 
 /** PostgREST's code for "no such column", which is what a missing seed is. */
 function isUnknownColumn(error: { code?: string; message?: string } | null) {
-  return (
-    error?.code === "PGRST204" ||
-    (error?.message?.includes("seed_") ?? false)
-  );
+  return error?.code === "PGRST204" || (error?.message?.includes("seed_") ?? false);
 }
 
 /**
@@ -148,9 +144,7 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   }
 
   const qid = wikidataQid(mb);
-  const extras = qid
-    ? await getArtistExtras(qid)
-    : { imageUrl: null, bio: null };
+  const extras = qid ? await getArtistExtras(qid) : { imageUrl: null, bio: null };
 
   const artist: Artist = {
     mbid: mb.id,
@@ -174,18 +168,12 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   return artist;
 }
 
-export async function getCachedArtistAlbums(
-  artistMbid: string,
-): Promise<Release[]> {
+export async function getCachedArtistAlbums(artistMbid: string): Promise<Release[]> {
   if (!isMbid(artistMbid)) return [];
   const supabase = await createClient();
 
   const [{ data: artist }, { data: cached }] = await Promise.all([
-    supabase
-      .from("artists")
-      .select("albums_cached_at")
-      .eq("mbid", artistMbid)
-      .maybeSingle(),
+    supabase.from("artists").select("albums_cached_at").eq("mbid", artistMbid).maybeSingle(),
     supabase
       .from("releases")
       .select(RELEASE_COLUMNS)
@@ -222,9 +210,7 @@ export async function getCachedArtistAlbums(
 
   const admin = createAdminClient();
   if (fresh.length > 0) {
-    await admin
-      .from("releases")
-      .upsert(fresh, { onConflict: "mbid", ignoreDuplicates: true });
+    await admin.from("releases").upsert(fresh, { onConflict: "mbid", ignoreDuplicates: true });
   }
   await admin
     .from("artists")
@@ -304,15 +290,13 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
   const cover: string | null = cached ? cached.cover_art_url : coverArtUrl(mb.id);
 
   if (cached) {
-    await saveWithSeed(
-      (row) => admin.from("releases").update(row).eq("mbid", mb.id),
-      details,
-    );
+    await saveWithSeed((row) => admin.from("releases").update(row).eq("mbid", mb.id), details);
   } else {
-    await saveWithSeed(
-      (row) => admin.from("releases").upsert(row, { onConflict: "mbid" }),
-      { mbid: mb.id, cover_art_url: cover, ...details },
-    );
+    await saveWithSeed((row) => admin.from("releases").upsert(row, { onConflict: "mbid" }), {
+      mbid: mb.id,
+      cover_art_url: cover,
+      ...details,
+    });
   }
 
   const release: Release = {
@@ -333,11 +317,7 @@ export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
   const supabase = await createClient();
 
   const [{ data: release }, { data: cached }] = await Promise.all([
-    supabase
-      .from("releases")
-      .select("tracks_cached_at")
-      .eq("mbid", releaseMbid)
-      .maybeSingle(),
+    supabase.from("releases").select("tracks_cached_at").eq("mbid", releaseMbid).maybeSingle(),
     supabase
       .from("tracks")
       .select("position, title, duration_ms, song_mbid")
@@ -381,9 +361,7 @@ export async function getCachedTracks(releaseMbid: string): Promise<Track[]> {
 
   const admin = createAdminClient();
   if (songs.size > 0) {
-    const { error } = await admin
-      .from("songs")
-      .upsert([...songs.values()], { onConflict: "mbid" });
+    const { error } = await admin.from("songs").upsert([...songs.values()], { onConflict: "mbid" });
     if (error) return cached ?? [];
   }
 

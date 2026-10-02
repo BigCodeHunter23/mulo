@@ -185,7 +185,10 @@ export default function IntroCards() {
             if (distance > 50) setIndex((i) => Math.max(0, i - 1));
           }}
         >
-          <div key={`art-${index}`} className="goat-reveal flex h-48 items-center justify-center bg-surface-raised">
+          <div
+            key={`art-${index}`}
+            className="goat-reveal flex h-48 items-center justify-center bg-surface-raised"
+          >
             {card.art}
           </div>
 

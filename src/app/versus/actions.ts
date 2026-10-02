@@ -17,10 +17,7 @@ export type PickResult =
 const TRY_AGAIN = "Couldn't save that. Please try again.";
 
 /** One pick each, and only in today's matchup: the database holds both rules. */
-export async function castVote(
-  matchupId: number,
-  pick: VersusSideKey,
-): Promise<PickResult> {
+export async function castVote(matchupId: number, pick: VersusSideKey): Promise<PickResult> {
   if (!isRowId(matchupId) || (pick !== "left" && pick !== "right")) {
     return { ok: false, error: TRY_AGAIN };
   }
@@ -183,7 +180,9 @@ export async function backNomination(id: number, back: boolean): Promise<Nominat
 
   const supabase = await createClient();
   const { error } = back
-    ? await supabase.from("versus_nomination_backers").insert({ nomination_id: id, user_id: user.id })
+    ? await supabase
+        .from("versus_nomination_backers")
+        .insert({ nomination_id: id, user_id: user.id })
     : await supabase
         .from("versus_nomination_backers")
         .delete()

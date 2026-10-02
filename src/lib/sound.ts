@@ -22,7 +22,6 @@ const DISPLAY: Record<string, string> = {
   "neo soul": "neo-soul",
 };
 
-
 /**
  * Somebody's sound, worked out from what they rate highly rather than asked
  * for. Albums scored 7 or more count, a 10 far more than a 7; loving an
@@ -115,10 +114,7 @@ export async function getSound(userId: string): Promise<string[]> {
     // on nearly every album in their family, so the bar is 40%, not half.
     const narrower = ranked.find(
       (r) =>
-        r.genre !== genre &&
-        narrows(genre, r.genre) &&
-        r.score >= score * 0.4 &&
-        !clashes(r.genre),
+        r.genre !== genre && narrows(genre, r.genre) && r.score >= score * 0.4 && !clashes(r.genre),
     );
     const pick = narrower?.genre ?? genre;
 

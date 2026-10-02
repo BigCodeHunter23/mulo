@@ -12,11 +12,7 @@ function SubmitButton({ mode }: { mode: Mode }) {
   const { pending } = useFormStatus();
 
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={`${buttonClass()} w-full`}
-    >
+    <button type="submit" disabled={pending} className={`${buttonClass()} w-full`}>
       {pending
         ? mode === "login"
           ? "Logging in…"
@@ -62,9 +58,7 @@ export default function AuthForm({
             aria-pressed={mode === m}
             onClick={() => setMode(m)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mode === m
-                ? "bg-surface-raised text-text"
-                : "text-text-muted hover:text-text"
+              mode === m ? "bg-surface-raised text-text" : "text-text-muted hover:text-text"
             }`}
           >
             {m === "login" ? "Log in" : "Join"}
@@ -103,10 +97,7 @@ function AuthPanel({ mode, next, notice }: { mode: Mode; next: string; notice?: 
           />
         </Field>
 
-        <Field
-          label="Password"
-          hint={mode === "signup" ? "At least 6 characters." : undefined}
-        >
+        <Field label="Password" hint={mode === "signup" ? "At least 6 characters." : undefined}>
           <input
             id="password"
             name="password"

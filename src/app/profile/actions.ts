@@ -25,10 +25,7 @@ const profileInput = z.object({
  * Uploads with the service role from the server, so the storage bucket needs
  * no client-facing write policy. Returns the public URL, or an error string.
  */
-async function uploadAvatar(
-  userId: string,
-  file: File,
-): Promise<{ url?: string; error?: string }> {
+async function uploadAvatar(userId: string, file: File): Promise<{ url?: string; error?: string }> {
   if (file.size > MAX_AVATAR_BYTES) {
     return { error: "That image is over 2MB. Please pick a smaller one." };
   }
@@ -60,10 +57,7 @@ async function uploadAvatar(
   return { url: `${publicUrl}?v=${Date.now()}` };
 }
 
-export async function saveProfile(
-  _prev: ProfileState,
-  formData: FormData,
-): Promise<ProfileState> {
+export async function saveProfile(_prev: ProfileState, formData: FormData): Promise<ProfileState> {
   const user = await getCurrentUser();
   if (!user) return { error: "You've been logged out. Log in again to save your profile." };
 

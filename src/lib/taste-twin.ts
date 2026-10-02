@@ -40,24 +40,43 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
 
   const [{ data: myAlbums }, { data: myArtists }, { data: follows }] = await Promise.all([
     readAll((from, to) =>
-      supabase.from("ratings").select("release_mbid, score").eq("user_id", userId).order("id").range(from, to),
+      supabase
+        .from("ratings")
+        .select("release_mbid, score")
+        .eq("user_id", userId)
+        .order("id")
+        .range(from, to),
     ),
     readAll((from, to) =>
-      supabase.from("artist_ratings").select("artist_mbid, score").eq("user_id", userId).order("id").range(from, to),
+      supabase
+        .from("artist_ratings")
+        .select("artist_mbid, score")
+        .eq("user_id", userId)
+        .order("id")
+        .range(from, to),
     ),
     supabase.from("follows").select("following_id").eq("follower_id", userId),
   ]);
 
   const albums = new Map(
-    ((myAlbums ?? []) as { release_mbid: string; score: number }[]).map((r) => [r.release_mbid, r.score]),
+    ((myAlbums ?? []) as { release_mbid: string; score: number }[]).map((r) => [
+      r.release_mbid,
+      r.score,
+    ]),
   );
   const artists = new Map(
-    ((myArtists ?? []) as { artist_mbid: string; score: number }[]).map((r) => [r.artist_mbid, r.score]),
+    ((myArtists ?? []) as { artist_mbid: string; score: number }[]).map((r) => [
+      r.artist_mbid,
+      r.score,
+    ]),
   );
   if (albums.size + artists.size < MINIMUM) return null;
 
   // Everybody else's scores on the same things, a chunk of ids at a time.
-  const others = new Map<string, { gap: number; shared: number; best: { mbid: string; yours: number; theirs: number } | null }>();
+  const others = new Map<
+    string,
+    { gap: number; shared: number; best: { mbid: string; yours: number; theirs: number } | null }
+  >();
   function add(row: Row, yours: number, albumMbid: string | null) {
     const entry = others.get(row.user_id) ?? { gap: 0, shared: 0, best: null };
     entry.gap += Math.abs(yours - row.score);
@@ -88,10 +107,10 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
             .range(from, to),
         10_000,
       ).then(({ data }) => {
-          for (const row of (data ?? []) as (Row & { release_mbid: string })[]) {
-            add(row, albums.get(row.release_mbid)!, row.release_mbid);
-          }
-        }),
+        for (const row of (data ?? []) as (Row & { release_mbid: string })[]) {
+          add(row, albums.get(row.release_mbid)!, row.release_mbid);
+        }
+      }),
     );
   }
   for (let i = 0; i < artistIds.length; i += CHUNK) {
@@ -107,10 +126,10 @@ export async function getTasteTwin(userId: string): Promise<TasteTwin | null> {
             .range(from, to),
         10_000,
       ).then(({ data }) => {
-          for (const row of (data ?? []) as (Row & { artist_mbid: string })[]) {
-            add(row, artists.get(row.artist_mbid)!, null);
-          }
-        }),
+        for (const row of (data ?? []) as (Row & { artist_mbid: string })[]) {
+          add(row, artists.get(row.artist_mbid)!, null);
+        }
+      }),
     );
   }
   await Promise.all(lookups);

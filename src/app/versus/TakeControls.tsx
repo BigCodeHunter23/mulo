@@ -7,13 +7,7 @@ import { buttonClass, fieldClass } from "@/components/ui";
 import { deleteTake, postTake } from "./actions";
 
 /** Where you make your case for the side you picked. */
-export function TakeComposer({
-  matchupId,
-  pickedName,
-}: {
-  matchupId: number;
-  pickedName: string;
-}) {
+export function TakeComposer({ matchupId, pickedName }: { matchupId: number; pickedName: string }) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);

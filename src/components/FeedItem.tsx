@@ -35,12 +35,9 @@ function timeAgo(iso: string) {
   return `${value}${unit.charAt(0)}`;
 }
 
-const EYEBROW =
-  "text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted";
-const TITLE =
-  "display-sm block truncate text-base text-text transition-colors hover:text-accent";
-const SUBTITLE =
-  "block truncate text-sm text-text-secondary transition-colors hover:text-text";
+const EYEBROW = "text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted";
+const TITLE = "display-sm block truncate text-base text-text transition-colors hover:text-accent";
+const SUBTITLE = "block truncate text-sm text-text-secondary transition-colors hover:text-text";
 
 function AuthorScore({ score }: { score: number }) {
   return (
@@ -90,11 +87,7 @@ function Artwork({
 
 function Review({ text }: { text: string | null }) {
   if (!text) return null;
-  return (
-    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-text-secondary">
-      {text}
-    </p>
-  );
+  return <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-text-secondary">{text}</p>;
 }
 
 function AlbumDetails({ item }: { item: Of<"album"> }) {
@@ -181,9 +174,7 @@ function SongDetails({ item }: { item: Of<"songs"> }) {
             <span className="font-bold tabular-nums text-score-you">{song.score}</span>
           </li>
         ))}
-        {more > 0 && (
-          <li className="px-1 py-0.5 text-xs text-text-muted">+{more} more</li>
-        )}
+        {more > 0 && <li className="px-1 py-0.5 text-xs text-text-muted">+{more} more</li>}
       </ul>
     </>
   );
@@ -203,7 +194,10 @@ function PickArt({ item }: { item: Of<"pick"> }) {
         const src = artistPhotoSrc(matchup[side].image, 200);
         const faded = revealed && side !== pick;
         return (
-          <span key={side} className="relative block h-full w-1/2 overflow-hidden bg-surface-raised">
+          <span
+            key={side}
+            className="relative block h-full w-1/2 overflow-hidden bg-surface-raised"
+          >
             {src && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -268,8 +262,7 @@ export default function FeedItem({
   // A grouped song item is many ratings at once, so there is nothing single
   // to love or disagree with; a pick you can't see yet can't be judged.
   const reactable = item.kind !== "songs" && (item.kind !== "pick" || item.revealed);
-  const hasReactions =
-    reactable && (item.reaction.love > 0 || item.reaction.dislike > 0);
+  const hasReactions = reactable && (item.reaction.love > 0 || item.reaction.dislike > 0);
 
   return (
     <li className="group rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong">

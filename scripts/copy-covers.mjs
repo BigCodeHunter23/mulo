@@ -30,8 +30,7 @@ const supabase = createClient(
 );
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const log = (...parts) =>
-  console.log(new Date().toISOString().slice(11, 19), ...parts);
+const log = (...parts) => console.log(new Date().toISOString().slice(11, 19), ...parts);
 
 /** "ok" with the image, "missing" if no cover exists, "failed" to retry. */
 async function download(url) {

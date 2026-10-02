@@ -57,11 +57,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function ArtistPage({
-  params,
-}: {
-  params: Promise<{ mbid: string }>;
-}) {
+export default async function ArtistPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
 
   const artist = await getCachedArtist(mbid);
@@ -80,7 +76,10 @@ export default async function ArtistPage({
   const [albumScores, myScores, albumFriends, reactions] = await Promise.all([
     getScoresForReleases(albums.map((a) => a.mbid)),
     getMyAlbumScores(albums.map((a) => a.mbid)),
-    getFriendRaters("album", albums.map((a) => a.mbid)),
+    getFriendRaters(
+      "album",
+      albums.map((a) => a.mbid),
+    ),
     getReactions(
       "artist",
       reviews.map((review) => review.id),
@@ -104,7 +103,13 @@ export default async function ArtistPage({
 
   return (
     <>
-      <TrackView kind="artist" mbid={mbid} title={artist.name} subtitle={null} image={artist.image_url || null} />
+      <TrackView
+        kind="artist"
+        mbid={mbid}
+        title={artist.name}
+        subtitle={null}
+        image={artist.image_url || null}
+      />
       <div className="relative">
         <div className="backdrop h-[360px]">
           {artist.image_url && (
@@ -204,9 +209,7 @@ export default async function ArtistPage({
         <SectionHeading>Albums</SectionHeading>
 
         {albums.length === 0 ? (
-          <p className="text-sm text-text-secondary">
-            No albums found for this artist.
-          </p>
+          <p className="text-sm text-text-secondary">No albums found for this artist.</p>
         ) : (
           <ul className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-5">
             {albums.map((album, i) => (

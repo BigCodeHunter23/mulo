@@ -24,7 +24,15 @@ export async function GET(
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <Tile src={avatar} size={96} round />
-          <div style={{ display: "flex", marginLeft: 28, fontSize: 44, fontWeight: 500, color: OG.secondary }}>
+          <div
+            style={{
+              display: "flex",
+              marginLeft: 28,
+              fontSize: 44,
+              fontWeight: 500,
+              color: OG.secondary,
+            }}
+          >
             {short(card.profile.name, 24)}
           </div>
         </div>
@@ -41,7 +49,9 @@ export async function GET(
         >
           {String(card.count)}
         </div>
-        <div style={{ display: "flex", marginTop: 16, fontSize: 80, fontWeight: 800, color: OG.text }}>
+        <div
+          style={{ display: "flex", marginTop: 16, fontSize: 80, fontWeight: 800, color: OG.text }}
+        >
           albums rated
         </div>
         {card.average !== null && (
@@ -49,7 +59,15 @@ export async function GET(
             {`${card.average.toFixed(1)} average score`}
           </div>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", marginTop: 50, width: 790, alignSelf: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            marginTop: 50,
+            width: 790,
+            alignSelf: "center",
+          }}
+        >
           {picks.map((pick, i) => (
             <div
               key={pick.mbid}

@@ -82,8 +82,7 @@ export function dayLabel(day: string) {
 /** Which pair runs on a day: the lineup in order, starting over at the end. */
 export function pairForDay(day: string): VersusPair {
   const days = Math.round(
-    (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${VERSUS_START}T00:00:00Z`)) /
-      86_400_000,
+    (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${VERSUS_START}T00:00:00Z`)) / 86_400_000,
   );
   const count = VERSUS_PAIRS.length;
   return VERSUS_PAIRS[((days % count) + count) % count];
@@ -172,10 +171,7 @@ export async function countPicks(matchupId: number) {
 type FriendPick = { matchup_id: number; pick: VersusSideKey; profiles: VersusPerson };
 
 /** Picks made by the people somebody follows, across one or more matchups. */
-async function friendPicks(
-  matchupIds: number[],
-  followingIds: string[],
-): Promise<FriendPick[]> {
+async function friendPicks(matchupIds: number[], followingIds: string[]): Promise<FriendPick[]> {
   if (matchupIds.length === 0 || followingIds.length === 0) return [];
 
   const { data } = await createPublicClient()
@@ -198,10 +194,7 @@ function bySide(picks: FriendPick[], matchupId: number): VersusTally["friends"] 
 }
 
 /** Somebody's pick in a matchup, if they made one. */
-export async function getPick(
-  matchupId: number,
-  userId: string,
-): Promise<VersusSideKey | null> {
+export async function getPick(matchupId: number, userId: string): Promise<VersusSideKey | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("versus_votes")
@@ -214,10 +207,7 @@ export async function getPick(
 }
 
 /** The split, and how the people somebody follows went. */
-export async function getTally(
-  matchupId: number,
-  userId: string | null,
-): Promise<VersusTally> {
+export async function getTally(matchupId: number, userId: string | null): Promise<VersusTally> {
   const [counts, followingIds] = await Promise.all([
     countPicks(matchupId),
     userId ? getFollowingIds(userId) : Promise.resolve<string[]>([]),
@@ -266,10 +256,7 @@ export async function hasPickedToday(userId: string) {
 }
 
 /** The finished matchups somebody picked in lately, newest first, with how they went. */
-export async function getRecentResults(
-  userId: string,
-  limit = 5,
-): Promise<VersusResult[]> {
+export async function getRecentResults(userId: string, limit = 5): Promise<VersusResult[]> {
   const supabase = await createClient();
   const today = sydneyDay();
 

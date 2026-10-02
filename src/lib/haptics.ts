@@ -35,7 +35,8 @@ function iosTick() {
   if (!iosSwitch) {
     const label = document.createElement("label");
     label.setAttribute("aria-hidden", "true");
-    label.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
+    label.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
     const input = document.createElement("input");
     input.type = "checkbox";
     input.setAttribute("switch", "");
@@ -59,7 +60,10 @@ export function haptic(kind: Haptic = "tap") {
       return;
     }
     // Only iPhones and iPads get the switch; elsewhere it does nothing useful.
-    if (!/iP(hone|ad|od)/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))) {
+    if (
+      !/iP(hone|ad|od)/.test(navigator.userAgent) &&
+      !(navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))
+    ) {
       return;
     }
     const ticks = TICKS[kind];

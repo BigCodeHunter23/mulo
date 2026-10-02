@@ -86,7 +86,14 @@ export default function StoryButton({
       disabled={state === "working"}
       className={`${buttonClass({ variant: "secondary", size: "sm" })} gap-2`}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
         <rect x="6" y="2.5" width="12" height="19" rx="3" />
         <path d="M10 18.5h4" strokeLinecap="round" />
       </svg>

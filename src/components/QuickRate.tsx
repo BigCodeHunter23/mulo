@@ -111,10 +111,8 @@ export default function QuickRate({
 
           {status === "login" ? (
             <p className="mt-5 text-center text-sm text-text-secondary">
-              <LoginLink className="font-medium text-accent hover:underline">
-                Log in
-              </LoginLink>{" "}
-              to rate albums.
+              <LoginLink className="font-medium text-accent hover:underline">Log in</LoginLink> to
+              rate albums.
             </p>
           ) : (
             <div className="mt-5 grid grid-cols-5 gap-2">
@@ -135,7 +133,11 @@ export default function QuickRate({
               ))}
             </div>
           )}
-          {status === "error" && error && <p role="alert" className="mt-3 text-center text-sm text-score-you">{error}</p>}
+          {status === "error" && error && (
+            <p role="alert" className="mt-3 text-center text-sm text-score-you">
+              {error}
+            </p>
+          )}
           <Link
             href={`/album/${mbid}`}
             onClick={onClose}

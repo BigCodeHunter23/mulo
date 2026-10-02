@@ -21,11 +21,7 @@ export async function generateMetadata({
   return matchup ? versusMetadata(matchup) : { title: "Daily Versus" };
 }
 
-export default async function VersusDayPage({
-  params,
-}: {
-  params: Promise<{ day: string }>;
-}) {
+export default async function VersusDayPage({ params }: { params: Promise<{ day: string }> }) {
   const matchup = await matchupFor((await params).day);
   if (!matchup) notFound();
 

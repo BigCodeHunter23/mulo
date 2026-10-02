@@ -102,7 +102,11 @@ export async function getStreak(userId: string): Promise<Streak> {
   // Count back from today, or from yesterday if today hasn't happened yet:
   // a streak isn't broken until the day is over.
   let days = 0;
-  for (let day = today ? todayKey : previousDay(todayKey); active.has(day); day = previousDay(day)) {
+  for (
+    let day = today ? todayKey : previousDay(todayKey);
+    active.has(day);
+    day = previousDay(day)
+  ) {
     days++;
   }
 
@@ -110,7 +114,7 @@ export async function getStreak(userId: string): Promise<Streak> {
   for (const day of active) {
     if (active.has(previousDay(day))) continue; // not the start of a run
     let length = 0;
-    for (let d = day; active.has(d); ) {
+    for (let d = day; active.has(d);) {
       length++;
       const next = new Date(`${d}T12:00:00Z`);
       next.setUTCDate(next.getUTCDate() + 1);

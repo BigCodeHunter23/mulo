@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import {
-  getFollowState,
-  getProfileByUsername,
-  getProfileStats,
-} from "@/lib/social";
+import { getFollowState, getProfileByUsername, getProfileStats } from "@/lib/social";
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
 import { getBadges } from "@/lib/badges";
@@ -47,8 +43,7 @@ export async function generateMetadata({
 
   const name = String(data.display_name || data.username);
   const title = `${name} (@${data.username})`;
-  const description =
-    (data.bio as string | null) || `See what ${name} is rating on MULO.`;
+  const description = (data.bio as string | null) || `See what ${name} is rating on MULO.`;
 
   return {
     title,
@@ -59,7 +54,14 @@ export async function generateMetadata({
 
 function RecordIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 text-accent"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
       <circle cx="12" cy="12" r="9" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -111,15 +113,7 @@ function RaisedOnLine({ raisedOn, isSelf }: { raisedOn: RaisedOn | null; isSelf:
  * One figure from a profile header. Followers and Following carry a link,
  * because the interesting question about a count is always who's in it.
  */
-function Stat({
-  value,
-  label,
-  href,
-}: {
-  value: string | number;
-  label: string;
-  href?: string;
-}) {
+function Stat({ value, label, href }: { value: string | number; label: string; href?: string }) {
   const body = (
     <>
       <span className="display-sm text-lg tabular-nums text-text sm:text-xl">{value}</span>
@@ -148,11 +142,7 @@ function Stat({
  * match, top shelf and ratings each stream in underneath as they're ready, so
  * the slowest of them never holds up the page.
  */
-export default async function ProfilePage({
-  params,
-}: {
-  params: Promise<{ username: string }>;
-}) {
+export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
 
   const profile = await getProfileByUsername(username);
@@ -272,11 +262,7 @@ export default async function ProfilePage({
             <ButtonLink href="/goat" variant="secondary" size="sm">
               Your GOAT
             </ButtonLink>
-            <ButtonLink
-              href={`/u/${profile.username}/badges`}
-              variant="secondary"
-              size="sm"
-            >
+            <ButtonLink href={`/u/${profile.username}/badges`} variant="secondary" size="sm">
               Your badges
             </ButtonLink>
             <ButtonLink href="/ratings" variant="secondary" size="sm">
@@ -285,11 +271,7 @@ export default async function ProfilePage({
             <ButtonLink href="/lists" variant="secondary" size="sm">
               Your lists
             </ButtonLink>
-            <ButtonLink
-              href={`/u/${profile.username}/mixtape`}
-              variant="secondary"
-              size="sm"
-            >
+            <ButtonLink href={`/u/${profile.username}/mixtape`} variant="secondary" size="sm">
               Your mixtape
             </ButtonLink>
             <InviteButton />
@@ -364,13 +346,7 @@ async function ProfileSound({
   );
 }
 
-async function ProfileBadges({
-  userId,
-  username,
-}: {
-  userId: string;
-  username: string;
-}) {
+async function ProfileBadges({ userId, username }: { userId: string; username: string }) {
   const badges = await getBadges(userId);
 
   return (
@@ -390,9 +366,7 @@ async function ProfileTaste({ userId, username }: { userId: string; username: st
     return (
       <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-sm text-text-secondary">
-            Not enough rated in common yet
-          </span>
+          <span className="text-sm text-text-secondary">Not enough rated in common yet</span>
           <Link
             href={`/u/${username}/vs`}
             className="ml-auto text-xs font-medium text-text-secondary underline-offset-4 transition-colors hover:text-accent hover:underline"
@@ -408,9 +382,7 @@ async function ProfileTaste({ userId, username }: { userId: string; username: st
     <div className="mt-5 rounded-xl border border-border bg-surface/60 px-4 py-3 sm:max-w-md">
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="display text-xl text-accent">{taste.percent}%</span>
-        <span className="text-sm text-text-secondary">
-          taste match · {taste.shared} in common
-        </span>
+        <span className="text-sm text-text-secondary">taste match · {taste.shared} in common</span>
         <Link
           href={`/u/${username}/vs`}
           className="ml-auto text-xs font-medium text-text-secondary underline-offset-4 transition-colors hover:text-accent hover:underline"
@@ -501,13 +473,7 @@ async function ProfileGoat({
   );
 }
 
-async function ProfileTopShelf({
-  userId,
-  isSelf,
-}: {
-  userId: string;
-  isSelf: boolean;
-}) {
+async function ProfileTopShelf({ userId, isSelf }: { userId: string; isSelf: boolean }) {
   const highest = await getHighestRatedAlbums(userId, 12);
   if (highest.length < 4) return null;
 
@@ -561,14 +527,8 @@ async function ProfileRatings({
     return (
       <EmptyState
         title="Nothing rated yet"
-        body={
-          isSelf
-            ? "Find an artist, album or song and give it a score out of 10."
-            : undefined
-        }
-        action={
-          isSelf ? <ButtonLink href="/search">Search music</ButtonLink> : undefined
-        }
+        body={isSelf ? "Find an artist, album or song and give it a score out of 10." : undefined}
+        action={isSelf ? <ButtonLink href="/search">Search music</ButtonLink> : undefined}
       />
     );
   }

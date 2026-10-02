@@ -9,7 +9,10 @@ import { short, storyResponse, Tile } from "@/lib/story";
  * Somebody's GOAT as a phone-screen story: their number one, crowned and big,
  * then the next four. `?kind=artist` for artists; albums otherwise.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ username: string }> },
+) {
   const { username } = await params;
   const kind: PickKind = request.nextUrl.searchParams.get("kind") === "artist" ? "artist" : "album";
 
@@ -57,7 +60,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         <div style={{ display: "flex", marginTop: 30 }}>
           <Tile src={first} size={560} round={round} radius={28} />
         </div>
-        <div style={{ display: "flex", marginTop: 36, fontSize: 70, fontWeight: 800, color: OG.gold }}>
+        <div
+          style={{ display: "flex", marginTop: 36, fontSize: 70, fontWeight: 800, color: OG.gold }}
+        >
           {short(picks[0].title, 22)}
         </div>
         {picks[0].subtitle && (
@@ -78,7 +83,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               }}
             >
               <Tile src={rest[i]} size={190} round={round} radius={16} />
-              <div style={{ display: "flex", marginTop: 14, fontSize: 30, fontWeight: 800, color: OG.accent }}>
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: 14,
+                  fontSize: 30,
+                  fontWeight: 800,
+                  color: OG.accent,
+                }}
+              >
                 {`#${i + 2}`}
               </div>
               <div style={{ display: "flex", marginTop: 4, fontSize: 23, color: OG.text }}>

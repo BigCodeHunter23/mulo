@@ -72,7 +72,11 @@ async function toggle(key: string, artist: string, title: string, album?: string
 }
 
 function usePreviewState() {
-  return useSyncExternalStore(subscribe, () => state, () => IDLE);
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => IDLE,
+  );
 }
 
 export function PlayButton({
@@ -144,11 +148,19 @@ export function PlayButton({
         </svg>
       ) : mine === "missing" ? (
         <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" aria-hidden="true">
-          <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path
+            d="M3 3l6 6M9 3l-6 6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
       ) : (
         <svg viewBox="0 0 12 12" className="ml-0.5 h-2.5 w-2.5" aria-hidden="true">
-          <path d="M3 1.8v8.4a.5.5 0 0 0 .77.42l6.5-4.2a.5.5 0 0 0 0-.84l-6.5-4.2A.5.5 0 0 0 3 1.8z" fill="currentColor" />
+          <path
+            d="M3 1.8v8.4a.5.5 0 0 0 .77.42l6.5-4.2a.5.5 0 0 0 0-.84l-6.5-4.2A.5.5 0 0 0 3 1.8z"
+            fill="currentColor"
+          />
         </svg>
       )}
     </button>

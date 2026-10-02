@@ -39,11 +39,7 @@ export async function generateMetadata({
  * Where an invite link lands. Joining from here means the new account and the
  * inviter follow each other from the start.
  */
-export default async function JoinPage({
-  params,
-}: {
-  params: Promise<{ code: string }>;
-}) {
+export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const inviter = await findInvite(code);
   if (!inviter) notFound();
@@ -59,8 +55,8 @@ export default async function JoinPage({
       <Avatar url={inviter.avatar_url} name={name} size="xl" />
       <h1 className="display mt-6 text-3xl text-text">{name} wants you on MULO</h1>
       <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-        Rate albums, artists and songs out of ten, crown your GOAT, and see
-        exactly where you and {name} disagree.
+        Rate albums, artists and songs out of ten, crown your GOAT, and see exactly where you and{" "}
+        {name} disagree.
       </p>
 
       {picks.length > 0 && (
@@ -78,7 +74,11 @@ export default async function JoinPage({
                 >
                   {pick.image && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pick.image} alt="" className="h-full w-full object-cover object-top" />
+                    <img
+                      src={pick.image}
+                      alt=""
+                      className="h-full w-full object-cover object-top"
+                    />
                   )}
                 </span>
                 <span className="line-clamp-2 text-xs text-text-secondary">

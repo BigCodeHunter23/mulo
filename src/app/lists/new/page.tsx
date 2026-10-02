@@ -24,7 +24,12 @@ export default async function NewListPage({
       .select("mbid, title, cover_art_url")
       .eq("mbid", add)
       .maybeSingle();
-    if (data) album = { mbid: String(data.mbid), title: String(data.title), cover: data.cover_art_url as string | null };
+    if (data)
+      album = {
+        mbid: String(data.mbid),
+        title: String(data.title),
+        cover: data.cover_art_url as string | null,
+      };
   }
 
   return (
@@ -34,7 +39,11 @@ export default async function NewListPage({
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
           {album.cover && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={coverSrc(album.cover, 250) ?? album.cover} alt="" className="h-12 w-12 rounded-md object-cover" />
+            <img
+              src={coverSrc(album.cover, 250) ?? album.cover}
+              alt=""
+              className="h-12 w-12 rounded-md object-cover"
+            />
           )}
           <p className="text-sm text-text-secondary">
             Starting with <span className="font-medium text-text">{album.title}</span>

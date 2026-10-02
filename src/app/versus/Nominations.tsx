@@ -48,7 +48,9 @@ export default function Nominations({
     const apply = (on: boolean) =>
       setNominations((current) =>
         current.map((n) =>
-          n.id === nomination.id ? { ...n, mine: on, backers: n.backers + (on === n.mine ? 0 : on ? 1 : -1) } : n,
+          n.id === nomination.id
+            ? { ...n, mine: on, backers: n.backers + (on === n.mine ? 0 : on ? 1 : -1) }
+            : n,
         ),
       );
     setError(null);
@@ -71,7 +73,11 @@ export default function Nominations({
 
       <NominateForm signedIn={signedIn} onDone={() => router.refresh()} />
 
-      {error && <p role="alert" className="mt-3 text-sm text-score-you">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-score-you">
+          {error}
+        </p>
+      )}
 
       {nominations.length > 0 && (
         <ol className="mt-6 flex flex-col gap-2">
@@ -85,11 +91,17 @@ export default function Nominations({
                 <Face artist={nomination.right} />
               </div>
               <p className="min-w-0 flex-1 text-sm text-text">
-                <Link href={`/artist/${nomination.left.mbid}`} className="font-medium hover:text-accent">
+                <Link
+                  href={`/artist/${nomination.left.mbid}`}
+                  className="font-medium hover:text-accent"
+                >
                   {nomination.left.name}
                 </Link>{" "}
                 <span className="text-accent">vs</span>{" "}
-                <Link href={`/artist/${nomination.right.mbid}`} className="font-medium hover:text-accent">
+                <Link
+                  href={`/artist/${nomination.right.mbid}`}
+                  className="font-medium hover:text-accent"
+                >
                   {nomination.right.name}
                 </Link>
               </p>
@@ -117,7 +129,12 @@ function Face({ artist }: { artist: { name: string; image: string | null } }) {
   const src = artistPhotoSrc(artist.image, 96);
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" loading="lazy" className="h-9 w-9 rounded-full object-cover object-top ring-2 ring-surface" />
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      className="h-9 w-9 rounded-full object-cover object-top ring-2 ring-surface"
+    />
   ) : (
     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised text-xs font-bold text-text-muted ring-2 ring-surface">
       {artist.name.charAt(0).toUpperCase()}
@@ -160,9 +177,23 @@ function NominateForm({ signedIn, onDone }: { signedIn: boolean; onDone: () => v
   return (
     <div className="mt-4 rounded-xl border border-border bg-surface p-3">
       <div className="grid items-start gap-2 sm:grid-cols-[1fr_auto_1fr]">
-        <ArtistPicker value={left} onChange={(a) => { setLeft(a); setDone(false); }} placeholder="First artist" />
+        <ArtistPicker
+          value={left}
+          onChange={(a) => {
+            setLeft(a);
+            setDone(false);
+          }}
+          placeholder="First artist"
+        />
         <span className="self-center text-center text-sm font-semibold text-accent">vs</span>
-        <ArtistPicker value={right} onChange={(a) => { setRight(a); setDone(false); }} placeholder="Second artist" />
+        <ArtistPicker
+          value={right}
+          onChange={(a) => {
+            setRight(a);
+            setDone(false);
+          }}
+          placeholder="Second artist"
+        />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -173,8 +204,14 @@ function NominateForm({ signedIn, onDone }: { signedIn: boolean; onDone: () => v
         >
           {pending ? "Sending…" : "Nominate"}
         </button>
-        {done && <span className="text-sm text-success">✓ Nominated. It&rsquo;s in the list below.</span>}
-        {error && <span role="alert" className="text-sm text-score-you">{error}</span>}
+        {done && (
+          <span className="text-sm text-success">✓ Nominated. It&rsquo;s in the list below.</span>
+        )}
+        {error && (
+          <span role="alert" className="text-sm text-score-you">
+            {error}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -199,7 +236,9 @@ function ArtistPicker({
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
         const body = (await response.json()) as { artists?: Artist[] };
         setFound((body.artists ?? []).slice(0, 5));
       } catch {

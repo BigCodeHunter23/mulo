@@ -17,32 +17,30 @@ export default async function Icon({ id }: { id: Promise<string> | string }) {
   const fonts = await ogFonts();
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: OG.bg,
+        borderRadius: Math.round(size * 0.22),
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: OG.bg,
-          borderRadius: Math.round(size * 0.22),
+          fontFamily: "Inter",
+          fontSize: Math.round(size * 0.66),
+          fontWeight: 800,
+          color: OG.accent,
+          lineHeight: 1,
+          letterSpacing: "-0.04em",
         }}
       >
-        <div
-          style={{
-            fontFamily: "Inter",
-            fontSize: Math.round(size * 0.66),
-            fontWeight: 800,
-            color: OG.accent,
-            lineHeight: 1,
-            letterSpacing: "-0.04em",
-          }}
-        >
-          M
-        </div>
+        M
       </div>
-    ),
+    </div>,
     { width: size, height: size, fonts },
   );
 }

@@ -37,19 +37,21 @@ const discographies = new Map<string, Promise<AlbumResult[]>>();
 
 /** Lowercase, no accents, no "(feat. …)" or "[Remastered]", letters and digits only. */
 function normalise(text: string) {
-  return text
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[([].*?[)\]]/g, " ")
-    .replace(/\s(feat|ft)\.?\s.*$/, " ")
-    .replace(/&/g, "and")
-    // Apple stars out explicit words. Dropping the stars rather than turning
-    // them into spaces keeps "F**kin'" one word, so it can still be lined up
-    // against "Fuckin'" below.
-    .replace(/\*/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return (
+    text
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[([].*?[)\]]/g, " ")
+      .replace(/\s(feat|ft)\.?\s.*$/, " ")
+      .replace(/&/g, "and")
+      // Apple stars out explicit words. Dropping the stars rather than turning
+      // them into spaces keeps "F**kin'" one word, so it can still be lined up
+      // against "Fuckin'" below.
+      .replace(/\*/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -179,7 +181,9 @@ async function discography(artist: string): Promise<AlbumResult[]> {
   search.searchParams.set("limit", "10");
   const response = await fetch(search, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!response.ok) return [];
-  const body = (await response.json()) as { results?: { artistId?: number; artistName?: string }[] };
+  const body = (await response.json()) as {
+    results?: { artistId?: number; artistName?: string }[];
+  };
 
   const people = body.results ?? [];
   // Exact first: "drake" would otherwise settle for "drake bell".

@@ -205,7 +205,10 @@ export async function removeFromList(id: number, releaseMbid: string): Promise<L
     .eq("list_id", id)
     .eq("release_mbid", releaseMbid);
   if (error) return TRY_AGAIN;
-  await renumber(id, (await items(id)).map((item) => item.release_mbid));
+  await renumber(
+    id,
+    (await items(id)).map((item) => item.release_mbid),
+  );
   await touch(id);
   refresh(id);
   return { ok: true };
@@ -236,7 +239,11 @@ export async function moveInList(id: number, releaseMbid: string, to: number): P
   return { ok: true };
 }
 
-export async function setListNote(id: number, releaseMbid: string, note: string): Promise<ListResult> {
+export async function setListNote(
+  id: number,
+  releaseMbid: string,
+  note: string,
+): Promise<ListResult> {
   if (!itemInput.safeParse({ id, releaseMbid }).success || typeof note !== "string") {
     return TRY_AGAIN;
   }

@@ -32,12 +32,11 @@ export default async function Home() {
             For music lovers
           </p>
           <h1 className="display mt-4 text-balance text-[2.75rem] leading-[1.02] text-text sm:text-6xl">
-            Every record,{" "}
-            <span className="text-accent">rated by people you trust.</span>
+            Every record, <span className="text-accent">rated by people you trust.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-secondary">
-            Rate the albums, artists and songs you love, crown your GOAT, and
-            settle the debate with your friends.
+            Rate the albums, artists and songs you love, crown your GOAT, and settle the debate with
+            your friends.
           </p>
           <div className="mx-auto mt-8 flex max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
             <ButtonLink href="/login?mode=signup">Join MULO, it&rsquo;s free</ButtonLink>
@@ -190,10 +189,7 @@ async function HomeRotation() {
 
 /** Nobody to follow yet is the normal state early on, so this just hides. */
 async function PeopleToFollow({ userId }: { userId: string }) {
-  const [profiles, followingIds] = await Promise.all([
-    listProfiles(),
-    getFollowingIds(userId),
-  ]);
+  const [profiles, followingIds] = await Promise.all([listProfiles(), getFollowingIds(userId)]);
 
   const following = new Set([...followingIds, userId]);
   const suggestions = profiles.filter((p) => !following.has(p.id)).slice(0, 4);

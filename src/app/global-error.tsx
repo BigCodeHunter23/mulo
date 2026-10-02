@@ -33,9 +33,7 @@ export default function GlobalError({
           <button type="button" onClick={() => retry()} className={buttonClass()}>
             Try again
           </button>
-          {error.digest && (
-            <p className="text-xs text-text-muted">Reference: {error.digest}</p>
-          )}
+          {error.digest && <p className="text-xs text-text-muted">Reference: {error.digest}</p>}
         </main>
       </body>
     </html>

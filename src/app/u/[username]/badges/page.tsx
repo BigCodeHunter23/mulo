@@ -26,11 +26,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function BadgesPage({
-  params,
-}: {
-  params: Promise<{ username: string }>;
-}) {
+export default async function BadgesPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();

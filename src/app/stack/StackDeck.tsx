@@ -204,8 +204,8 @@ export default function StackDeck({
             <>Passed on {lastMove.album.title}</>
           ) : (
             <>
-              <span className="font-semibold text-score-you">{lastMove.score}</span>{" "}
-              for {lastMove.album.title}
+              <span className="font-semibold text-score-you">{lastMove.score}</span> for{" "}
+              {lastMove.album.title}
             </>
           )}
         </span>
@@ -223,9 +223,7 @@ export default function StackDeck({
   if (done) {
     return (
       <div className="stack-finish mx-auto max-w-lg py-10 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">
-          Run finished
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">Run finished</p>
         <p className="display mt-3 text-6xl tabular-nums text-text sm:text-7xl">{rated}</p>
         <p className="mt-1 text-sm text-text-muted">
           {rated === 1 ? "record rated" : "records rated"}
@@ -376,9 +374,7 @@ export default function StackDeck({
                   className="stack-hit relative flex items-center gap-3 px-3 py-2.5"
                   // The deal-in caps out, so the last song of a double album
                   // isn't still arriving when the first score is tapped.
-                  style={
-                    { "--at": `${0.15 + Math.min(i, 8) * 0.06}s` } as React.CSSProperties
-                  }
+                  style={{ "--at": `${0.15 + Math.min(i, 8) * 0.06}s` } as React.CSSProperties}
                 >
                   {/* How much it's played, as a hairline along the foot of
                       the row. Filling the whole row behind the words turned a

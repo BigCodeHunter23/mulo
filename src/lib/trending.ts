@@ -31,7 +31,6 @@ const MINIMUM_ALBUMS = 4;
 /** "Hot" means a crowd. Below this it would just be somebody's own ratings. */
 const MINIMUM_PEOPLE = 3;
 
-
 /**
  * What MULO has in heavy rotation, from MULO's own activity rather than an
  * outside chart. ListenBrainz's weekly chart was the obvious source, but its
@@ -77,9 +76,7 @@ async function rotation(limit: number): Promise<HeavyRotation | null> {
         ranked.map((entry) => entry.release_mbid),
       );
 
-    const details = new Map(
-      (data ?? []).map((row) => [row.mbid, row]),
-    );
+    const details = new Map((data ?? []).map((row) => [row.mbid, row]));
 
     const hot = ranked.flatMap((entry) => {
       const mbid = entry.release_mbid;

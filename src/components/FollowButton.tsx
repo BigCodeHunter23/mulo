@@ -58,8 +58,7 @@ export default function FollowButton({
     });
   }
 
-  const dimensions =
-    size === "small" ? "h-9 px-3.5 sm:h-8 sm:px-3" : "h-11 px-5 sm:h-10 sm:px-4";
+  const dimensions = size === "small" ? "h-9 px-3.5 sm:h-8 sm:px-3" : "h-11 px-5 sm:h-10 sm:px-4";
 
   return (
     <div className={`flex flex-col gap-1 ${block ? "w-full items-stretch" : "items-end"}`}>
@@ -75,7 +74,11 @@ export default function FollowButton({
       >
         {following ? "Following" : "Follow"}
       </button>
-      {error && <p role="alert" className="text-xs text-score-you">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-score-you">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

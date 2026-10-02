@@ -10,21 +10,14 @@ function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={`${buttonClass()} w-full`}
-    >
+    <button type="submit" disabled={pending} className={`${buttonClass()} w-full`}>
       {pending ? "Saving…" : "Set new password"}
     </button>
   );
 }
 
 export default function UpdatePasswordPage() {
-  const [state, formAction] = useActionState<UpdatePasswordState, FormData>(
-    updatePassword,
-    {},
-  );
+  const [state, formAction] = useActionState<UpdatePasswordState, FormData>(updatePassword, {});
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-7 px-4 py-12">

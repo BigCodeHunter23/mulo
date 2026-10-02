@@ -9,8 +9,7 @@ import { z } from "zod";
  */
 
 /** UUID-shaped hex, as MusicBrainz issues ids. Case doesn't matter to Postgres. */
-export const MBID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const MBID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** An artist, album or song id from MusicBrainz. */
 export const mbidSchema = z.string().regex(MBID_PATTERN);
@@ -86,6 +85,9 @@ export function field(form: FormData, name: string): string {
 }
 
 /** The first problem with some input, worded for people. */
-export function firstError(error: z.ZodError, fallback = "Please check that and try again."): string {
+export function firstError(
+  error: z.ZodError,
+  fallback = "Please check that and try again.",
+): string {
   return error.issues[0]?.message || fallback;
 }

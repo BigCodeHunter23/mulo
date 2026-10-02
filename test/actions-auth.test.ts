@@ -92,12 +92,21 @@ describe("over the rate limit", () => {
 
   it.each([
     ["rate", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 8)],
-    ["setReaction", async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 1)],
-    ["setFollowing", async () => (await import("@/app/u/[username]/actions")).setFollowing(MBID, "alex", true)],
+    [
+      "setReaction",
+      async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 1),
+    ],
+    [
+      "setFollowing",
+      async () => (await import("@/app/u/[username]/actions")).setFollowing(MBID, "alex", true),
+    ],
     ["createList", async () => (await import("@/app/lists/actions")).createList({ title: "Mine" })],
     ["addToList", async () => (await import("@/app/lists/actions")).addToList(1, MBID)],
     ["postTake", async () => (await import("@/app/versus/actions")).postTake(1, "Obviously")],
-    ["nominateMatchup", async () => (await import("@/app/versus/actions")).nominateMatchup(MBID, OTHER)],
+    [
+      "nominateMatchup",
+      async () => (await import("@/app/versus/actions")).nominateMatchup(MBID, OTHER),
+    ],
   ])("%s says so and does nothing", async (_name, call) => {
     const result = (await call()) as { ok: boolean; error?: string };
     expect(result.ok).toBe(false);
@@ -124,12 +133,28 @@ describe("over the rate limit", () => {
 describe("signed out, every action refuses before touching the database", () => {
   const cases: [string, () => Promise<unknown>][] = [
     ["rate", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 8)],
-    ["saveReview", async () => (await import("@/app/ratings/actions")).saveReview("album", MBID, "Great")],
-    ["removeRating", async () => (await import("@/app/ratings/actions")).removeRating("album", MBID)],
-    ["setReaction", async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 1)],
-    ["saveTopPicks", async () => (await import("@/app/goat/actions")).saveTopPicks("album", [MBID])],
+    [
+      "saveReview",
+      async () => (await import("@/app/ratings/actions")).saveReview("album", MBID, "Great"),
+    ],
+    [
+      "removeRating",
+      async () => (await import("@/app/ratings/actions")).removeRating("album", MBID),
+    ],
+    [
+      "setReaction",
+      async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 1),
+    ],
+    [
+      "saveTopPicks",
+      async () => (await import("@/app/goat/actions")).saveTopPicks("album", [MBID]),
+    ],
     ["createList", async () => (await import("@/app/lists/actions")).createList({ title: "Mine" })],
-    ["updateList", async () => (await import("@/app/lists/actions")).updateList(1, { title: "Mine", ranked: false })],
+    [
+      "updateList",
+      async () =>
+        (await import("@/app/lists/actions")).updateList(1, { title: "Mine", ranked: false }),
+    ],
     ["deleteList", async () => (await import("@/app/lists/actions")).deleteList(1)],
     ["addToList", async () => (await import("@/app/lists/actions")).addToList(1, MBID)],
     ["removeFromList", async () => (await import("@/app/lists/actions")).removeFromList(1, MBID)],
@@ -138,15 +163,52 @@ describe("signed out, every action refuses before touching the database", () => 
     ["castVote", async () => (await import("@/app/versus/actions")).castVote(1, "left")],
     ["postTake", async () => (await import("@/app/versus/actions")).postTake(1, "Obviously")],
     ["deleteTake", async () => (await import("@/app/versus/actions")).deleteTake(1)],
-    ["nominateMatchup", async () => (await import("@/app/versus/actions")).nominateMatchup(MBID, OTHER)],
+    [
+      "nominateMatchup",
+      async () => (await import("@/app/versus/actions")).nominateMatchup(MBID, OTHER),
+    ],
     ["backNomination", async () => (await import("@/app/versus/actions")).backNomination(1, true)],
-    ["saveRankOff", async () => (await import("@/app/u/[username]/mixtape/actions")).saveRankOff("2026-09", "album", MBID)],
-    ["setFollowing", async () => (await import("@/app/u/[username]/actions")).setFollowing(OTHER, "alex", true)],
-    ["saveRaisedOn", async () => (await import("@/app/raised-on/actions")).saveRaisedOn({ mbid: MBID, era: null, scene: null, useAsPicture: false })],
+    [
+      "saveRankOff",
+      async () =>
+        (await import("@/app/u/[username]/mixtape/actions")).saveRankOff("2026-09", "album", MBID),
+    ],
+    [
+      "setFollowing",
+      async () => (await import("@/app/u/[username]/actions")).setFollowing(OTHER, "alex", true),
+    ],
+    [
+      "saveRaisedOn",
+      async () =>
+        (await import("@/app/raised-on/actions")).saveRaisedOn({
+          mbid: MBID,
+          era: null,
+          scene: null,
+          useAsPicture: false,
+        }),
+    ],
     ["getInviteLink", async () => (await import("@/app/invite/actions")).getInviteLink()],
-    ["saveProfile", async () => (await import("@/app/profile/actions")).saveProfile({}, form({ username: "alex" }))],
-    ["submitReport", async () => (await import("@/app/report/actions")).submitReport({}, form({ reason: "Spam or advertising", rating_id: "1" }))],
-    ["updatePassword", async () => (await import("@/app/auth/update-password/actions")).updatePassword({}, form({ password: "longenough", confirm: "longenough" }))],
+    [
+      "saveProfile",
+      async () =>
+        (await import("@/app/profile/actions")).saveProfile({}, form({ username: "alex" })),
+    ],
+    [
+      "submitReport",
+      async () =>
+        (await import("@/app/report/actions")).submitReport(
+          {},
+          form({ reason: "Spam or advertising", rating_id: "1" }),
+        ),
+    ],
+    [
+      "updatePassword",
+      async () =>
+        (await import("@/app/auth/update-password/actions")).updatePassword(
+          {},
+          form({ password: "longenough", confirm: "longenough" }),
+        ),
+    ],
   ];
 
   it.each(cases)("%s", async (_name, call) => {
@@ -157,8 +219,14 @@ describe("signed out, every action refuses before touching the database", () => 
   });
 
   it.each([
-    ["setReportStatus", async () => (await import("@/app/admin/reports/actions")).setReportStatus(1, "dismissed")],
-    ["removeReview", async () => (await import("@/app/admin/reports/actions")).removeReview("album", 1)],
+    [
+      "setReportStatus",
+      async () => (await import("@/app/admin/reports/actions")).setReportStatus(1, "dismissed"),
+    ],
+    [
+      "removeReview",
+      async () => (await import("@/app/admin/reports/actions")).removeReview("album", 1),
+    ],
     ["removeList", async () => (await import("@/app/admin/reports/actions")).removeList(1)],
     ["removeTake", async () => (await import("@/app/admin/reports/actions")).removeTake(1)],
   ])("admin %s does nothing", async (_name, call) => {
@@ -173,7 +241,11 @@ describe("signed in, but not the owner", () => {
   });
 
   it.each([
-    ["updateList", async () => (await import("@/app/lists/actions")).updateList(1, { title: "Theirs", ranked: false })],
+    [
+      "updateList",
+      async () =>
+        (await import("@/app/lists/actions")).updateList(1, { title: "Theirs", ranked: false }),
+    ],
     ["deleteList", async () => (await import("@/app/lists/actions")).deleteList(1)],
     ["addToList", async () => (await import("@/app/lists/actions")).addToList(1, MBID)],
     ["removeFromList", async () => (await import("@/app/lists/actions")).removeFromList(1, MBID)],
@@ -198,14 +270,36 @@ describe("bad input is refused before anything else", () => {
   });
 
   it.each([
-    ["a made-up rating kind", async () => (await import("@/app/ratings/actions")).rate("podcast" as never, MBID, 8)],
-    ["a score out of range", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 11)],
-    ["an id that isn't an MBID", async () => (await import("@/app/ratings/actions")).rate("album", "../etc", 8)],
-    ["a song without its album", async () => (await import("@/app/ratings/actions")).rate("song", MBID, 8)],
-    ["a reaction of 5", async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 5 as never)],
+    [
+      "a made-up rating kind",
+      async () => (await import("@/app/ratings/actions")).rate("podcast" as never, MBID, 8),
+    ],
+    [
+      "a score out of range",
+      async () => (await import("@/app/ratings/actions")).rate("album", MBID, 11),
+    ],
+    [
+      "an id that isn't an MBID",
+      async () => (await import("@/app/ratings/actions")).rate("album", "../etc", 8),
+    ],
+    [
+      "a song without its album",
+      async () => (await import("@/app/ratings/actions")).rate("song", MBID, 8),
+    ],
+    [
+      "a reaction of 5",
+      async () => (await import("@/app/reactions/actions")).setReaction("album", 1, 5 as never),
+    ],
     ["a negative list id", async () => (await import("@/app/lists/actions")).deleteList(-1)],
-    ["a vote for the middle", async () => (await import("@/app/versus/actions")).castVote(1, "middle" as never)],
-    ["a follow of a non-id", async () => (await import("@/app/u/[username]/actions")).setFollowing("not-a-user", "x", true)],
+    [
+      "a vote for the middle",
+      async () => (await import("@/app/versus/actions")).castVote(1, "middle" as never),
+    ],
+    [
+      "a follow of a non-id",
+      async () =>
+        (await import("@/app/u/[username]/actions")).setFollowing("not-a-user", "x", true),
+    ],
   ])("%s", async (_name, call) => {
     const result = (await call()) as { ok: boolean };
     expect(result.ok).toBe(false);
@@ -214,9 +308,15 @@ describe("bad input is refused before anything else", () => {
 
   it("a report needs exactly one thing to report", async () => {
     const { submitReport } = await import("@/app/report/actions");
-    const both = await submitReport({}, form({ reason: "Spam or advertising", rating_id: "1", list_id: "2" }));
+    const both = await submitReport(
+      {},
+      form({ reason: "Spam or advertising", rating_id: "1", list_id: "2" }),
+    );
     const none = await submitReport({}, form({ reason: "Spam or advertising" }));
-    const nonsense = await submitReport({}, form({ reason: "Spam or advertising", rating_id: "1 OR 1=1" }));
+    const nonsense = await submitReport(
+      {},
+      form({ reason: "Spam or advertising", rating_id: "1 OR 1=1" }),
+    );
     for (const result of [both, none, nonsense]) expect(result.error).toBeTruthy();
     expect(session.db.touched).toBe(0);
   });
@@ -224,7 +324,9 @@ describe("bad input is refused before anything else", () => {
   it("a profile with a bad username or an over-long bio is refused", async () => {
     const { saveProfile } = await import("@/app/profile/actions");
     expect((await saveProfile({}, form({ username: "a b" }))).error).toMatch(/Usernames/);
-    expect((await saveProfile({}, form({ username: "alex", bio: "x".repeat(301) }))).error).toMatch(/300/);
+    expect((await saveProfile({}, form({ username: "alex", bio: "x".repeat(301) }))).error).toMatch(
+      /300/,
+    );
     expect(session.db.touched).toBe(0);
   });
 });

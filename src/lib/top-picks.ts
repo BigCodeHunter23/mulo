@@ -52,10 +52,7 @@ function toAlbumPick(row: AlbumRow): TopPick {
 }
 
 /** Somebody's ranked list, best first. */
-export async function getTopPicks(
-  userId: string,
-  kind: PickKind,
-): Promise<TopPick[]> {
+export async function getTopPicks(userId: string, kind: PickKind): Promise<TopPick[]> {
   const supabase = await createClient();
 
   if (kind === "artist") {
@@ -78,10 +75,7 @@ export async function getTopPicks(
 }
 
 /** The same list for the share picture, which runs without a session. */
-export async function getPublicTopPicks(
-  userId: string,
-  kind: PickKind,
-): Promise<TopPick[]> {
+export async function getPublicTopPicks(userId: string, kind: PickKind): Promise<TopPick[]> {
   const supabase = createPublicClient();
 
   if (kind === "artist") {
@@ -117,10 +111,7 @@ const POPULAR_LIMIT = 12;
  * one of them, highest score first, since their GOAT is almost certainly in
  * there. Anyone who hasn't gets well-known names to start from.
  */
-export async function getPickSuggestions(
-  userId: string,
-  kind: PickKind,
-): Promise<PickSuggestions> {
+export async function getPickSuggestions(userId: string, kind: PickKind): Promise<PickSuggestions> {
   const supabase = await createClient();
   const best = { ascending: false } as const;
 
@@ -164,9 +155,7 @@ export async function getPickSuggestions(
 
   const { data } = await supabase
     .from("ratings")
-    .select(
-      "score, releases!inner ( mbid, title, artist_credit, cover_art_url, artists ( name ) )",
-    )
+    .select("score, releases!inner ( mbid, title, artist_credit, cover_art_url, artists ( name ) )")
     .eq("user_id", userId)
     .order("score", best)
     .order("created_at", best)

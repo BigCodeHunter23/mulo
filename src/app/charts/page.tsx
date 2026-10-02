@@ -55,8 +55,7 @@ export default async function ChartsPage({
 }) {
   const { type, genre: genreParam } = await searchParams;
   const kind: ChartKind = type && isChartKind(type) ? type : "albums";
-  const genre =
-    genreParam && CHART_GENRES.some((g) => g.id === genreParam) ? genreParam : null;
+  const genre = genreParam && CHART_GENRES.some((g) => g.id === genreParam) ? genreParam : null;
 
   const chart = await getChart(kind, { genre, limit: HOW_MANY });
   const progress = await getChartProgress(chart);
@@ -67,24 +66,24 @@ export default async function ChartsPage({
     ? `Top ${family} ${label.label.toLowerCase()}`
     : `Top ${label.label.toLowerCase()}`;
 
-  const percent =
-    progress.total === 0 ? 0 : Math.round((progress.rated / progress.total) * 100);
+  const percent = progress.total === 0 ? 0 : Math.round((progress.rated / progress.total) * 100);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-20 pt-8 sm:px-6">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-          The Charts
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">The Charts</p>
         <h1 className="display mt-2 text-4xl text-text sm:text-5xl">{heading}</h1>
         <p className="mt-2 max-w-2xl text-sm text-text-secondary sm:text-base">
-          Ranked by everyone on MULO. A record climbs as more people back it, so
-          three big scores never outrank a room full of them.
+          Ranked by everyone on MULO. A record climbs as more people back it, so three big scores
+          never outrank a room full of them.
         </p>
       </header>
 
       {/* Albums / Songs / Artists */}
-      <nav className="rail -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Chart type">
+      <nav
+        className="rail -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        aria-label="Chart type"
+      >
         {CHART_KINDS.map((option) => (
           <Link
             key={option.id}
@@ -98,7 +97,10 @@ export default async function ChartsPage({
       </nav>
 
       {/* Everything, or one genre */}
-      <nav className="rail -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Genre">
+      <nav
+        className="rail -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        aria-label="Genre"
+      >
         <Link
           href={chartHref(kind, null)}
           aria-current={genre === null ? "page" : undefined}
@@ -150,9 +152,7 @@ export default async function ChartsPage({
                 ? `No ${family.toLowerCase()} ${label.label.toLowerCase()} have been rated on MULO yet. Rate a few and this chart fills itself.`
                 : `No ${label.label.toLowerCase()} have been rated yet. Rate a few and this chart fills itself.`
             }
-            action={
-              <ButtonLink href="/discover">Find something to rate</ButtonLink>
-            }
+            action={<ButtonLink href="/discover">Find something to rate</ButtonLink>}
           />
         ) : (
           <>

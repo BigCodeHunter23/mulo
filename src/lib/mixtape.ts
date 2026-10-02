@@ -80,7 +80,6 @@ type ReleaseRef = {
   artists: ArtistRef | null;
 };
 
-
 const RELEASE =
   "releases!inner ( mbid, title, artist_credit, cover_art_url, artist_mbid, artists ( mbid, name, image_url ) )";
 
@@ -96,9 +95,7 @@ function crown(picks: MixtapePick[], saved: string | undefined) {
   const first = picks[0];
   if (!first) return { top: null, tie: null };
 
-  const contenders = picks
-    .filter((pick) => pick.score === first.score)
-    .slice(0, RANK_OFF_LIMIT);
+  const contenders = picks.filter((pick) => pick.score === first.score).slice(0, RANK_OFF_LIMIT);
   if (contenders.length < 2) return { top: first, tie: null };
 
   const winner = contenders.find((pick) => pick.mbid === saved);
@@ -151,11 +148,7 @@ async function load(
       .lt("created_at", end)
       .order("score", highest)
       .limit(200),
-    supabase
-      .from("mixtape_picks")
-      .select("kind, mbid")
-      .eq("user_id", userId)
-      .eq("month", month),
+    supabase.from("mixtape_picks").select("kind, mbid").eq("user_id", userId).eq("month", month),
   ]);
 
   const albumRows = albumResult.data ?? [];
@@ -228,9 +221,7 @@ async function load(
     songs: songRows.length,
     artists: artistRows.length,
     average:
-      scores.length > 0
-        ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-        : null,
+      scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null,
     topAlbum: album.top,
     topSong: song.top,
     topArtist:
@@ -242,9 +233,7 @@ async function load(
             subtitle: null,
             image: artistPhotoSrc(busiest.artist.image_url, 300),
             href: `/artist/${busiest.artist.mbid}`,
-            score:
-              artistPicks.find((p) => p.key === `artist-${busiest.artist.mbid}`)
-                ?.score ?? 0,
+            score: artistPicks.find((p) => p.key === `artist-${busiest.artist.mbid}`)?.score ?? 0,
             rated: busiest.rated,
           }
         : null,
@@ -253,10 +242,7 @@ async function load(
     // Before the table exists, reading it fails, and there's nowhere to save a result.
     rankOffs: !pickResult.error,
     highlights: [...albumPicks, ...songPicks, ...artistPicks]
-      .sort(
-        (a, b) =>
-          b.score - a.score || Number(crowned.has(b.key)) - Number(crowned.has(a.key)),
-      )
+      .sort((a, b) => b.score - a.score || Number(crowned.has(b.key)) - Number(crowned.has(a.key)))
       .slice(0, 12),
   };
 }

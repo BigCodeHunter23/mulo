@@ -36,9 +36,7 @@ const CLASH = 2;
  * A perfect match is identical scores; the widest possible gap is nine points,
  * so the percentage is how much of that gap they avoid on average.
  */
-export async function getTasteMatch(
-  otherUserId: string,
-): Promise<TasteMatch | null> {
+export async function getTasteMatch(otherUserId: string): Promise<TasteMatch | null> {
   const user = await getCurrentUser();
   if (!user || user.id === otherUserId) return null;
 
@@ -120,8 +118,7 @@ export async function getTasteMatch(
   if (pairs.length < MINIMUM) return null;
 
   const gap =
-    pairs.reduce((sum, pair) => sum + Math.abs(pair.yours - pair.theirs), 0) /
-    pairs.length;
+    pairs.reduce((sum, pair) => sum + Math.abs(pair.yours - pair.theirs), 0) / pairs.length;
   const percent = Math.max(0, Math.min(100, Math.round(100 - (gap / 9) * 100)));
 
   const worst = [...pairs].sort(

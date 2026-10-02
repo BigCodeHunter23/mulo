@@ -104,7 +104,10 @@ async function alsoRated(
   ]);
 
   const myScores = new Map(
-    ((mine ?? []) as { release_mbid: string; score: number }[]).map((r) => [r.release_mbid, r.score]),
+    ((mine ?? []) as { release_mbid: string; score: number }[]).map((r) => [
+      r.release_mbid,
+      r.score,
+    ]),
   );
   const titles = new Map(
     ((releases ?? []) as { mbid: string; title: string }[]).map((r) => [r.mbid, r.title]),
@@ -135,10 +138,7 @@ async function alsoRated(
  * ratings, and the Daily Versus. Worked out from those tables on request, like
  * the feed, so there's nothing extra to store or keep in step.
  */
-export async function getNotifications(
-  userId: string,
-  limit = 50,
-): Promise<Notification[]> {
+export async function getNotifications(userId: string, limit = 50): Promise<Notification[]> {
   const supabase = await createClient();
   const newest = { ascending: false } as const;
 
@@ -161,7 +161,9 @@ export async function getNotifications(
       .limit(limit),
     supabase
       .from("reactions")
-      .select(`id, value, created_at, ${PERSON}, ratings!inner ( user_id, releases ( mbid, title ) )`)
+      .select(
+        `id, value, created_at, ${PERSON}, ratings!inner ( user_id, releases ( mbid, title ) )`,
+      )
       .eq("ratings.user_id", userId)
       .neq("user_id", userId)
       .order("created_at", newest)
@@ -222,79 +224,71 @@ export async function getNotifications(
         ? [{ kind: "follow", key: `follow-${row.follower_id}`, at: row.created_at, person }]
         : [];
     }),
-    ...(albumReactions.data ?? []).flatMap(
-      (row): Notification[] => {
-        const release = row.ratings?.releases;
-        return release
-          ? [
-              {
-                kind: "reaction",
-                key: `reaction-${row.id}`,
-                at: row.created_at,
-                person: row.profiles,
-                value: row.value === 1 ? 1 : -1,
-                on: "rating",
-                subject: { title: release.title, href: `/album/${release.mbid}` },
-              },
-            ]
-          : [];
-      },
-    ),
-    ...(artistReactions.data ?? []).flatMap(
-      (row): Notification[] => {
-        const artist = row.artist_ratings?.artists;
-        return artist
-          ? [
-              {
-                kind: "reaction",
-                key: `reaction-${row.id}`,
-                at: row.created_at,
-                person: row.profiles,
-                value: row.value === 1 ? 1 : -1,
-                on: "rating",
-                subject: { title: artist.name, href: `/artist/${artist.mbid}` },
-              },
-            ]
-          : [];
-      },
-    ),
-    ...(pickReactions.data ?? []).flatMap(
-      (row): Notification[] => {
-        const vote = row.versus_votes;
-        if (!vote?.versus_matchups) return [];
-        const matchup = toMatchup(vote.versus_matchups);
-        return [
-          {
-            kind: "reaction",
-            key: `reaction-${row.id}`,
-            at: row.created_at,
-            person: row.profiles,
-            value: row.value === 1 ? 1 : -1,
-            on: "pick",
-            subject: { title: matchup.title, href: `/versus/${matchup.day}` },
-            picked: matchup[sideKey(vote.pick)].name,
-          },
-        ];
-      },
-    ),
-    ...(takeReactions.data ?? []).flatMap(
-      (row): Notification[] => {
-        const take = row.versus_takes;
-        if (!take?.versus_matchups) return [];
-        const matchup = toMatchup(take.versus_matchups);
-        return [
-          {
-            kind: "reaction",
-            key: `reaction-${row.id}`,
-            at: row.created_at,
-            person: row.profiles,
-            value: row.value === 1 ? 1 : -1,
-            on: "take",
-            subject: { title: matchup.title, href: `/versus/${matchup.day}` },
-          },
-        ];
-      },
-    ),
+    ...(albumReactions.data ?? []).flatMap((row): Notification[] => {
+      const release = row.ratings?.releases;
+      return release
+        ? [
+            {
+              kind: "reaction",
+              key: `reaction-${row.id}`,
+              at: row.created_at,
+              person: row.profiles,
+              value: row.value === 1 ? 1 : -1,
+              on: "rating",
+              subject: { title: release.title, href: `/album/${release.mbid}` },
+            },
+          ]
+        : [];
+    }),
+    ...(artistReactions.data ?? []).flatMap((row): Notification[] => {
+      const artist = row.artist_ratings?.artists;
+      return artist
+        ? [
+            {
+              kind: "reaction",
+              key: `reaction-${row.id}`,
+              at: row.created_at,
+              person: row.profiles,
+              value: row.value === 1 ? 1 : -1,
+              on: "rating",
+              subject: { title: artist.name, href: `/artist/${artist.mbid}` },
+            },
+          ]
+        : [];
+    }),
+    ...(pickReactions.data ?? []).flatMap((row): Notification[] => {
+      const vote = row.versus_votes;
+      if (!vote?.versus_matchups) return [];
+      const matchup = toMatchup(vote.versus_matchups);
+      return [
+        {
+          kind: "reaction",
+          key: `reaction-${row.id}`,
+          at: row.created_at,
+          person: row.profiles,
+          value: row.value === 1 ? 1 : -1,
+          on: "pick",
+          subject: { title: matchup.title, href: `/versus/${matchup.day}` },
+          picked: matchup[sideKey(vote.pick)].name,
+        },
+      ];
+    }),
+    ...(takeReactions.data ?? []).flatMap((row): Notification[] => {
+      const take = row.versus_takes;
+      if (!take?.versus_matchups) return [];
+      const matchup = toMatchup(take.versus_matchups);
+      return [
+        {
+          kind: "reaction",
+          key: `reaction-${row.id}`,
+          at: row.created_at,
+          person: row.profiles,
+          value: row.value === 1 ? 1 : -1,
+          on: "take",
+          subject: { title: matchup.title, href: `/versus/${matchup.day}` },
+        },
+      ];
+    }),
     ...(today && !pickedToday
       ? [
           {
@@ -305,19 +299,15 @@ export async function getNotifications(
           } satisfies Notification,
         ]
       : []),
-    ...results.map(
-      (result): Notification => ({
-        kind: "versus-result",
-        key: `versus-result-${result.matchup.day}`,
-        at: result.at,
-        result,
-      }),
-    ),
+    ...results.map((result): Notification => ({
+      kind: "versus-result",
+      key: `versus-result-${result.matchup.day}`,
+      at: result.at,
+      result,
+    })),
   ];
 
-  return notifications
-    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
-    .slice(0, limit);
+  return notifications.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit);
 }
 
 /** The time of somebody's newest notification, for the dot on the bell. */
@@ -327,42 +317,42 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
 
   const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus] =
     await Promise.all([
-    supabase
-      .from("follows")
-      .select("created_at")
-      .eq("following_id", userId)
-      .order("created_at", newest)
-      .limit(1),
-    supabase
-      .from("reactions")
-      .select("created_at, ratings!inner ( user_id )")
-      .eq("ratings.user_id", userId)
-      .neq("user_id", userId)
-      .order("created_at", newest)
-      .limit(1),
-    supabase
-      .from("reactions")
-      .select("created_at, artist_ratings!inner ( user_id )")
-      .eq("artist_ratings.user_id", userId)
-      .neq("user_id", userId)
-      .order("created_at", newest)
-      .limit(1),
-    supabase
-      .from("reactions")
-      .select("created_at, versus_votes!inner ( user_id )")
-      .eq("versus_votes.user_id", userId)
-      .neq("user_id", userId)
-      .order("created_at", newest)
-      .limit(1),
-    supabase
-      .from("reactions")
-      .select("created_at, versus_takes!inner ( user_id )")
-      .eq("versus_takes.user_id", userId)
-      .neq("user_id", userId)
-      .order("created_at", newest)
-      .limit(1),
-    getLatestVersusAt(userId),
-  ]);
+      supabase
+        .from("follows")
+        .select("created_at")
+        .eq("following_id", userId)
+        .order("created_at", newest)
+        .limit(1),
+      supabase
+        .from("reactions")
+        .select("created_at, ratings!inner ( user_id )")
+        .eq("ratings.user_id", userId)
+        .neq("user_id", userId)
+        .order("created_at", newest)
+        .limit(1),
+      supabase
+        .from("reactions")
+        .select("created_at, artist_ratings!inner ( user_id )")
+        .eq("artist_ratings.user_id", userId)
+        .neq("user_id", userId)
+        .order("created_at", newest)
+        .limit(1),
+      supabase
+        .from("reactions")
+        .select("created_at, versus_votes!inner ( user_id )")
+        .eq("versus_votes.user_id", userId)
+        .neq("user_id", userId)
+        .order("created_at", newest)
+        .limit(1),
+      supabase
+        .from("reactions")
+        .select("created_at, versus_takes!inner ( user_id )")
+        .eq("versus_takes.user_id", userId)
+        .neq("user_id", userId)
+        .order("created_at", newest)
+        .limit(1),
+      getLatestVersusAt(userId),
+    ]);
 
   const times = [
     follow.data,

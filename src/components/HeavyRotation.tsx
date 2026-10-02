@@ -89,9 +89,7 @@ export default function HeavyRotation({
                 <span className="display-sm mt-2 block truncate text-xs text-text transition-colors group-hover:text-accent">
                   {album.title}
                 </span>
-                <span className="block truncate text-[11px] text-text-muted">
-                  {album.artist}
-                </span>
+                <span className="block truncate text-[11px] text-text-muted">{album.artist}</span>
               </Link>
             </li>
           ))}

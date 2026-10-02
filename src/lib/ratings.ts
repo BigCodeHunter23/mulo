@@ -59,9 +59,7 @@ const MIDDLE = 6.5;
 
 function fromArtist(artistSeed: number | null): number | null {
   if (artistSeed === null) return null;
-  return (
-    Math.round((artistSeed * FROM_ARTIST + MIDDLE * TOWARDS_MIDDLE) * 10) / 10
-  );
+  return Math.round((artistSeed * FROM_ARTIST + MIDDLE * TOWARDS_MIDDLE) * 10) / 10;
 }
 
 type Seeded = { sum: number; count: number; seeded: boolean };
@@ -114,17 +112,12 @@ function average(values: number[]): number | null {
 }
 
 /** The starting score an album or artist borrows while MULO has too few of its own. */
-async function getSeed(
-  kind: "album" | "artist",
-  mbid: string,
-): Promise<number | null> {
+async function getSeed(kind: "album" | "artist", mbid: string): Promise<number | null> {
   const supabase = await createClient();
   // An album also carries its artist's score, to fall back on.
   const { data } = await supabase
     .from(SEED_TABLES[kind])
-    .select(
-      kind === "album" ? "seed_score, artists ( seed_score )" : "seed_score",
-    )
+    .select(kind === "album" ? "seed_score, artists ( seed_score )" : "seed_score")
     .eq("mbid", mbid)
     .maybeSingle();
   // The column only exists once migration 0014 has been run, so a missing one
@@ -153,9 +146,7 @@ export async function getCrowd(
     kind === "song" ? Promise.resolve(null) : getSeed(kind, mbid),
   ]);
   const crowd = withSeed(totals.get(mbid), seed);
-  return crowd.count
-    ? { average: crowd.sum / crowd.count, count: crowd.count }
-    : undefined;
+  return crowd.count ? { average: crowd.sum / crowd.count, count: crowd.count } : undefined;
 }
 
 /**
@@ -166,7 +157,11 @@ const BY = "profiles ( username, display_name, avatar_url )";
 
 type ByRow = {
   score: number;
-  profiles: { username: string | null; display_name: string | null; avatar_url: string | null } | null;
+  profiles: {
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
 
 /** A rating row as somebody with a name and a face, or nothing if they have neither. */
@@ -207,10 +202,7 @@ export async function friendsForResults(results: {
 }
 
 /** The three scores shown at the top of an album or artist page. */
-export async function getScores(
-  kind: "album" | "artist",
-  mbid: string,
-): Promise<Scores> {
+export async function getScores(kind: "album" | "artist", mbid: string): Promise<Scores> {
   const supabase = await createClient();
   const user = await getCurrentUser();
   const { column } = RATING_TABLES[kind];
@@ -292,9 +284,7 @@ export async function getFriendRaters(
  * Overall scores for many releases in one query, for grids like the artist
  * page. Returns a map of release mbid to average, omitting unrated releases.
  */
-export async function getScoresForReleases(
-  releaseMbids: string[],
-): Promise<Map<string, number>> {
+export async function getScoresForReleases(releaseMbids: string[]): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (releaseMbids.length === 0) return result;
 
@@ -325,10 +315,7 @@ export async function getScoresForReleases(
   return result;
 }
 
-export async function getOwnRating(
-  kind: "album" | "artist",
-  mbid: string,
-): Promise<OwnRating> {
+export async function getOwnRating(kind: "album" | "artist", mbid: string): Promise<OwnRating> {
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -400,10 +387,7 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
     for (const row of theirs) {
       const friend = asFriend(row);
       if (friend.length > 0) {
-        result.friends[row.song_mbid] = [
-          ...(result.friends[row.song_mbid] ?? []),
-          ...friend,
-        ];
+        result.friends[row.song_mbid] = [...(result.friends[row.song_mbid] ?? []), ...friend];
       }
     }
 
@@ -608,10 +592,7 @@ export async function getOwnRatingCounts(): Promise<Record<RatingKind, number>> 
  * Somebody's best-scored albums, for the shelf at the top of their profile.
  * A wall of covers says more about someone's taste than a list of dates.
  */
-export async function getHighestRatedAlbums(
-  userId: string,
-  limit = 12,
-): Promise<AlbumRating[]> {
+export async function getHighestRatedAlbums(userId: string, limit = 12): Promise<AlbumRating[]> {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -652,6 +633,9 @@ export async function getMyAlbumScores(mbids: string[]): Promise<Map<string, num
     .eq("user_id", user.id)
     .in("release_mbid", mbids.slice(0, 500));
   return new Map(
-    ((data ?? []) as { release_mbid: string; score: number }[]).map((r) => [r.release_mbid, r.score]),
+    ((data ?? []) as { release_mbid: string; score: number }[]).map((r) => [
+      r.release_mbid,
+      r.score,
+    ]),
   );
 }

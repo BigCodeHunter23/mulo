@@ -5,9 +5,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { userIdSchema, usernameSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
-export type FollowResult =
-  | { ok: true }
-  | { ok: false; error: string; needsLogin?: boolean };
+export type FollowResult = { ok: true } | { ok: false; error: string; needsLogin?: boolean };
 
 /** Follows or unfollows; called directly when the button is tapped. */
 export async function setFollowing(
@@ -31,9 +29,7 @@ export async function setFollowing(
   const supabase = await createClient();
 
   const { error } = follow
-    ? await supabase
-        .from("follows")
-        .insert({ follower_id: user.id, following_id: targetId })
+    ? await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId })
     : await supabase
         .from("follows")
         .delete()

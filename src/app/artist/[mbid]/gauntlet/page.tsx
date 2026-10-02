@@ -23,11 +23,7 @@ export async function generateMetadata({
  * Every album an artist made, one card at a time, and a ranking at the end.
  * The same card as The Stack, so the thumb already knows what to do.
  */
-export default async function GauntletPage({
-  params,
-}: {
-  params: Promise<{ mbid: string }>;
-}) {
+export default async function GauntletPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   const user = await requireUser(`/artist/${mbid}/gauntlet`);
 
@@ -53,8 +49,8 @@ export default async function GauntletPage({
         </p>
         <h1 className="display mt-2 text-3xl text-text sm:text-4xl">{artist.name}</h1>
         <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
-          Every album, oldest first. Score the lot and get your ranking of their
-          whole discography at the end.
+          Every album, oldest first. Score the lot and get your ranking of their whole discography
+          at the end.
         </p>
       </header>
 

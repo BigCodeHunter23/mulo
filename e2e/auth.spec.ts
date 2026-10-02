@@ -51,7 +51,9 @@ test.describe("signed-in flows", () => {
     await expect(page.getByRole("heading", { name: "My ratings" })).toBeVisible();
   });
 
-  test("logging in from a page comes back to it, and the session survives a reload", async ({ page }) => {
+  test("logging in from a page comes back to it, and the session survives a reload", async ({
+    page,
+  }) => {
     await page.goto(`/album/${env.album}`);
     await page.getByRole("link", { name: "Log in" }).first().click();
     await expect(page).toHaveURL(new RegExp(`/login\\?next=%2Falbum%2F${env.album}`));

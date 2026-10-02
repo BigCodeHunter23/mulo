@@ -20,10 +20,7 @@ export default function ReviewList({
   return (
     <ul className="flex flex-col gap-3">
       {reviews.map((review) => (
-        <li
-          key={review.id}
-          className="rounded-xl border border-border bg-surface p-4"
-        >
+        <li key={review.id} className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-center gap-2.5">
             <Avatar
               url={review.avatar_url}
@@ -46,9 +43,7 @@ export default function ReviewList({
           </div>
 
           {review.review && (
-            <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-              {review.review}
-            </p>
+            <p className="mt-3 text-sm leading-relaxed text-text-secondary">{review.review}</p>
           )}
 
           <div className="mt-3.5 flex items-center justify-between gap-3">
@@ -59,9 +54,7 @@ export default function ReviewList({
               signedIn={signedIn}
             />
             <ReportButton
-              {...(kind === "album"
-                ? { ratingId: review.id }
-                : { artistRatingId: review.id })}
+              {...(kind === "album" ? { ratingId: review.id } : { artistRatingId: review.id })}
               signedIn={signedIn}
               label="Report"
             />

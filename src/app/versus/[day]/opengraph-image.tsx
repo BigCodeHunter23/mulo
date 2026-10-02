@@ -127,132 +127,130 @@ export default async function Image({ params }: { params: Promise<{ day: string 
     ahead === null ? null : ahead === side ? "won" : "lost";
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        padding: "52px 72px",
+        background: OG.bg,
+        fontFamily: "Inter",
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          padding: "52px 72px",
-          background: OG.bg,
-          fontFamily: "Inter",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 26,
+              fontWeight: 800,
+              color: OG.accent,
+              letterSpacing: "0.16em",
+            }}
+          >
+            DAILY VERSUS
+          </div>
+          <div
+            style={{
+              display: "flex",
+              marginTop: 6,
+              fontSize: matchup.title.length > 22 ? 40 : 52,
+              fontWeight: 800,
+              color: OG.text,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {short(matchup.title, 32)}
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 38,
+            fontWeight: 800,
+            color: OG.accent,
+            letterSpacing: "-0.03em",
+          }}
+        >
+          MULO
+        </div>
+      </div>
+
+      {/* The pair sits in the middle of whatever height is left. */}
+      <div
+        style={{
+          display: "flex",
+          flexGrow: 1,
+          alignItems: "center",
         }}
       >
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            flexGrow: 1,
+            alignItems: "flex-start",
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <Contender
+            photo={leftPhoto}
+            name={matchup.left.name}
+            share={split?.left ?? null}
+            outcome={outcome("left")}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginTop: 82,
+            }}
+          >
             <div
               style={{
                 display: "flex",
-                fontSize: 26,
+                alignItems: "center",
+                justifyContent: "center",
+                width: 110,
+                height: 110,
+                borderRadius: 55,
+                border: `4px solid ${OG.accent}`,
+                background: OG.surface,
+                fontSize: 38,
                 fontWeight: 800,
                 color: OG.accent,
-                letterSpacing: "0.16em",
               }}
             >
-              DAILY VERSUS
+              VS
             </div>
             <div
               style={{
                 display: "flex",
-                marginTop: 6,
-                fontSize: matchup.title.length > 22 ? 40 : 52,
-                fontWeight: 800,
-                color: OG.text,
-                letterSpacing: "-0.03em",
+                marginTop: 18,
+                fontSize: 26,
+                fontWeight: 500,
+                color: OG.muted,
               }}
             >
-              {short(matchup.title, 32)}
+              {closed ? "Final" : "Who you got?"}
             </div>
           </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: 38,
-              fontWeight: 800,
-              color: OG.accent,
-              letterSpacing: "-0.03em",
-            }}
-          >
-            MULO
-          </div>
-        </div>
-
-        {/* The pair sits in the middle of whatever height is left. */}
-        <div
-          style={{
-            display: "flex",
-            flexGrow: 1,
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexGrow: 1,
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-            }}
-          >
-            <Contender
-              photo={leftPhoto}
-              name={matchup.left.name}
-              share={split?.left ?? null}
-              outcome={outcome("left")}
-            />
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginTop: 82,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 110,
-                  height: 110,
-                  borderRadius: 55,
-                  border: `4px solid ${OG.accent}`,
-                  background: OG.surface,
-                  fontSize: 38,
-                  fontWeight: 800,
-                  color: OG.accent,
-                }}
-              >
-                VS
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  marginTop: 18,
-                  fontSize: 26,
-                  fontWeight: 500,
-                  color: OG.muted,
-                }}
-              >
-                {closed ? "Final" : "Who you got?"}
-              </div>
-            </div>
-            <Contender
-              photo={rightPhoto}
-              name={matchup.right.name}
-              share={split?.right ?? null}
-              outcome={outcome("right")}
-            />
-          </div>
+          <Contender
+            photo={rightPhoto}
+            name={matchup.right.name}
+            share={split?.right ?? null}
+            outcome={outcome("right")}
+          />
         </div>
       </div>
-    ),
+    </div>,
     { ...size, fonts },
   );
 }
