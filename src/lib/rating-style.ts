@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { mainFamily } from "@/lib/main-genre";
+import { startingScore } from "@/lib/ratings";
 
 /**
  * How one person rates, next to everybody else.
@@ -50,7 +51,8 @@ type Row = {
     release_date: string | null;
     cover_art_url: string | null;
     genres: string[];
-    artists: { name: string } | null;
+    seed_score: number | null;
+    artists: { name: string; seed_score: number | null } | null;
   } | null;
 };
 
@@ -83,7 +85,7 @@ export async function getRatingStyle(userId: string): Promise<RatingStyle | null
     supabase
       .from("ratings")
       .select(
-        "release_mbid, score, releases!inner ( title, release_date, cover_art_url, genres, artists ( name ) )",
+        "release_mbid, score, releases!inner ( title, release_date, cover_art_url, genres, seed_score, artists ( name, seed_score ) )",
       )
       .eq("user_id", userId)
       .order("release_mbid")
@@ -109,8 +111,15 @@ export async function getRatingStyle(userId: string): Promise<RatingStyle | null
   );
 
   const compared = mine.flatMap((row) => {
-    const theirs = crowd.get(row.release_mbid);
-    if (theirs === undefined || !row.releases) return [];
+    if (!row.releases) return [];
+    // What everybody else says: MULO's own scores where there are any, and
+    // otherwise the starting score the album page shows, so this works from
+    // the first week rather than waiting for an overlap to build up.
+    const theirs =
+      crowd.get(row.release_mbid) ??
+      startingScore(row.releases.seed_score, row.releases.artists?.seed_score ?? null) ??
+      undefined;
+    if (theirs === undefined) return [];
     return [
       {
         mbid: row.release_mbid,

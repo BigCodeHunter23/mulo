@@ -128,7 +128,7 @@ export default async function TastePage({ params }: { params: Promise<{ username
         <div className="mt-6">
           <p className="text-sm text-text-secondary">
             Not enough to go on yet. This fills in once {name} has rated {ENOUGH_TO_JUDGE} records
-            that somebody else has rated too.
+            that carry a score to measure against.
           </p>
           <div className="mt-5">
             <ButtonLink href="/stack">Rate some records</ButtonLink>
@@ -143,7 +143,7 @@ export default async function TastePage({ params }: { params: Promise<{ username
             </p>
             <p className="mt-2 text-sm text-text-secondary">{verdict(style.gap).line}</p>
             <p className="mt-4 text-xs text-text-muted">
-              Across {style.compared} records other people have rated too, {name} averages{" "}
+              Across {style.compared} records with something to compare against, {name} averages{" "}
               <span className="font-semibold text-score-you">{style.yours.toFixed(1)}</span> where
               everybody else gives{" "}
               <span className="font-semibold text-score-overall">{style.everyone.toFixed(1)}</span>.
@@ -187,7 +187,8 @@ export default async function TastePage({ params }: { params: Promise<{ username
 
           <p className="mt-10 text-xs text-text-muted">
             A plus means kinder than everyone else, a minus means harsher. Their own score is always
-            left out of the crowd&rsquo;s.
+            left out of the crowd&rsquo;s, and on records MULO hasn&rsquo;t enough of its own scores
+            for, the starting score from MusicBrainz stands in.
           </p>
         </>
       )}

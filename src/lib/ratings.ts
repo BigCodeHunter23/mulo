@@ -62,6 +62,18 @@ function fromArtist(artistSeed: number | null): number | null {
   return Math.round((artistSeed * FROM_ARTIST + MIDDLE * TOWARDS_MIDDLE) * 10) / 10;
 }
 
+/**
+ * An album's starting score: its own, or its artist's pulled towards the
+ * middle. For callers that already hold both rows and want the same number a
+ * page would show.
+ */
+export function startingScore(
+  releaseSeed: number | null,
+  artistSeed: number | null,
+): number | null {
+  return releaseSeed ?? fromArtist(artistSeed);
+}
+
 type Seeded = { sum: number; count: number; seeded: boolean };
 
 /** Everyone's ratings, plus the starting score while it still counts. */
