@@ -43,6 +43,21 @@ export default async function ProfileSettingsPage() {
         </Link>
       )}
 
+      <Link
+        href="/profile/account"
+        className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 transition-colors hover:bg-surface-raised"
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-medium uppercase tracking-wider text-text-secondary">
+            Account
+          </span>
+          <span className="mt-1 block truncate text-sm text-text">
+            Password, email, a copy of your data, and the way out
+          </span>
+        </span>
+        <span className="shrink-0 text-sm text-accent">Open →</span>
+      </Link>
+
       {/* Also in the account menu; kept here, where people look for it. */}
       <form action={logout} className="mt-12 border-t border-border pt-6">
         <button type="submit" className={buttonClass({ variant: "secondary" })}>
