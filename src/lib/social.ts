@@ -93,7 +93,9 @@ export async function listProfiles({ offset = 0, size = 200 }: Slice = {}): Prom
     .order("id")
     .range(offset, offset + size - 1);
 
-  return data ?? [];
+  // Blocked either way round: not somebody to be offered.
+  const hidden = await hiddenPeople();
+  return (data ?? []).filter((person) => !hidden.has(person.id));
 }
 
 /**
@@ -134,9 +136,13 @@ export async function listFollows(
     .in("id", ids);
 
   // Keep the order the follows came back in — most recent first — which
-  // fetching the profiles doesn't preserve.
+  // fetching the profiles doesn't preserve. Anybody blocked drops out.
+  const hidden = await hiddenPeople();
   const byId = new Map((data ?? []).map((row) => [row.id, row]));
-  return ids.map((id) => byId.get(id)).filter((row): row is PublicProfile => Boolean(row));
+  return ids
+    .filter((id) => !hidden.has(id))
+    .map((id) => byId.get(id))
+    .filter((row): row is PublicProfile => Boolean(row));
 }
 
 /**

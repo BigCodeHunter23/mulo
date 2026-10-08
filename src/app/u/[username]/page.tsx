@@ -194,9 +194,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
               label="Following"
               href={`/u/${profile.username}/follows?show=following`}
             />
+            {/* An average on its own says nothing until it's next to
+                everybody else's, which is what this opens. */}
             <Stat
               value={stats.averageScore !== null ? stats.averageScore.toFixed(1) : "–"}
               label="Avg"
+              href={`/u/${profile.username}/taste`}
             />
           </div>
 
@@ -284,6 +287,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
             </ButtonLink>
             <ButtonLink href={`/u/${profile.username}/mixtape`} variant="secondary" size="sm">
               Your mixtape
+            </ButtonLink>
+            <ButtonLink href={`/u/${profile.username}/taste`} variant="secondary" size="sm">
+              How you rate
             </ButtonLink>
             <InviteButton />
           </div>
