@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
+import { hiddenPeople } from "@/lib/blocks";
 
 export type PublicProfile = {
   id: string;

@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { RATING_TABLES, reviewedTable } from "@/lib/rating-kinds";
+import { hiddenFilter } from "@/lib/blocks";
 
 export type Review = {
   id: number;

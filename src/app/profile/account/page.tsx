@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { listBlocked } from "@/lib/blocks";
+import BlockedList from "@/components/BlockedList";
 import { DeleteSection, EmailSection, PasswordSection } from "./AccountForms";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const user = await requireUser("/profile/account");
+  const blocked = await listBlocked();
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 pb-20 pt-12 sm:px-6">
@@ -40,6 +43,14 @@ export default async function AccountPage() {
           >
             Download my data
           </a>
+        </section>
+
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <h2 className="display-sm text-lg text-text">Blocked people</h2>
+          <p className="mt-1 mb-4 text-sm text-text-secondary">
+            Neither of you sees the other&rsquo;s scores, reviews or profile.
+          </p>
+          <BlockedList people={blocked} />
         </section>
 
         <DeleteSection />
