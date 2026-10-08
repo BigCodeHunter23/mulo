@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { RATING_TABLES, reviewedTable } from "@/lib/rating-kinds";
+import { hiddenFilter } from "@/lib/blocks";
 
 export type Review = {
   id: number;
@@ -21,13 +22,19 @@ export async function getReviews(kind: "album" | "artist", mbid: string): Promis
   const { column } = RATING_TABLES[kind];
   const table = reviewedTable(kind);
 
-  const { data } = await supabase
+  const query = supabase
     .from(table)
     .select("id, score, review, created_at, profiles!inner ( username, display_name, avatar_url )")
     .eq(column, mbid)
     .not("review", "is", null)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  // Somebody blocked has nothing to say on any record, either way round.
+  const hidden = await hiddenFilter();
+  if (hidden) query.not("user_id", "in", hidden);
+
+  const { data } = await query;
 
   return (data ?? []).map((row) => ({
     id: row.id,

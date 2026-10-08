@@ -15,6 +15,8 @@ import DiscoverSections, { NewReleases } from "@/components/DiscoverSections";
 import RaisedOnPrompt from "@/components/RaisedOnPrompt";
 import CoverWall from "@/components/CoverWall";
 import TasteTwin from "@/components/TasteTwin";
+import ReceiptCard from "@/components/ReceiptCard";
+import { getReceipt, howLongAgo } from "@/lib/receipts";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
 /** How much of the feed to show before the first break, and between breaks. */
@@ -91,6 +93,11 @@ export default async function Home() {
         </div>
         <Suspense fallback={null}>
           <div className="mb-14 empty:hidden">
+            <OldScore userId={user.id} />
+          </div>
+        </Suspense>
+        <Suspense fallback={null}>
+          <div className="mb-14 empty:hidden">
             <TasteTwin userId={user.id} />
           </div>
         </Suspense>
@@ -111,6 +118,12 @@ export default async function Home() {
       {/* These stream in on their own, so the feed never waits for them. */}
       <Suspense fallback={<TodaysVersusPlaceholder className="mb-10" />}>
         <TodaysVersus className="mb-10" />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <div className="mb-10 empty:hidden">
+          <OldScore userId={user.id} />
+        </div>
       </Suspense>
 
       <SectionHeading
@@ -255,4 +268,15 @@ async function AroundMulo({ seen, me }: { seen: string[]; me: string }) {
       <Feed items={others} />
     </section>
   );
+}
+
+/**
+ * A score they gave a while back, asked about again. Nothing shows until
+ * somebody has a rating old enough to have settled.
+ */
+async function OldScore({ userId }: { userId: string }) {
+  const receipt = await getReceipt(userId);
+  if (!receipt) return null;
+
+  return <ReceiptCard receipt={receipt} howLongAgo={howLongAgo(receipt.rated_at)} />;
 }

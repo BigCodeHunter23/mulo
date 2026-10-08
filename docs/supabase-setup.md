@@ -58,10 +58,21 @@ Dashboard → **SQL Editor**. Paste each file's contents and run it.
    charts are empty, and the logs say "run migration 0018".
 5. `supabase/migrations/0019_search_indexes.sql`: makes search fast as the
    catalogue grows. Safe to run twice, and any time; nothing depends on it.
+6. `supabase/migrations/0020_blocks.sql`: blocking. Safe to run twice. Until
+   it runs, the Block button says it couldn't and nobody is hidden; everything
+   else carries on as before.
 
-Check: in the Table Editor, `profiles` now shows the new constraints, and a
-`rate_limits` table exists (it fills as people log in and rate things). In
-**Database → Functions**, `score_totals` and `album_chart_rows` are listed.
+Check: in the Table Editor, `profiles` now shows the new constraints, and
+`rate_limits` and `blocks` tables exist (`rate_limits` fills as people log in
+and rate things). In **Database → Functions**, `score_totals`,
+`album_chart_rows` and `hidden_profiles` are listed.
+
+Note on 0016: it creates a `pg_temp.add_rule()` helper and calls it in later
+statements. The SQL Editor runs statements over pooled connections, so the
+helper can be gone by the next one and the run fails part way. If that
+happens, add the remaining constraints with a single `do $$ … $$` block that
+checks `pg_constraint` for each name first; the rules themselves are
+unchanged.
 
 ## 4. Check the storage buckets
 

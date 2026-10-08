@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
+import { hiddenFilter } from "@/lib/blocks";
 import { getReactions, NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
 import { MATCHUP_SELECT, sydneyDay, toMatchup } from "@/lib/versus";
 import { sideKey, type VersusMatchup, type VersusSideKey } from "@/lib/versus-shared";
@@ -154,6 +155,14 @@ async function loadFeed(
     albums.in("user_id", userIds);
     artists.in("user_id", userIds);
     songs.in("user_id", userIds);
+  }
+
+  // Anybody blocked, either way round, stays out of every feed.
+  const hidden = await hiddenFilter();
+  if (hidden) {
+    albums.not("user_id", "in", hidden);
+    artists.not("user_id", "in", hidden);
+    songs.not("user_id", "in", hidden);
   }
 
   // Before picks can take reactions they have no id, and this reads nothing.

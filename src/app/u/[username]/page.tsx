@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getFollowState, getProfileByUsername, getProfileStats } from "@/lib/social";
+import { isHidden } from "@/lib/blocks";
 import { getUserFeed } from "@/lib/feed";
 import { getTopPicks } from "@/lib/top-picks";
 import { getBadges } from "@/lib/badges";
@@ -21,6 +22,7 @@ import FollowButton from "@/components/FollowButton";
 import FeedItem from "@/components/FeedItem";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
+import BlockButton from "@/components/BlockButton";
 import InviteButton from "@/components/InviteButton";
 import ShareButton from "@/components/ShareButton";
 import TopPicks from "@/components/TopPicks";
@@ -148,6 +150,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
   const profile = await getProfileByUsername(username);
   if (!profile) notFound();
 
+  // Blocked, either way round: as far as each is concerned, the other is gone.
+  if (await isHidden(profile.id)) notFound();
+
   const [stats, followState, raisedOn, streak] = await Promise.all([
     getProfileStats(profile.id),
     getFollowState(profile.id),
@@ -189,9 +194,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
               label="Following"
               href={`/u/${profile.username}/follows?show=following`}
             />
+            {/* An average on its own says nothing until it's next to
+                everybody else's, which is what this opens. */}
             <Stat
               value={stats.averageScore !== null ? stats.averageScore.toFixed(1) : "–"}
               label="Avg"
+              href={`/u/${profile.username}/taste`}
             />
           </div>
 
@@ -230,6 +238,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                   profileId={profile.id}
                   signedIn={followState.signedIn}
                   label="Report"
+                />
+                <BlockButton
+                  targetId={profile.id}
+                  username={profile.username}
+                  name={name}
+                  signedIn={followState.signedIn}
                 />
               </>
             )}
@@ -273,6 +287,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
             </ButtonLink>
             <ButtonLink href={`/u/${profile.username}/mixtape`} variant="secondary" size="sm">
               Your mixtape
+            </ButtonLink>
+            <ButtonLink href={`/u/${profile.username}/taste`} variant="secondary" size="sm">
+              How you rate
             </ButtonLink>
             <InviteButton />
           </div>

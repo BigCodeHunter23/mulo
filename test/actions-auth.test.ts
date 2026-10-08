@@ -209,6 +209,30 @@ describe("signed out, every action refuses before touching the database", () => 
           form({ password: "longenough", confirm: "longenough" }),
         ),
     ],
+    [
+      "changePassword",
+      async () =>
+        (await import("@/app/profile/account/actions")).changePassword(
+          {},
+          form({ current: "longenough", next: "longenough2" }),
+        ),
+    ],
+    [
+      "changeEmail",
+      async () =>
+        (await import("@/app/profile/account/actions")).changeEmail(
+          {},
+          form({ email: "new@example.com", current: "longenough" }),
+        ),
+    ],
+    [
+      "deleteAccount",
+      async () =>
+        (await import("@/app/profile/account/actions")).deleteAccount(
+          {},
+          form({ current: "longenough", confirm: "DELETE" }),
+        ),
+    ],
   ];
 
   it.each(cases)("%s", async (_name, call) => {
