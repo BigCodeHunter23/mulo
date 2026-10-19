@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { preconnect } from "react-dom";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-bg font-sans text-text">
         <Header />
         {children}
+        <Footer />
         {/* Room for the phone tab bar, so it never covers the end of a page. */}
         <div
           aria-hidden="true"
