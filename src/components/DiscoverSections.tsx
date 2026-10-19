@@ -270,8 +270,14 @@ async function JustRated() {
   );
 }
 
-/** People's lists, newest first. Only shows once somebody has made one. */
+/**
+ * People's lists, newest first. Only once somebody has made one, and only for
+ * somebody signed in: a list is a shelf, and shelves are for people who are
+ * here rather than for passers-by.
+ */
 async function RecentLists() {
+  if (!(await getCurrentUser())) return null;
+
   const lists = await getRecentLists(4).catch(() => []);
   if (lists.length === 0) return null;
 

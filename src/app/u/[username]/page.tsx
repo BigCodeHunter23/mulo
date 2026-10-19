@@ -305,7 +305,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       </Suspense>
 
       <Suspense fallback={null}>
-        <ProfileLists userId={profile.id} username={profile.username} />
+        <ProfileLists
+          userId={profile.id}
+          username={profile.username}
+          signedIn={followState.signedIn}
+        />
       </Suspense>
 
       <SectionHeading
@@ -566,7 +570,17 @@ async function ProfileRatings({
 }
 
 /** A few of their lists, newest first; hidden until they've made one with albums in. */
-async function ProfileLists({ userId, username }: { userId: string; username: string }) {
+async function ProfileLists({
+  userId,
+  username,
+  signedIn,
+}: {
+  userId: string;
+  username: string;
+  /** Lists are for people who are here; a passer-by sees none. */
+  signedIn: boolean;
+}) {
+  if (!signedIn) return null;
   const lists = (await getUserLists(userId)).filter((list) => list.count > 0);
   if (lists.length === 0) return null;
 

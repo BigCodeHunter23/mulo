@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProfileByUsername } from "@/lib/social";
+import { requireUser } from "@/lib/auth";
 import { getUserLists } from "@/lib/lists";
 import ListCard from "@/components/ListCard";
 import { EmptyState } from "@/components/ui";
@@ -13,7 +14,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function UserListsPage({ params }: { params: Params }) {
-  const profile = await getProfileByUsername((await params).username);
+  const username = (await params).username;
+  await requireUser(`/u/${username}/lists`);
+  const profile = await getProfileByUsername(username);
   if (!profile) notFound();
   const name = profile.display_name || profile.username;
   const lists = (await getUserLists(profile.id)).filter((list) => list.count > 0);

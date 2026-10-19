@@ -222,7 +222,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
         </div>
 
         <Suspense fallback={null}>
-          <OnLists releaseMbid={mbid} />
+          <OnLists releaseMbid={mbid} signedIn={signedIn} />
         </Suspense>
 
         {/* The end of the page shouldn't be a dead end. */}
@@ -298,7 +298,15 @@ function TracklistPlaceholder() {
 }
 
 /** Lists this album is on, so one good list leads to the next. */
-async function OnLists({ releaseMbid }: { releaseMbid: string }) {
+async function OnLists({
+  releaseMbid,
+  signedIn,
+}: {
+  releaseMbid: string;
+  /** Lists are for people who are here, so a passer-by sees none. */
+  signedIn: boolean;
+}) {
+  if (!signedIn) return null;
   const lists = (await getListsWithAlbum(releaseMbid).catch(() => [])).filter(
     (list) => list.count > 0,
   );

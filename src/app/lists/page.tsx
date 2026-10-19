@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { getRecentLists, getUserLists } from "@/lib/lists";
-import { loginPath } from "@/lib/redirects";
 import ListCard from "@/components/ListCard";
 import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -11,11 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function ListsPage() {
-  const user = await getCurrentUser();
-  const [mine, recent] = await Promise.all([
-    user ? getUserLists(user.id) : Promise.resolve([]),
-    getRecentLists(),
-  ]);
+  const user = await requireUser("/lists");
+  const [mine, recent] = await Promise.all([getUserLists(user.id), getRecentLists()]);
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-20 pt-8 sm:px-6">
@@ -27,7 +23,7 @@ export default async function ListsPage() {
             them.
           </p>
         </div>
-        <ButtonLink href={user ? "/lists/new" : loginPath("/lists/new")}>New list</ButtonLink>
+        <ButtonLink href="/lists/new">New list</ButtonLink>
       </header>
 
       {user && (

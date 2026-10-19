@@ -3,8 +3,10 @@
  * signed-out visitors away from these before anything renders, and each page
  * also checks for itself with `requireUser`.
  *
- * Everything else is public on purpose: album, artist and list pages, profiles
- * and their share cards are what people send to each other. The admin inbox
+ * Everything else is public on purpose: album and artist pages, profiles and
+ * their share cards are what people send to each other. Lists are not among
+ * them — somebody's shelf is for people who are here, not for passers-by, so
+ * every list page asks for an account. The admin inbox
  * isn't listed: it answers "not found" to anyone who isn't an admin, rather
  * than admitting it exists.
  *
@@ -17,10 +19,10 @@ const SIGNED_IN_ONLY: RegExp[] = [
   /^\/notifications$/,
   /^\/profile(\/.*)?$/,
   /^\/welcome$/,
-  /^\/lists\/new$/,
+  /^\/lists(\/.*)?$/,
   /^\/badges$/,
   /^\/people$/,
-  /^\/u\/[^/]+\/(follows|vs)$/,
+  /^\/u\/[^/]+\/(follows|vs|lists)$/,
   /^\/artist\/[^/]+\/gauntlet$/,
 ];
 
