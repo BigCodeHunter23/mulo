@@ -113,6 +113,22 @@ function AuthPanel({ mode, next, notice }: { mode: Mode; next: string; notice?: 
         <SubmitButton mode={mode} />
       </form>
 
+      {/* Said where somebody is actually agreeing to it, rather than only in
+          a footer nobody scrolls to. */}
+      {mode === "signup" && (
+        <p className="text-center text-xs leading-relaxed text-text-muted">
+          Joining means you&rsquo;re happy with the{" "}
+          <Link href="/terms" className="underline underline-offset-4 hover:text-text">
+            terms
+          </Link>{" "}
+          and the{" "}
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-text">
+            privacy policy
+          </Link>
+          .
+        </p>
+      )}
+
       {mode === "login" && (
         <Link
           href="/auth/reset"
