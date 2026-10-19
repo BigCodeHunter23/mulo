@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { getList, LIST_LIMIT } from "@/lib/lists";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
@@ -25,7 +25,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function ListPage({ params }: { params: Params }) {
-  const [list, user] = await Promise.all([getList(Number((await params).id)), getCurrentUser()]);
+  const id = Number((await params).id);
+  const [list, user] = await Promise.all([getList(id), requireUser(`/lists/${id}`)]);
   if (!list) notFound();
   const own = user?.id === list.ownerId;
 
