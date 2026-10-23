@@ -69,11 +69,19 @@ export default function PrivacyPage() {
 
       <Section title="What other people can see">
         <p>
-          Your profile, your scores, your reviews, your lists and who you follow are public on MULO
-          — that&rsquo;s the point of it.{" "}
-          <strong className="text-text">Your email address is never shown to anybody.</strong> If
-          you&rsquo;d rather somebody couldn&rsquo;t see you at all, blocking them hides each of you
-          from the other.
+          Your scores, reviews, lists and who you follow are visible to other people on MULO —
+          that&rsquo;s the point of it. They are not visible to the open internet:{" "}
+          <strong className="text-text">
+            somebody without an account can&rsquo;t see what you&rsquo;ve rated, your lists, or what
+            anybody is rating right now.
+          </strong>{" "}
+          All they get of a profile is a name, a picture, what you were raised on and your GOAT, so
+          a link you send somebody lands somewhere real.
+        </p>
+        <p>
+          <strong className="text-text">Your email address is never shown to anybody</strong>,
+          signed in or not. If you&rsquo;d rather somebody couldn&rsquo;t see you at all, blocking
+          them hides each of you from the other.
         </p>
       </Section>
 

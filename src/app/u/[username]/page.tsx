@@ -301,7 +301,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       </Suspense>
 
       <Suspense fallback={null}>
-        <ProfileTopShelf userId={profile.id} isSelf={followState.isSelf} />
+        <ProfileTopShelf
+          userId={profile.id}
+          isSelf={followState.isSelf}
+          signedIn={followState.signedIn}
+        />
       </Suspense>
 
       <Suspense fallback={null}>
@@ -494,7 +498,18 @@ async function ProfileGoat({
   );
 }
 
-async function ProfileTopShelf({ userId, isSelf }: { userId: string; isSelf: boolean }) {
+async function ProfileTopShelf({
+  userId,
+  isSelf,
+  signedIn,
+}: {
+  userId: string;
+  isSelf: boolean;
+  /** Their best scores are still scores; a passer-by gets the GOAT instead. */
+  signedIn: boolean;
+}) {
+  if (!signedIn) return null;
+
   const highest = await getHighestRatedAlbums(userId, 12);
   if (highest.length < 4) return null;
 
@@ -542,6 +557,19 @@ async function ProfileRatings({
   signedIn: boolean;
   isSelf: boolean;
 }) {
+  // Somebody's listening, item by item, isn't for passers-by. The profile
+  // still introduces them — name, picture, what they were raised on, their
+  // GOAT — so an invite or a shared card lands somewhere real.
+  if (!signedIn) {
+    return (
+      <EmptyState
+        title="Join MULO to see what they've been rating"
+        body="Scores, reviews and who agrees with whom are for people with an account."
+        action={<ButtonLink href="/login?mode=signup">Join MULO, it&rsquo;s free</ButtonLink>}
+      />
+    );
+  }
+
   const ratings = await getUserFeed(userId);
 
   if (ratings.length === 0) {
