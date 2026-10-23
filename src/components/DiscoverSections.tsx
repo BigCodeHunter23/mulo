@@ -61,14 +61,9 @@ export default function DiscoverSections({ search = false }: { search?: boolean 
       <Suspense fallback={null}>
         <RecentLists />
       </Suspense>
-      <Suspense
-        fallback={
-          <section>
-            <SectionHeading>Just rated</SectionHeading>
-            <SkeletonRows count={2} />
-          </section>
-        }
-      >
+      {/* The placeholder stays out of a signed-out page too, so a heading
+          doesn't flash up for a section that will never arrive. */}
+      <Suspense fallback={<JustRatedPlaceholder />}>
         <JustRated />
       </Suspense>
     </div>
@@ -254,8 +249,30 @@ async function ArtistsToExplore() {
   );
 }
 
+/**
+ * What people have scored lately — for people who are here.
+ *
+ * A rolling feed of who rated what, names and faces attached, is the one part
+ * of MULO that reads as watching rather than browsing. Nobody needs it to
+ * decide whether to join, and nobody signing up to a small music app expects
+ * their listening to be readable by anybody who finds the address.
+ */
+async function JustRatedPlaceholder() {
+  if (!(await getCurrentUser())) return null;
+
+  return (
+    <section>
+      <SectionHeading>Just rated</SectionHeading>
+      <SkeletonRows count={2} />
+    </section>
+  );
+}
+
 async function JustRated() {
-  const [recent, user] = await Promise.all([getGlobalFeed(6), getCurrentUser()]);
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const recent = await getGlobalFeed(6);
   if (recent.length === 0) return null;
 
   return (
