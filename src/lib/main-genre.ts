@@ -29,8 +29,8 @@ export function headFamily(tag: string): string | null {
 
   // From the last word backwards: "garage rock revival" is rock, because
   // "revival" belongs to no family and "rock" is the next word in.
-  for (let i = words.length - 1; i >= 0; i--) {
-    const word = words[i] === "hiphop" ? "hop" : words[i];
+  for (const raw of [...words].reverse()) {
+    const word = raw === "hiphop" ? "hop" : raw;
     const family = GENRE_FAMILIES.find((f) => f.match.includes(word));
     if (family) return family.id;
   }
