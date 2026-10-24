@@ -2,16 +2,15 @@
 /**
  * Marks albums whose artwork doesn't exist, so pages stop asking for it.
  *
- * An album cached from an artist's list keeps pointing at the Cover Art
- * Archive until copy-covers.mjs reaches it, and some of those records have no
+ * Album covers are served by the Cover Art Archive, and some records have no
  * cover at all — A$AP Rocky's ALL $MILE$ is one. The archive answers 404, the
  * browser draws its broken-image icon, and no amount of client-side handling
  * clears it reliably: the markup is server-rendered and React defers
  * hydrating a streamed boundary, so the error has come and gone before any
  * handler exists. Recording the absence is the fix.
  *
- * An empty cover_art_url means "looked, and there is nothing" — the same mark
- * copy-covers.mjs writes — and the app then renders the empty sleeve instead.
+ * An empty cover_art_url means "looked, and there is nothing", and the app
+ * then renders the empty sleeve instead.
  * Only asks for the headers, so nothing is downloaded or stored. Safe to stop
  * and run again.
  *
