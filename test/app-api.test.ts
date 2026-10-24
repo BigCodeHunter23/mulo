@@ -619,6 +619,13 @@ describe("GET discover", () => {
     expect(body.mine).toEqual({});
     expect(lib.getMyAlbumScores).not.toHaveBeenCalled();
   });
+
+  it("keeps who rated what to people with an account, as the page does", async () => {
+    const body = await (await discover()).json();
+    expect(body.justRated).toEqual([]);
+    expect(body.newReleases).toEqual(four);
+    expect(lib.getGlobalFeed).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET charts", () => {
@@ -778,7 +785,9 @@ describe("GET users/[username]", () => {
     lib.getHighestRatedAlbums.mockResolvedValue([]);
   });
 
-  it("answers the profile's core, signed out", async () => {
+  it("answers the profile's core signed out, without their listening", async () => {
+    lib.getUserFeed.mockResolvedValue([{ key: "r" }]);
+    lib.getHighestRatedAlbums.mockResolvedValue([{ mbid: MBID }]);
     const body = await (await profile()).json();
     expect(body).toMatchObject({
       profile: PROFILE,
@@ -787,6 +796,16 @@ describe("GET users/[username]", () => {
       recent: [],
       highest: [],
     });
+    expect(lib.getUserFeed).not.toHaveBeenCalled();
+    expect(lib.getHighestRatedAlbums).not.toHaveBeenCalled();
+  });
+
+  it("answers their latest ratings and top shelf to somebody signed in", async () => {
+    signIn();
+    lib.getUserFeed.mockResolvedValue([{ key: "r" }]);
+    lib.getHighestRatedAlbums.mockResolvedValue([{ mbid: MBID }]);
+    const body = await (await profile()).json();
+    expect(body).toMatchObject({ recent: [{ key: "r" }], highest: [{ mbid: MBID }] });
     expect(lib.getUserFeed).toHaveBeenCalledWith(OTHER);
     expect(lib.getHighestRatedAlbums).toHaveBeenCalledWith(OTHER, 12);
   });

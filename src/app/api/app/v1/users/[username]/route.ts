@@ -13,6 +13,9 @@ const NOT_FOUND = "We couldn't find that person.";
  * Somebody's profile: who they are, their numbers, whether you follow them,
  * their latest ratings and their top shelf. Badges, GOAT, taste and the rest
  * arrive with their own app stages.
+ *
+ * Their listening, item by item, is for people with an account, as on the
+ * page: signed out, the ratings and the top shelf come back empty.
  */
 export const GET = appRoute(
   async (_request: NextRequest, { params }: Params<{ username: string }>) => {
@@ -25,11 +28,12 @@ export const GET = appRoute(
     // Blocked, either way round: as far as each is concerned, the other is gone.
     if (!profile || (await isHidden(profile.id))) return appError(404, NOT_FOUND);
 
+    const signedIn = Boolean(caller.user);
     const [stats, follow, recent, highest] = await Promise.all([
       getProfileStats(profile.id),
       getFollowState(profile.id),
-      getUserFeed(profile.id),
-      getHighestRatedAlbums(profile.id, 12),
+      signedIn ? getUserFeed(profile.id) : [],
+      signedIn ? getHighestRatedAlbums(profile.id, 12) : [],
     ]);
     return appJson<ProfilePage>({ profile, stats, follow, recent, highest });
   },

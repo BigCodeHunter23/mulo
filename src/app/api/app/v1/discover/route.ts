@@ -35,7 +35,9 @@ export const GET = appRoute(async () => {
     topRatedOnMulo(SHELVES.topRated.limit),
     mostPlayedAlbums(SHELVES.mostPlayed.limit),
     artistsToExplore(SHELVES.artistsToExplore.limit),
-    getGlobalFeed(SHELVES.justRated.limit),
+    // Who rated what, names and faces attached, is for people with an
+    // account, as on the page.
+    caller.user ? getGlobalFeed(SHELVES.justRated.limit) : Promise.resolve([]),
   ]);
 
   const page: Omit<DiscoverPage, "mine"> = {
