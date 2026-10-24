@@ -419,3 +419,49 @@ describe("GET artists/[mbid]/similar", () => {
     expect(lib.similarArtists).toHaveBeenCalledWith(OTHER, 6);
   });
 });
+
+describe("GET search", () => {
+  const RESULTS = { artists: [ARTIST], albums: [], songs: [] };
+  const search = async (q: string) =>
+    (await import("@/app/api/app/v1/search/route")).GET(
+      request(`search?q=${encodeURIComponent(q)}`),
+    );
+
+  beforeEach(() => {
+    lib.searchCatalog.mockResolvedValue(RESULTS);
+    lib.friendsForResults.mockResolvedValue({ artists: { [OTHER]: [] }, albums: {} });
+  });
+
+  it("answers signed out with nobody's friends", async () => {
+    expect(await (await search("kendrick")).json()).toEqual({
+      ...RESULTS,
+      friends: { artists: {}, albums: {} },
+    });
+    expect(lib.searchCatalog).toHaveBeenCalledWith("kendrick", 8);
+    expect(lib.friendsForResults).not.toHaveBeenCalled();
+  });
+
+  it("adds who you follow has rated what when signed in", async () => {
+    signIn();
+    expect((await (await search("kendrick")).json()).friends.artists).toEqual({ [OTHER]: [] });
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await search("kendrick")).status).toBe(401);
+  });
+
+  it("says no politely over the limit", async () => {
+    caller.limited = true;
+    expect((await search("kendrick")).status).toBe(429);
+    expect(lib.searchCatalog).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET search/wider", () => {
+  it("is the website's own MusicBrainz search", async () => {
+    const app = await import("@/app/api/app/v1/search/wider/route");
+    const site = await import("@/app/api/search/wider/route");
+    expect(app.GET).toBe(site.GET);
+  });
+});
