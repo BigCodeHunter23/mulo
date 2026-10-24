@@ -1,8 +1,6 @@
 import "server-only";
-import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { copyCoverToStorage } from "@/lib/cover-storage";
 import {
   coverArtUrl,
   creditText,
@@ -77,13 +75,6 @@ async function saveWithSeed<T extends Record<SeedColumn, unknown>>(
   if (error && isUnknownColumn(error)) {
     seedColumnsExist = false;
     await write(withoutSeed(row));
-  }
-}
-
-/** A cover still served by the archive gets copied to our storage, later. */
-function copyCoverLater(release: Pick<Release, "mbid" | "cover_art_url">) {
-  if (release.cover_art_url?.includes("coverartarchive.org")) {
-    after(() => copyCoverToStorage(release.mbid));
   }
 }
 
@@ -224,7 +215,6 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
   // A release listed on an artist's page has a title and date but no genres
   // yet; only one whose details were fetched is complete.
   if (cached?.details_cached_at) {
-    copyCoverLater(cached);
     return cached;
   }
   if (!(await allowAddress("catalog"))) {
@@ -287,7 +277,6 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
     genres: details.genres,
   };
 
-  copyCoverLater(release);
   return release;
 }
 

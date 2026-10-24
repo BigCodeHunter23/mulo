@@ -15,7 +15,8 @@ in plain language, and give them links and exact steps when they need to act.
 - Supabase for Postgres, auth and storage, in Sydney. Vercel is pinned to
   `syd1` beside it. A push to `master` deploys.
 - Catalogue from MusicBrainz, at about one request a second with a descriptive
-  User-Agent, cached in Postgres. Covers are copied into Supabase storage.
+  User-Agent, cached in Postgres. Covers are shown straight from the Cover Art Archive,
+  never stored (they once were, and filled the storage allowance).
   Artist photos and bios come from Wikidata and Wikipedia; popularity from
   ListenBrainz.
 
@@ -252,7 +253,7 @@ in plain language, and give them links and exact steps when they need to act.
   adds artists MusicBrainz hasn't tagged at all; `--details` fetches genre tags
   (plus credit, date and starting score) for albums that never had them;
   `--top-artists` adds
-  ListenBrainz's top ~1,000 artists that are missing (its published limit); `scripts/copy-covers.mjs` copies covers into storage;
+  ListenBrainz's top ~1,000 artists that are missing (its published limit);
   `scripts/seed-scores.mjs` backfills starting scores for records cached
   before 0014, which never go back to MusicBrainz on their own.
 

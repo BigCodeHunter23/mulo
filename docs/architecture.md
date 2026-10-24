@@ -107,7 +107,9 @@ Every action follows the same order, so none of them can skip a step:
 Albums, artists and songs come from MusicBrainz. The first time somebody
 opens one, `src/lib/catalog.ts` fetches it (about one request a second, with
 a descriptive User-Agent), stores it with the admin client, and serves it
-from Postgres from then on. Covers are copied into Supabase storage; photos
+from Postgres from then on. Covers are shown straight from the Cover Art
+Archive and never stored, since 15,000 albums of them outgrew the storage
+allowance; `coverSrc()` reads any old stored-cover address as the archive's. Photos
 and bios come from Wikidata and Wikipedia. Anything a person is waiting on
 gets a short deadline and no retries, because MusicBrainz often rate-limits
 Vercel's shared addresses. `scripts/seed-catalog.mjs` pre-loads popular
