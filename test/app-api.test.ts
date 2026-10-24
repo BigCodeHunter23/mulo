@@ -49,7 +49,16 @@ const lib = vi.hoisted(() => ({
   // gauntlet, discover, search
   getSetProgress: vi.fn(),
   similarArtists: vi.fn(),
+  newReleases: vi.fn(),
+  topRatedOnMulo: vi.fn(),
+  mostPlayedAlbums: vi.fn(),
+  artistsToExplore: vi.fn(),
   searchCatalog: vi.fn(),
+  // trending, charts, stack
+  getHeavyRotation: vi.fn(),
+  getChart: vi.fn(),
+  getChartProgress: vi.fn(),
+  getStack: vi.fn(),
   // feed
   getFollowingFeed: vi.fn(),
   getGlobalFeed: vi.fn(),
@@ -101,7 +110,31 @@ vi.mock("@/lib/ratings", () => ({
 vi.mock("@/lib/reviews", () => ({ getReviews: lib.getReviews }));
 vi.mock("@/lib/reactions", () => ({ getReactions: lib.getReactions }));
 vi.mock("@/lib/gauntlet", () => ({ getSetProgress: lib.getSetProgress }));
-vi.mock("@/lib/discover", () => ({ similarArtists: lib.similarArtists }));
+vi.mock("@/lib/discover", async (original) => ({
+  // The shelves' sizes and minimums are the real ones.
+  SHELVES: (await original<typeof import("@/lib/discover")>()).SHELVES,
+  similarArtists: lib.similarArtists,
+  newReleases: lib.newReleases,
+  topRatedOnMulo: lib.topRatedOnMulo,
+  mostPlayedAlbums: lib.mostPlayedAlbums,
+  artistsToExplore: lib.artistsToExplore,
+}));
+vi.mock("@/lib/trending", () => ({ getHeavyRotation: lib.getHeavyRotation }));
+vi.mock("@/lib/charts", () => ({
+  CHART_KINDS: [
+    { id: "albums", label: "Albums", noun: "album" },
+    { id: "songs", label: "Songs", noun: "song" },
+  ],
+  CHART_GENRES: [{ id: "hip-hop", name: "Hip hop" }],
+  isChartKind: (value: string) => value === "albums" || value === "songs",
+  getChart: lib.getChart,
+  getChartProgress: lib.getChartProgress,
+}));
+vi.mock("@/lib/stack", () => ({
+  STACK_DECADES: [1980, 1990],
+  STACK_RUN: 10,
+  getStack: lib.getStack,
+}));
 vi.mock("@/lib/search", () => ({ searchCatalog: lib.searchCatalog }));
 vi.mock("@/lib/feed", () => ({
   getFollowingFeed: lib.getFollowingFeed,
@@ -497,6 +530,7 @@ describe("signed-in-only reads", () => {
       async () => (await import("@/app/api/app/v1/ratings/route")).GET(request("ratings")),
     ],
     ["people", async () => (await import("@/app/api/app/v1/people/route")).GET(request("people"))],
+    ["stack", async () => (await import("@/app/api/app/v1/stack/route")).GET(request("stack"))],
   ])("%s needs a token", async (_name, call) => {
     const response = await call();
     expect(response.status).toBe(401);
@@ -526,6 +560,130 @@ describe("GET feed", () => {
 
   it("refuses a scope it doesn't know", async () => {
     expect((await feed("?scope=mine")).status).toBe(400);
+  });
+});
+
+describe("GET discover", () => {
+  const discover = async () => (await import("@/app/api/app/v1/discover/route")).GET();
+  const album = (mbid: string) => ({
+    mbid,
+    title: mbid,
+    artist: null,
+    cover_art_url: null,
+    year: null,
+  });
+  const four = ["a", "b", "c", "d"].map(album);
+
+  beforeEach(() => {
+    lib.getHeavyRotation.mockResolvedValue(null);
+    lib.newReleases.mockResolvedValue(four);
+    lib.topRatedOnMulo.mockResolvedValue([]);
+    lib.mostPlayedAlbums.mockResolvedValue([album("e")]);
+    lib.artistsToExplore.mockResolvedValue([ARTIST]);
+    lib.getGlobalFeed.mockResolvedValue([{ key: "f" }]);
+    lib.getMyAlbumScores.mockResolvedValue(new Map([["a", 9]]));
+  });
+
+  it("answers every shelf, and your own scores for the albums on them", async () => {
+    signIn();
+    const body = await (await discover()).json();
+    expect(body).toEqual({
+      rotation: null,
+      newReleases: four,
+      topRated: [],
+      mostPlayed: [album("e")],
+      artistsToExplore: [ARTIST],
+      justRated: [{ key: "f" }],
+      mine: { a: 9 },
+    });
+    expect(lib.newReleases).toHaveBeenCalledWith(10);
+    expect(lib.getMyAlbumScores.mock.calls[0][0]).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("leaves out a shelf below the page's minimum", async () => {
+    lib.newReleases.mockResolvedValue(four.slice(0, 3));
+    expect((await (await discover()).json()).newReleases).toEqual([]);
+  });
+
+  it("leaves out a shelf whose read fails, and keeps the rest", async () => {
+    lib.mostPlayedAlbums.mockRejectedValue(new Error("down"));
+    const response = await discover();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.mostPlayed).toEqual([]);
+    expect(body.newReleases).toEqual(four);
+  });
+
+  it("is open to somebody signed out, with no scores of their own", async () => {
+    const body = await (await discover()).json();
+    expect(body.mine).toEqual({});
+    expect(lib.getMyAlbumScores).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET charts", () => {
+  const charts = async (query = "") =>
+    (await import("@/app/api/app/v1/charts/route")).GET(request(`charts${query}`));
+  const CHART = {
+    kind: "songs",
+    genre: "hip-hop",
+    genreName: "Hip hop",
+    entries: [],
+    pool: 0,
+    siteAverage: 6.5,
+  };
+
+  beforeEach(() => {
+    lib.getChart.mockResolvedValue(CHART);
+    lib.getChartProgress.mockResolvedValue({ yours: new Map([["x", 8]]), rated: 1, total: 5 });
+  });
+
+  it("answers the chart asked for, and what you've rated in it as plain data", async () => {
+    const body = await (await charts("?type=songs&genre=hip-hop")).json();
+    expect(lib.getChart).toHaveBeenCalledWith("songs", { genre: "hip-hop", limit: 100 });
+    expect(body).toEqual({
+      chart: CHART,
+      progress: { yours: { x: 8 }, rated: 1, total: 5 },
+      kinds: [
+        { id: "albums", label: "Albums" },
+        { id: "songs", label: "Songs" },
+      ],
+      genres: [{ id: "hip-hop", label: "Hip hop" }],
+    });
+  });
+
+  it("falls back to every album for a type or genre it doesn't know", async () => {
+    await charts("?type=podcasts&genre=nope");
+    expect(lib.getChart).toHaveBeenCalledWith("albums", { genre: null, limit: 100 });
+  });
+});
+
+describe("GET stack", () => {
+  const stack = async (query = "") =>
+    (await import("@/app/api/app/v1/stack/route")).GET(request(`stack${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getStack.mockResolvedValue([{ mbid: "a" }]);
+  });
+
+  it("draws a run for the signed-in person, with the filters on offer", async () => {
+    const body = await (await stack("?decade=1990&genre=hip-hop")).json();
+    expect(lib.getStack).toHaveBeenCalledWith(OTHER, 10, { decade: 1990, genre: "hip-hop" });
+    expect(body.albums).toEqual([{ mbid: "a" }]);
+    expect(body.decade).toBe(1990);
+    expect(body.genre).toBe("hip-hop");
+    expect(body.decades).toEqual([1980, 1990]);
+    expect(body.genres).toContainEqual({ id: "hip-hop", label: "Hip hop" });
+  });
+
+  it("ignores a filter it doesn't know", async () => {
+    await stack("?decade=1875&genre=nope");
+    expect(lib.getStack).toHaveBeenCalledWith(OTHER, 10, { decade: null, genre: null });
+  });
+
+  it("is never kept by a cache: every run is new", async () => {
+    expect((await stack()).headers.get("cache-control")).toBe("private, no-store");
   });
 });
 
