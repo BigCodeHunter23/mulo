@@ -29,6 +29,20 @@ isn't a page: search as you type (`/api/search`, `/api/search/wider`), the
 unread-notification count, email-link sign-in (`/auth/confirm`), and
 generated images (record avatars and story images).
 
+**The app API** (`src/app/api/app/v1/`) serves the MULO phone app. It signs
+people in by bearer token, never by cookie: `src/lib/supabase/server.ts`
+reads `Authorization: Bearer`, so every lib function and action acts as the
+right person unchanged, and the proxy (`src/lib/app-proxy.ts`) answers CORS
+for `/api/app/*` and drops cookies there, so a page elsewhere can't borrow
+somebody's website session. Handlers are thin and built from
+`src/lib/app-route.ts`: check the caller (`appCaller`, or `signedInCaller`
+where an account is needed), read the input, call the same lib function or
+action a page uses, answer JSON. A token that doesn't verify is a 401
+everywhere, so the app knows to refresh it; writes answer with the action's
+own `{ ok, error }`. Every shape they answer with is declared in
+`src/lib/app-api.ts`, which the app copies, so it stays framework-free (its
+test says how). New endpoints go in `test/app-api.test.ts`.
+
 Nothing talks to Supabase from the browser. The session cookies are
 `httpOnly`, so page scripts can't read them, and every query runs on the
 server.
@@ -40,7 +54,7 @@ schema, so a wrong table or column name fails the type check.
 
 | Client                | Who it acts as                       | Used for                                                              |
 | --------------------- | ------------------------------------ | --------------------------------------------------------------------- |
-| `server.ts`           | The signed-in person (their cookie)  | Almost everything: pages, actions. One per request (React `cache`).   |
+| `server.ts`           | The signed-in person (their cookie, or the app's bearer token) | Almost everything: pages, actions, the app API. One per request (React `cache`). |
 | `public.ts`           | Nobody (anon key, no cookie)         | Public reads that are the same for everyone, so they can be cached.   |
 | `admin.ts`            | Service role, **bypasses RLS**       | Writing catalogue data fetched from MusicBrainz. Server only.          |
 | `middleware.ts`       | The signed-in person                 | The proxy's session refresh.                                          |
