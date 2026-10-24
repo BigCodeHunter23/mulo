@@ -4,7 +4,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { hiddenPeople } from "@/lib/blocks";
-import type { ProfileStats, PublicProfile } from "@/lib/app-api";
+import type { OwnProfile, ProfileStats, PublicProfile } from "@/lib/app-api";
 
 export type { PublicProfile, ProfileStats };
 
@@ -160,4 +160,19 @@ export async function getUsername(userId: string): Promise<string | null> {
     .eq("id", userId)
     .maybeSingle();
   return (data?.username as string | undefined) ?? null;
+}
+
+/**
+ * The signed-in person's own profile, or null until they've picked a
+ * username: the home page sends them to the welcome steps then, and so does
+ * the app.
+ */
+export async function getOwnProfile(userId: string): Promise<OwnProfile | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("username, display_name, avatar_url, raised_on_mbid")
+    .eq("id", userId)
+    .maybeSingle();
+  return data ?? null;
 }

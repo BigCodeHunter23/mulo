@@ -169,3 +169,35 @@ describe("POST auth/signup", () => {
     expect(auth.signUp).not.toHaveBeenCalled();
   });
 });
+
+describe("GET me", () => {
+  const me = async () => (await import("@/app/api/app/v1/me/route")).GET();
+
+  it("needs a token", async () => {
+    expect((await me()).status).toBe(401);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await me()).status).toBe(401);
+  });
+
+  it("answers who you are and your profile", async () => {
+    signIn();
+    const profile = {
+      username: "alex",
+      display_name: null,
+      avatar_url: null,
+      raised_on_mbid: null,
+    };
+    lib.getOwnProfile.mockResolvedValue(profile);
+    expect(await (await me()).json()).toEqual({ ...USER, profile });
+    expect(lib.getOwnProfile).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("says when there's no username yet", async () => {
+    signIn();
+    lib.getOwnProfile.mockResolvedValue(null);
+    expect((await (await me()).json()).profile).toBeNull();
+  });
+});
