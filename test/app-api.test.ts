@@ -116,6 +116,21 @@ vi.mock("@/lib/social", () => ({
 }));
 vi.mock("@/lib/blocks", () => ({ isHidden: lib.isHidden }));
 
+/** Stand-ins for the website's own actions, which the writes hand straight to. */
+const actions = vi.hoisted(() => ({
+  rate: vi.fn(),
+  removeRating: vi.fn(),
+  saveReview: vi.fn(),
+  setFollowing: vi.fn(),
+}));
+
+vi.mock("@/app/ratings/actions", () => ({
+  rate: actions.rate,
+  removeRating: actions.removeRating,
+  saveReview: actions.saveReview,
+}));
+vi.mock("@/app/u/[username]/actions", () => ({ setFollowing: actions.setFollowing }));
+
 const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
 const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
 const USER = { id: OTHER, email: "someone@example.com" };
@@ -147,6 +162,7 @@ beforeEach(() => {
   auth.signInWithPassword.mockReset();
   auth.signUp.mockReset();
   for (const fn of Object.values(lib)) fn.mockReset();
+  for (const fn of Object.values(actions)) fn.mockReset().mockResolvedValue({ ok: true });
 });
 
 const SESSION = {
@@ -629,5 +645,114 @@ describe("GET users/[username]", () => {
   it("is 404 for a username that can't exist, without looking", async () => {
     expect((await profile("no!")).status).toBe(404);
     expect(lib.getProfileByUsername).not.toHaveBeenCalled();
+  });
+});
+
+describe("writes", () => {
+  const writes: [string, () => Promise<Response>][] = [
+    [
+      "POST ratings",
+      async () =>
+        (await import("@/app/api/app/v1/ratings/route")).POST(
+          json("ratings", "POST", { kind: "album", mbid: MBID, score: 8 }),
+        ),
+    ],
+    [
+      "DELETE ratings",
+      async () =>
+        (await import("@/app/api/app/v1/ratings/route")).DELETE(
+          request(`ratings?kind=album&mbid=${MBID}`, { method: "DELETE" }),
+        ),
+    ],
+    [
+      "PUT reviews",
+      async () =>
+        (await import("@/app/api/app/v1/reviews/route")).PUT(
+          json("reviews", "PUT", { kind: "album", mbid: MBID, review: "Great" }),
+        ),
+    ],
+    [
+      "PUT follows",
+      async () =>
+        (await import("@/app/api/app/v1/follows/[userId]/route")).PUT(
+          json(`follows/${OTHER}`, "PUT", { following: true, username: "alex" }),
+          params({ userId: OTHER }),
+        ),
+    ],
+  ];
+
+  it.each(writes)("%s needs a token, and touches nothing without one", async (_name, call) => {
+    expect((await call()).status).toBe(401);
+    for (const action of Object.values(actions)) expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each(writes)("%s refuses a token that doesn't verify", async (_name, call) => {
+    caller.token = "forged";
+    expect((await call()).status).toBe(401);
+    for (const action of Object.values(actions)) expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each(writes)("%s answers with the action's own result", async (_name, call) => {
+    signIn();
+    const response = await call();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("hands a score straight to rate", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    await POST(json("ratings", "POST", { kind: "song", mbid: OTHER, score: 7, releaseMbid: MBID }));
+    expect(actions.rate).toHaveBeenCalledWith("song", OTHER, 7, MBID);
+  });
+
+  it("hands a removal straight to removeRating", async () => {
+    signIn();
+    const { DELETE } = await import("@/app/api/app/v1/ratings/route");
+    await DELETE(
+      request(`ratings?kind=song&mbid=${OTHER}&releaseMbid=${MBID}`, { method: "DELETE" }),
+    );
+    expect(actions.removeRating).toHaveBeenCalledWith("song", OTHER, MBID);
+  });
+
+  it("hands a review straight to saveReview", async () => {
+    signIn();
+    const { PUT } = await import("@/app/api/app/v1/reviews/route");
+    await PUT(json("reviews", "PUT", { kind: "artist", mbid: OTHER, review: "" }));
+    expect(actions.saveReview).toHaveBeenCalledWith("artist", OTHER, "");
+  });
+
+  it("hands a follow straight to setFollowing", async () => {
+    signIn();
+    const { PUT } = await import("@/app/api/app/v1/follows/[userId]/route");
+    await PUT(
+      json(`follows/${MBID}`, "PUT", { following: false, username: "sam" }),
+      params({ userId: MBID }),
+    );
+    expect(actions.setFollowing).toHaveBeenCalledWith(MBID, "sam", false);
+  });
+
+  it("passes on the action's own refusal, in its words", async () => {
+    signIn();
+    actions.rate.mockResolvedValueOnce({ ok: false, error: "Scores run from 1 to 10." });
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    const response = await POST(json("ratings", "POST", { kind: "album", mbid: MBID, score: 11 }));
+    expect(await response.json()).toEqual({ ok: false, error: "Scores run from 1 to 10." });
+  });
+
+  it("refuses a body it can't read", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    const response = await POST(request("ratings", { method: "POST", body: "{" }));
+    expect(response.status).toBe(400);
+    expect(actions.rate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a removal that doesn't say what", async () => {
+    signIn();
+    const { DELETE } = await import("@/app/api/app/v1/ratings/route");
+    const response = await DELETE(request("ratings?kind=album", { method: "DELETE" }));
+    expect(response.status).toBe(400);
+    expect(actions.removeRating).not.toHaveBeenCalled();
   });
 });
