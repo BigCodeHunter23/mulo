@@ -465,3 +465,105 @@ describe("GET search/wider", () => {
     expect(app.GET).toBe(site.GET);
   });
 });
+
+describe("signed-in-only reads", () => {
+  it.each([
+    ["feed", async () => (await import("@/app/api/app/v1/feed/route")).GET(request("feed"))],
+    [
+      "ratings",
+      async () => (await import("@/app/api/app/v1/ratings/route")).GET(request("ratings")),
+    ],
+    ["people", async () => (await import("@/app/api/app/v1/people/route")).GET(request("people"))],
+  ])("%s needs a token", async (_name, call) => {
+    const response = await call();
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ ok: false, error: "Log in first." });
+  });
+});
+
+describe("GET feed", () => {
+  const feed = async (query = "") =>
+    (await import("@/app/api/app/v1/feed/route")).GET(request(`feed${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getFollowingFeed.mockResolvedValue([{ key: "a" }]);
+    lib.getGlobalFeed.mockResolvedValue([{ key: "b" }]);
+  });
+
+  it("is the people you follow by default", async () => {
+    expect(await (await feed()).json()).toEqual({ items: [{ key: "a" }] });
+    expect(lib.getFollowingFeed).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("is everyone on MULO when asked", async () => {
+    expect(await (await feed("?scope=everyone")).json()).toEqual({ items: [{ key: "b" }] });
+    expect(lib.getGlobalFeed).toHaveBeenCalledWith(24);
+  });
+
+  it("refuses a scope it doesn't know", async () => {
+    expect((await feed("?scope=mine")).status).toBe(400);
+  });
+});
+
+describe("GET ratings", () => {
+  const ratings = async (query = "") =>
+    (await import("@/app/api/app/v1/ratings/route")).GET(request(`ratings${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getOwnRatingCounts.mockResolvedValue({ album: 2, artist: 1, song: 0 });
+    lib.getOwnAlbumRatings.mockResolvedValue([{ score: 9 }]);
+    lib.getOwnArtistRatings.mockResolvedValue([{ score: 8 }]);
+    lib.getOwnSongRatings.mockResolvedValue([{ score: 7 }]);
+  });
+
+  it("is your albums, newest first, by default", async () => {
+    expect(await (await ratings()).json()).toEqual({
+      counts: { album: 2, artist: 1, song: 0 },
+      kind: "album",
+      sort: "recent",
+      items: [{ score: 9 }],
+    });
+    expect(lib.getOwnAlbumRatings).toHaveBeenCalledWith("recent");
+  });
+
+  it.each([
+    ["artist", "highest", lib.getOwnArtistRatings, 8],
+    ["song", "lowest", lib.getOwnSongRatings, 7],
+  ] as const)("is your %ss in %s order when asked", async (kind, sort, read, score) => {
+    const body = await (await ratings(`?kind=${kind}&sort=${sort}`)).json();
+    expect(body).toMatchObject({ kind, sort, items: [{ score }] });
+    expect(read).toHaveBeenCalledWith(sort);
+    expect(lib.getOwnAlbumRatings).not.toHaveBeenCalled();
+  });
+
+  it("refuses a kind it doesn't know", async () => {
+    expect((await ratings("?kind=podcast")).status).toBe(400);
+  });
+});
+
+describe("GET people", () => {
+  const people = async (query = "") =>
+    (await import("@/app/api/app/v1/people/route")).GET(request(`people${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getFollowingIds.mockResolvedValue(["p1"]);
+  });
+
+  it("pages through everyone, marking who you follow", async () => {
+    lib.listProfiles.mockResolvedValue(Array.from({ length: 51 }, (_, i) => ({ id: `p${i}` })));
+    const body = await (await people("?page=2")).json();
+    expect(lib.listProfiles).toHaveBeenCalledWith({ offset: 50, size: 51 });
+    expect(body.people).toHaveLength(50);
+    expect(body).toMatchObject({ following: ["p1"], hasMore: true });
+  });
+
+  it("says when it's the last page", async () => {
+    lib.listProfiles.mockResolvedValue([{ id: "p0" }]);
+    const body = await (await people()).json();
+    expect(lib.listProfiles).toHaveBeenCalledWith({ offset: 0, size: 51 });
+    expect(body.hasMore).toBe(false);
+  });
+});
