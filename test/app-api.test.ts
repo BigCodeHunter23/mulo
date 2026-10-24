@@ -22,7 +22,44 @@ const auth = vi.hoisted(() => ({
 
 /** Stand-ins for the lib functions the endpoints read through. */
 const lib = vi.hoisted(() => ({
+  // catalog
+  getCachedRelease: vi.fn(),
+  getCachedArtist: vi.fn(),
+  getCachedArtistAlbums: vi.fn(),
+  getCachedTracks: vi.fn(),
+  // ratings
+  getScores: vi.fn(),
+  getOwnRating: vi.fn(),
+  getSongScores: vi.fn(),
+  getTopSongs: vi.fn(),
+  getScoresForReleases: vi.fn(),
+  getMyAlbumScores: vi.fn(),
+  getFriendRaters: vi.fn(),
+  friendsForResults: vi.fn(),
+  getOwnRatingCounts: vi.fn(),
+  getOwnAlbumRatings: vi.fn(),
+  getOwnArtistRatings: vi.fn(),
+  getOwnSongRatings: vi.fn(),
+  getHighestRatedAlbums: vi.fn(),
+  // reviews, reactions
+  getReviews: vi.fn(),
+  getReactions: vi.fn(),
+  // gauntlet, discover, search
+  getSetProgress: vi.fn(),
+  similarArtists: vi.fn(),
+  searchCatalog: vi.fn(),
+  // feed
+  getFollowingFeed: vi.fn(),
+  getGlobalFeed: vi.fn(),
+  getUserFeed: vi.fn(),
+  // social, blocks
   getOwnProfile: vi.fn(),
+  getProfileByUsername: vi.fn(),
+  getProfileStats: vi.fn(),
+  getFollowState: vi.fn(),
+  listProfiles: vi.fn(),
+  getFollowingIds: vi.fn(),
+  isHidden: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -37,7 +74,47 @@ vi.mock("@/lib/rate-limit", async (original) => ({
   allowUser: vi.fn(async () => !caller.limited),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn }));
-vi.mock("@/lib/social", () => ({ getOwnProfile: lib.getOwnProfile }));
+vi.mock("@/lib/catalog", () => ({
+  getCachedRelease: lib.getCachedRelease,
+  getCachedArtist: lib.getCachedArtist,
+  getCachedArtistAlbums: lib.getCachedArtistAlbums,
+  getCachedTracks: lib.getCachedTracks,
+}));
+vi.mock("@/lib/ratings", () => ({
+  NO_FRIENDS: { artists: {}, albums: {} },
+  getScores: lib.getScores,
+  getOwnRating: lib.getOwnRating,
+  getSongScores: lib.getSongScores,
+  getTopSongs: lib.getTopSongs,
+  getScoresForReleases: lib.getScoresForReleases,
+  getMyAlbumScores: lib.getMyAlbumScores,
+  getFriendRaters: lib.getFriendRaters,
+  friendsForResults: lib.friendsForResults,
+  getOwnRatingCounts: lib.getOwnRatingCounts,
+  getOwnAlbumRatings: lib.getOwnAlbumRatings,
+  getOwnArtistRatings: lib.getOwnArtistRatings,
+  getOwnSongRatings: lib.getOwnSongRatings,
+  getHighestRatedAlbums: lib.getHighestRatedAlbums,
+}));
+vi.mock("@/lib/reviews", () => ({ getReviews: lib.getReviews }));
+vi.mock("@/lib/reactions", () => ({ getReactions: lib.getReactions }));
+vi.mock("@/lib/gauntlet", () => ({ getSetProgress: lib.getSetProgress }));
+vi.mock("@/lib/discover", () => ({ similarArtists: lib.similarArtists }));
+vi.mock("@/lib/search", () => ({ searchCatalog: lib.searchCatalog }));
+vi.mock("@/lib/feed", () => ({
+  getFollowingFeed: lib.getFollowingFeed,
+  getGlobalFeed: lib.getGlobalFeed,
+  getUserFeed: lib.getUserFeed,
+}));
+vi.mock("@/lib/social", () => ({
+  getOwnProfile: lib.getOwnProfile,
+  getProfileByUsername: lib.getProfileByUsername,
+  getProfileStats: lib.getProfileStats,
+  getFollowState: lib.getFollowState,
+  listProfiles: lib.listProfiles,
+  getFollowingIds: lib.getFollowingIds,
+}));
+vi.mock("@/lib/blocks", () => ({ isHidden: lib.isHidden }));
 
 const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
 const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
@@ -199,5 +276,88 @@ describe("GET me", () => {
     signIn();
     lib.getOwnProfile.mockResolvedValue(null);
     expect((await (await me()).json()).profile).toBeNull();
+  });
+});
+
+const RELEASE = {
+  mbid: MBID,
+  title: "To Pimp a Butterfly",
+  artist_mbid: OTHER,
+  release_date: "2015-03-15",
+  cover_art_url: null,
+  genres: ["hip hop"],
+};
+const ARTIST = { mbid: OTHER, name: "Kendrick Lamar", image_url: null, bio: null };
+const SCORES = {
+  overall: 9.1,
+  overallCount: 12,
+  you: null,
+  friends: null,
+  friendsCount: 0,
+  friendList: [],
+  seeded: false,
+};
+
+describe("GET albums/[mbid]", () => {
+  const album = async (mbid = MBID) =>
+    (await import("@/app/api/app/v1/albums/[mbid]/route")).GET(
+      request(`albums/${mbid}`),
+      params({ mbid }),
+    );
+
+  beforeEach(() => {
+    lib.getCachedRelease.mockResolvedValue(RELEASE);
+    lib.getCachedArtist.mockResolvedValue(ARTIST);
+    lib.getScores.mockResolvedValue(SCORES);
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([{ id: 7 }]);
+    lib.getReactions.mockResolvedValue({ 7: { love: 1, dislike: 0, mine: null } });
+  });
+
+  it("answers signed out with everything the album page shows", async () => {
+    const response = await album();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ release: RELEASE, artist: ARTIST, scores: SCORES, own: null });
+    expect(body.reactions).toEqual({ 7: { love: 1, dislike: 0, mine: null } });
+    expect(typeof body.prompt).toBe("string");
+    expect(lib.getReactions).toHaveBeenCalledWith("album", [7]);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await album()).status).toBe(401);
+  });
+
+  it("is 404 for an album that isn't there", async () => {
+    lib.getCachedRelease.mockResolvedValue(null);
+    expect((await album()).status).toBe(404);
+  });
+
+  it("is 404 for something that isn't an id, without looking", async () => {
+    expect((await album("nope")).status).toBe(404);
+    expect(lib.getCachedRelease).not.toHaveBeenCalled();
+  });
+
+  it("is 429 when the catalogue limit is hit", async () => {
+    const { RateLimitedError } = await import("@/lib/rate-limit");
+    lib.getCachedRelease.mockRejectedValue(new RateLimitedError("catalog"));
+    expect((await album()).status).toBe(429);
+  });
+});
+
+describe("GET albums/[mbid]/tracks", () => {
+  it("answers the tracklist with its song scores", async () => {
+    const tracks = [
+      { position: 1, title: "Wesley's Theory", duration_ms: 287000, song_mbid: OTHER },
+      { position: 2, title: "For Free?", duration_ms: 130000, song_mbid: null },
+    ];
+    const scores = { community: {}, own: {}, friends: {} };
+    lib.getCachedTracks.mockResolvedValue(tracks);
+    lib.getSongScores.mockResolvedValue(scores);
+    const { GET } = await import("@/app/api/app/v1/albums/[mbid]/tracks/route");
+    const body = await (await GET(request(`albums/${MBID}/tracks`), params({ mbid: MBID }))).json();
+    expect(body).toEqual({ tracks, scores });
+    expect(lib.getSongScores).toHaveBeenCalledWith([OTHER]);
   });
 });
