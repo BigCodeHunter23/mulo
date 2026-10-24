@@ -1,14 +1,10 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import type { ReactionSummary } from "@/lib/app-api";
+
+export type { ReactionSummary };
 
 export type ReactionKind = "album" | "artist" | "take" | "pick";
-
-export type ReactionSummary = {
-  love: number;
-  dislike: number;
-  /** What the signed-in person picked, if anything. */
-  mine: 1 | -1 | null;
-};
 
 /** Which column points at which kind of rating, or at a Versus take or pick. */
 export const REACTION_COLUMNS = {

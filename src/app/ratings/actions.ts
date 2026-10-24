@@ -9,35 +9,9 @@ import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { getBadges } from "@/lib/badges";
 import { getCrowd } from "@/lib/ratings";
 import { isMilestone, milestonePath } from "@/lib/milestones";
+import type { RatingResult } from "@/lib/app-api";
 
-export type RatingResult =
-  | {
-      ok: true;
-      /**
-       * Every badge this person now holds, sent back with each saved score.
-       * The browser keeps the last list it saw, so anything here that was not
-       * there before has just been unlocked and is worth making a fuss of.
-       * Badges stay worked out from ratings rather than stored, so this can
-       * never drift from the truth.
-       */
-      badges?: string[];
-      /**
-       * What everybody else gave the same thing, so a score far from the crowd
-       * can be spotted and the person invited to say why.
-       */
-      crowd?: { average: number; count: number };
-      /**
-       * Set when this score was somebody's tenth, hundredth (and so on) album,
-       * with the share page to celebrate it on.
-       */
-      milestone?: { count: number; url: string };
-    }
-  | {
-      ok: false;
-      error: string;
-      needsLogin?: boolean;
-      needsProfile?: boolean;
-    };
+export type { RatingResult };
 
 type DbError = { code?: string; message: string; details?: string | null };
 

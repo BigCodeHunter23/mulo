@@ -4,20 +4,9 @@ import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 import { createPublicClient } from "@/lib/supabase/public";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
+import type { AlbumSummary, ArtistSummary } from "@/lib/app-api";
 
-export type AlbumSummary = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover_art_url: string | null;
-  year: string | null;
-};
-
-export type ArtistSummary = {
-  mbid: string;
-  name: string;
-  image_url: string | null;
-};
+export type { AlbumSummary, ArtistSummary };
 
 type ReleaseRow = {
   mbid: string;

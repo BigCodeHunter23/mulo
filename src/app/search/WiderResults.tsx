@@ -1,7 +1,7 @@
 import Link from "next/link";
+import type { WiderAlbum, WiderArtist } from "@/lib/app-api";
 
-export type WiderArtist = { id: string; name: string; disambiguation: string | null };
-export type WiderAlbum = { id: string; title: string; artist: string | null; year: string | null };
+export type { WiderArtist, WiderAlbum };
 
 const ROW =
   "flex items-baseline justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-hover";

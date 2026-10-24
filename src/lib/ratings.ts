@@ -5,26 +5,21 @@ import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kind
 import { bestFirst, NO_FRIENDS, type FriendScore, type SearchFriends } from "@/lib/friend-scores";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
+import type {
+  AlbumRating,
+  ArtistRating,
+  OwnRating,
+  Scores,
+  SongRating,
+  SongScores,
+  Sort,
+  TopSong,
+} from "@/lib/app-api";
+
+export type { Scores, OwnRating, Sort, SongScores, TopSong, AlbumRating, ArtistRating, SongRating };
 
 export { NO_FRIENDS };
 export type { FriendScore, SearchFriends };
-
-/** Named to match the mockups: Ovr / You / Friends. */
-export type Scores = {
-  overall: number | null;
-  overallCount: number;
-  you: number | null;
-  friends: number | null;
-  friendsCount: number;
-  /** Which of them it was, and what each gave, their best first. */
-  friendList: FriendScore[];
-  /**
-   * True while the overall score still leans on the starting score borrowed
-   * from MusicBrainz, so a page can say so rather than passing an outside
-   * number off as MULO's own. See `supabase/migrations/0014_seed_ratings.sql`.
-   */
-  seeded: boolean;
-};
 
 /**
  * Past this many real MULO ratings the borrowed starting score is dropped.
@@ -110,13 +105,6 @@ async function scoreTotals(
   if (error) logQueryError("ratings", error, "0018");
   return new Map((data ?? []).flatMap((row) => (row.mbid ? [[row.mbid, row] as const] : [])));
 }
-
-export type OwnRating = {
-  score: number;
-  review: string | null;
-} | null;
-
-export type Sort = "recent" | "highest" | "lowest";
 
 function average(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -345,15 +333,6 @@ export async function getOwnRating(kind: "album" | "artist", mbid: string): Prom
   return data ?? null;
 }
 
-export type SongScores = {
-  /** Everyone's average for each rated song. */
-  community: Record<string, { average: number; count: number }>;
-  /** The signed-in person's own score for each song they've rated. */
-  own: Record<string, number>;
-  /** How the people you follow scored each song, their best first. */
-  friends: Record<string, FriendScore[]>;
-};
-
 /**
  * Scores for every song in a tracklist.
  *
@@ -409,14 +388,6 @@ export async function getSongScores(songMbids: string[]): Promise<SongScores> {
   return result;
 }
 
-export type TopSong = {
-  mbid: string;
-  title: string;
-  average: number;
-  count: number;
-  release: { mbid: string; title: string; cover_art_url: string | null };
-};
-
 /**
  * An artist's best-rated songs, from ratings on their albums: highest average
  * first, then the most rated. Counted by the database (migration 0018).
@@ -448,42 +419,6 @@ export async function getTopSongs(artistMbid: string, limit = 5): Promise<TopSon
       : [],
   );
 }
-
-type ArtistRef = { mbid: string; name: string };
-
-export type AlbumRating = {
-  score: number;
-  review: string | null;
-  created_at: string;
-  release: {
-    mbid: string;
-    title: string;
-    cover_art_url: string | null;
-    release_date: string | null;
-    /** MusicBrainz genre tags, for filtering somebody's ratings by genre. */
-    genres?: string[];
-    artist: ArtistRef | null;
-  };
-};
-
-export type ArtistRating = {
-  score: number;
-  review: string | null;
-  created_at: string;
-  artist: { mbid: string; name: string; image_url: string | null };
-};
-
-export type SongRating = {
-  score: number;
-  created_at: string;
-  song: { mbid: string; title: string };
-  release: {
-    mbid: string;
-    title: string;
-    cover_art_url: string | null;
-    artist: ArtistRef | null;
-  };
-};
 
 /** Highest or lowest first, newest first among equal scores. */
 function sortOrder(sort: Sort) {

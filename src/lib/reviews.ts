@@ -2,16 +2,9 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { RATING_TABLES, reviewedTable } from "@/lib/rating-kinds";
 import { hiddenFilter } from "@/lib/blocks";
+import type { Review } from "@/lib/app-api";
 
-export type Review = {
-  id: number;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  score: number;
-  review: string | null;
-  created_at: string;
-};
+export type { Review };
 
 /**
  * Written reviews of an album or an artist, newest first. Ratings without

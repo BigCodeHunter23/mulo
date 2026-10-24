@@ -4,22 +4,9 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { hiddenPeople } from "@/lib/blocks";
+import type { ProfileStats, PublicProfile } from "@/lib/app-api";
 
-export type PublicProfile = {
-  id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  created_at: string;
-};
-
-export type ProfileStats = {
-  followers: number;
-  following: number;
-  ratings: number;
-  averageScore: number | null;
-};
+export type { PublicProfile, ProfileStats };
 
 export async function getProfileByUsername(username: string): Promise<PublicProfile | null> {
   const supabase = await createClient();
