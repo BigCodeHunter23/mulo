@@ -325,6 +325,9 @@ export type OwnProfile = {
   raised_on_mbid: string | null;
 };
 
+/** `PUT me/profile`, and any other write that has nothing more to say. */
+export type SaveResult = { ok: true } | AppError;
+
 /** `GET me` */
 export type Me = { id: string; email: string | null; profile: OwnProfile | null };
 

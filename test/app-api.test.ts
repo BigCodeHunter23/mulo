@@ -14,10 +14,12 @@ const caller = vi.hoisted(() => ({
   limited: false,
 }));
 
-/** What Supabase answers a log-in or sign-up. */
+/** What Supabase answers a log-in, sign-up, refresh or log-out. */
 const auth = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
+  refreshSession: vi.fn(),
+  admin: { signOut: vi.fn() },
 }));
 
 /** Stand-ins for the lib functions the endpoints read through. */
@@ -122,7 +124,10 @@ const actions = vi.hoisted(() => ({
   removeRating: vi.fn(),
   saveReview: vi.fn(),
   setFollowing: vi.fn(),
+  saveProfile: vi.fn(),
 }));
+
+vi.mock("@/app/profile/actions", () => ({ saveProfile: actions.saveProfile }));
 
 vi.mock("@/app/ratings/actions", () => ({
   rate: actions.rate,
@@ -161,6 +166,8 @@ beforeEach(() => {
   caller.limited = false;
   auth.signInWithPassword.mockReset();
   auth.signUp.mockReset();
+  auth.refreshSession.mockReset();
+  auth.admin.signOut.mockReset().mockResolvedValue({ data: null, error: null });
   for (const fn of Object.values(lib)) fn.mockReset();
   for (const fn of Object.values(actions)) fn.mockReset().mockResolvedValue({ ok: true });
 });
@@ -754,5 +761,94 @@ describe("writes", () => {
     const response = await DELETE(request("ratings?kind=album", { method: "DELETE" }));
     expect(response.status).toBe(400);
     expect(actions.removeRating).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST auth/refresh", () => {
+  const refresh = async (body: unknown) =>
+    (await import("@/app/api/app/v1/auth/refresh/route")).POST(json("auth/refresh", "POST", body));
+
+  it("trades a refresh token for a fresh session", async () => {
+    auth.refreshSession.mockResolvedValue({ data: { session: SESSION }, error: null });
+    const response = await refresh({ refresh_token: "old" });
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+    expect(auth.refreshSession).toHaveBeenCalledWith({ refresh_token: "old" });
+  });
+
+  it("is 401 when Supabase won't refresh it", async () => {
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: "Invalid Refresh Token: Already Used" },
+    });
+    const response = await refresh({ refresh_token: "used" });
+    expect(response.status).toBe(401);
+    expect((await response.json()).error).toMatch(/log in again/);
+  });
+
+  it("refuses a body without a refresh token, without asking", async () => {
+    expect((await refresh({})).status).toBe(400);
+    expect(auth.refreshSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST auth/logout", () => {
+  const logout = async () => (await import("@/app/api/app/v1/auth/logout/route")).POST();
+
+  it("needs a token", async () => {
+    expect((await logout()).status).toBe(401);
+    expect(auth.admin.signOut).not.toHaveBeenCalled();
+  });
+
+  it("ends this device's session only", async () => {
+    signIn();
+    expect(await (await logout()).json()).toEqual({ ok: true });
+    expect(auth.admin.signOut).toHaveBeenCalledWith("good", "local");
+  });
+
+  it("still says ok when Supabase can't be reached: the app forgets the session anyway", async () => {
+    signIn();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    auth.admin.signOut.mockRejectedValue(new Error("fetch failed"));
+    expect(await (await logout()).json()).toEqual({ ok: true });
+  });
+});
+
+describe("PUT me/profile", () => {
+  const save = async (body: unknown) =>
+    (await import("@/app/api/app/v1/me/profile/route")).PUT(json("me/profile", "PUT", body));
+
+  it("needs a token", async () => {
+    expect((await save({ username: "alex" })).status).toBe(401);
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+  });
+
+  it("hands the username and display name to the website's own action, and nothing else", async () => {
+    signIn();
+    actions.saveProfile.mockResolvedValue({ message: "Profile saved." });
+    const response = await save({ username: "alex", display_name: "Alex" });
+    expect(await response.json()).toEqual({ ok: true });
+    const form = actions.saveProfile.mock.calls[0][1] as FormData;
+    expect(form.get("username")).toBe("alex");
+    expect(form.get("display_name")).toBe("Alex");
+    // Leaving these out keeps the bio as it was and stops the action redirecting.
+    expect(form.has("bio")).toBe(false);
+    expect(form.has("next")).toBe(false);
+  });
+
+  it("passes on the action's own refusal, in its words", async () => {
+    signIn();
+    actions.saveProfile.mockResolvedValue({
+      error: "That username is already taken. Try another.",
+    });
+    expect(await (await save({ username: "alex" })).json()).toEqual({
+      ok: false,
+      error: "That username is already taken. Try another.",
+    });
+  });
+
+  it("refuses a body it can't read", async () => {
+    signIn();
+    expect((await save({ username: 7 })).status).toBe(400);
+    expect(actions.saveProfile).not.toHaveBeenCalled();
   });
 });
