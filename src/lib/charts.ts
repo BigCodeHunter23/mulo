@@ -8,6 +8,9 @@ import { getArtistGenres } from "@/lib/artist-genres";
 import type { RatingTable } from "@/lib/rating-kinds";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
+import type { Chart, ChartEntry, ChartKind } from "@/lib/app-api";
+
+export type { Chart, ChartEntry, ChartKind };
 
 /**
  * The Charts: MULO's all-time rankings, for albums, songs and artists, over
@@ -31,8 +34,6 @@ import { readAll } from "@/lib/supabase/read-all";
  * the weighting, so nobody is shown a number that isn't theirs.
  */
 
-export type ChartKind = "albums" | "songs" | "artists";
-
 export const CHART_KINDS: { id: ChartKind; label: string; noun: string }[] = [
   { id: "albums", label: "Albums", noun: "album" },
   { id: "songs", label: "Songs", noun: "song" },
@@ -52,38 +53,6 @@ const CONFIDENCE: Record<ChartKind, number> = {
 
 /** The fallback middle when the site has nothing to average yet. */
 const NEUTRAL = 6.5;
-
-export type ChartEntry = {
-  rank: number;
-  mbid: string;
-  title: string;
-  /** The artist line, absent on an artist chart. */
-  subtitle: string | null;
-  /** The artist's own mbid, so a song or album row can link onward. */
-  artistMbid: string | null;
-  coverUrl: string | null;
-  year: string | null;
-  /** The plain average, which is what gets shown. */
-  average: number;
-  /** How many people rated it. */
-  votes: number;
-  /** The weighted score the ordering used. */
-  weighted: number;
-  /** Where the row points. */
-  href: string;
-};
-
-export type Chart = {
-  kind: ChartKind;
-  /** The genre family id, or null for everything. */
-  genre: string | null;
-  genreName: string | null;
-  entries: ChartEntry[];
-  /** How many rated things were in the running before the cut. */
-  pool: number;
-  /** The site-wide average the weighting pulled towards. */
-  siteAverage: number;
-};
 
 /** The genres a chart can be filtered to, reusing the badge ladders' families. */
 export const CHART_GENRES = GENRE_FAMILIES.map((family) => ({

@@ -258,6 +258,89 @@ export type WiderArtist = { id: string; name: string; disambiguation: string | n
 
 export type WiderAlbum = { id: string; title: string; artist: string | null; year: string | null };
 
+// --- Discover, The Charts and The Stack (discover.ts, trending.ts, charts.ts, stack.ts) ---
+
+/** One of the best-rated albums on MULO, with its average and how many backed it. */
+export type TopRatedAlbum = AlbumSummary & { average: number; count: number };
+
+export type RotationAlbum = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover: string | null;
+  /** Different people who rated the album or its songs in the window. */
+  people: number;
+  average: number;
+};
+
+export type HeavyRotation = {
+  label: "this week" | "this month";
+  albums: RotationAlbum[];
+};
+
+export type ChartKind = "albums" | "songs" | "artists";
+
+export type ChartEntry = {
+  rank: number;
+  mbid: string;
+  title: string;
+  /** The artist line, absent on an artist chart. */
+  subtitle: string | null;
+  /** The artist's own mbid, so a song or album row can link onward. */
+  artistMbid: string | null;
+  coverUrl: string | null;
+  year: string | null;
+  /** The plain average, which is what gets shown. */
+  average: number;
+  /** How many people rated it. */
+  votes: number;
+  /** The weighted score the ordering used. */
+  weighted: number;
+  /** Where the row points. */
+  href: string;
+};
+
+export type Chart = {
+  kind: ChartKind;
+  /** The genre family id, or null for everything. */
+  genre: string | null;
+  genreName: string | null;
+  entries: ChartEntry[];
+  /** How many rated things were in the running before the cut. */
+  pool: number;
+  /** The site-wide average the weighting pulled towards. */
+  siteAverage: number;
+};
+
+export type StackHit = {
+  title: string;
+  /** Plays relative to the album's biggest song, 0 to 1, for the bar. */
+  share: number;
+  /** The most-played song on the record, worth calling out. */
+  biggest: boolean;
+};
+
+export type StackAlbum = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover: string | null;
+  year: string | null;
+  /** Why it's in the run, shown as a quiet line under the cover. */
+  reason: string | null;
+  /**
+   * The record's tracklist, to jog a memory. A cover and a title often aren't
+   * enough to place an album — the moment somebody reads a song they know,
+   * they can score it honestly instead of guessing or skipping.
+   */
+  hits: StackHit[];
+  /** True when play counts are known, so the bars and "biggest" mean something. */
+  hitsByPlays: boolean;
+};
+
+/** A filter a page offers: a genre family, a chart type. */
+export type FilterOption<Id extends string = string> = { id: Id; label: string };
+
 // --- The Gauntlet (gauntlet.ts) ---
 
 export type SetProgress = {
@@ -406,4 +489,41 @@ export type ProfilePage = {
   recent: FeedItem[];
   /** Their highest-rated albums, the top shelf. */
   highest: AlbumRating[];
+};
+
+/**
+ * `GET discover`, the browsable shelves. Each is empty when there's too
+ * little to show (the website's own thresholds) or its read failed, so the
+ * app leaves it out.
+ */
+export type DiscoverPage = {
+  /** What MULO has in heavy rotation; null in a quiet week. */
+  rotation: HeavyRotation | null;
+  newReleases: AlbumSummary[];
+  topRated: TopRatedAlbum[];
+  mostPlayed: AlbumSummary[];
+  artistsToExplore: ArtistSummary[];
+  /** The latest ratings from everybody. */
+  justRated: FeedItem[];
+  /** The signed-in person's own scores for the albums above, by mbid. */
+  mine: Record<string, number>;
+};
+
+/** `GET charts?type=&genre=` */
+export type ChartPage = {
+  chart: Chart;
+  /** Which of the chart the signed-in person has rated, and what they gave each. */
+  progress: { yours: Record<string, number>; rated: number; total: number };
+  kinds: FilterOption<ChartKind>[];
+  genres: FilterOption[];
+};
+
+/** `GET stack?decade=&genre=`, a fresh run of records to rate. */
+export type StackRun = {
+  albums: StackAlbum[];
+  /** The filters this run was drawn with, once checked. */
+  decade: number | null;
+  genre: string | null;
+  decades: number[];
+  genres: FilterOption[];
 };

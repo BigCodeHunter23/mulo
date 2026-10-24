@@ -4,9 +4,23 @@ import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 import { createPublicClient } from "@/lib/supabase/public";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
-import type { AlbumSummary, ArtistSummary } from "@/lib/app-api";
+import type { AlbumSummary, ArtistSummary, TopRatedAlbum } from "@/lib/app-api";
 
-export type { AlbumSummary, ArtistSummary };
+export type { AlbumSummary, ArtistSummary, TopRatedAlbum };
+
+/**
+ * How many of each Discover shelf to show, and how few it takes to show the
+ * shelf at all: a ranking of three isn't a ranking. The Discover page and the
+ * app's `discover` endpoint both read these.
+ */
+export const SHELVES = {
+  rotation: { limit: 10 },
+  newReleases: { limit: 10, minimum: 4 },
+  topRated: { limit: 10, minimum: 4 },
+  mostPlayed: { limit: 15, minimum: 1 },
+  artistsToExplore: { limit: 15, minimum: 1 },
+  justRated: { limit: 6, minimum: 1 },
+} as const;
 
 type ReleaseRow = {
   mbid: string;
@@ -60,7 +74,7 @@ export async function popularArtists(limit = 10): Promise<ArtistSummary[]> {
  * The best average scores from people's ratings on MULO, averaged by the
  * database (migration 0018) across every rating.
  */
-type TopRated = AlbumSummary & { average: number; count: number };
+type TopRated = TopRatedAlbum;
 
 async function topRated(limit: number): Promise<TopRated[]> {
   const supabase = createPublicClient();

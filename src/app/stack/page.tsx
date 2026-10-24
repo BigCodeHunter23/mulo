@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { withQuery } from "@/lib/redirects";
 import Link from "next/link";
-import { getStack } from "@/lib/stack";
+import { getStack, STACK_DECADES, STACK_RUN } from "@/lib/stack";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getStreak } from "@/lib/streak";
 import StreakFlame from "@/components/StreakFlame";
@@ -13,18 +13,6 @@ export const metadata: Metadata = {
   title: "The Stack",
   description: "A quick run of records to rate, picked for you.",
 };
-
-/**
- * Long enough to be worth opening, short enough to finish in a sitting.
- *
- * Forty was a slog. A run nobody reaches the end of always feels like
- * homework, and the end of a run — where the ranking sits and another run is
- * one tap away — is the part that makes somebody go again. Ten takes a couple
- * of minutes and ends on that.
- */
-const RUN = 10;
-
-const DECADES = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
 /**
  * A run is never reused. `getStack` leaves out anything already rated, and
@@ -43,10 +31,10 @@ export default async function StackPage({
   // screen, and the value keys the deck so its state starts over.
   const { run, decade: decadeParam, genre: genreParam } = await searchParams;
   const user = await requireUser(withQuery("/stack", { decade: decadeParam, genre: genreParam }));
-  const decade = DECADES.includes(Number(decadeParam)) ? Number(decadeParam) : null;
+  const decade = STACK_DECADES.includes(Number(decadeParam)) ? Number(decadeParam) : null;
   const genre = GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
   const [albums, streak] = await Promise.all([
-    getStack(user.id, RUN, { decade, genre }),
+    getStack(user.id, STACK_RUN, { decade, genre }),
     getStreak(user.id),
   ]);
 
@@ -119,7 +107,7 @@ function Filters({ decade, genre }: { decade: number | null; genre: string | nul
         <Link href={href({ decade: null })} className={chip(decade === null)} scroll={false}>
           Any decade
         </Link>
-        {DECADES.map((d) => (
+        {STACK_DECADES.map((d) => (
           <Link key={d} href={href({ decade: d })} className={chip(decade === d)} scroll={false}>
             {String(d).slice(2)}s
           </Link>

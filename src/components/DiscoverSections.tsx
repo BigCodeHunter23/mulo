@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { artistsToExplore, mostPlayedAlbums, newReleases, topRatedOnMulo } from "@/lib/discover";
+import {
+  artistsToExplore,
+  mostPlayedAlbums,
+  newReleases,
+  SHELVES,
+  topRatedOnMulo,
+} from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
 import { getHeavyRotation } from "@/lib/trending";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -96,13 +102,13 @@ function GridPlaceholder({ title, round = false }: { title: string; round?: bool
 }
 
 async function Rotation() {
-  const rotation = await getHeavyRotation(10);
+  const rotation = await getHeavyRotation(SHELVES.rotation.limit);
   return rotation ? <HeavyRotation rotation={rotation} /> : null;
 }
 
 export async function NewReleases() {
-  const fresh = await newReleases(10);
-  if (fresh.length < 4) return null;
+  const fresh = await newReleases(SHELVES.newReleases.limit);
+  if (fresh.length < SHELVES.newReleases.minimum) return null;
   const mine = await getMyAlbumScores(fresh.map((album) => album.mbid));
 
   return (
@@ -163,9 +169,9 @@ function Shortcuts() {
 }
 
 async function TopRated() {
-  const topRated = await topRatedOnMulo(10);
+  const topRated = await topRatedOnMulo(SHELVES.topRated.limit);
   // Only worth showing once enough albums have been rated to rank.
-  if (topRated.length < 4) return null;
+  if (topRated.length < SHELVES.topRated.minimum) return null;
   const mine = await getMyAlbumScores(topRated.map((album) => album.mbid));
 
   return (
@@ -202,8 +208,8 @@ async function TopRated() {
 }
 
 async function MostPlayed() {
-  const mostPlayed = await mostPlayedAlbums(15);
-  if (mostPlayed.length === 0) return null;
+  const mostPlayed = await mostPlayedAlbums(SHELVES.mostPlayed.limit);
+  if (mostPlayed.length < SHELVES.mostPlayed.minimum) return null;
   const mine = await getMyAlbumScores(mostPlayed.map((album) => album.mbid));
 
   return (
@@ -233,8 +239,8 @@ async function MostPlayed() {
 }
 
 async function ArtistsToExplore() {
-  const artists = await artistsToExplore(15);
-  if (artists.length === 0) return null;
+  const artists = await artistsToExplore(SHELVES.artistsToExplore.limit);
+  if (artists.length < SHELVES.artistsToExplore.minimum) return null;
 
   return (
     <section>
@@ -255,8 +261,11 @@ async function ArtistsToExplore() {
 }
 
 async function JustRated() {
-  const [recent, user] = await Promise.all([getGlobalFeed(6), getCurrentUser()]);
-  if (recent.length === 0) return null;
+  const [recent, user] = await Promise.all([
+    getGlobalFeed(SHELVES.justRated.limit),
+    getCurrentUser(),
+  ]);
+  if (recent.length < SHELVES.justRated.minimum) return null;
 
   return (
     <section>
