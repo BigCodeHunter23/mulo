@@ -567,3 +567,67 @@ describe("GET people", () => {
     expect(body.hasMore).toBe(false);
   });
 });
+
+describe("GET users/[username]", () => {
+  const PROFILE = {
+    id: OTHER,
+    username: "alex",
+    display_name: null,
+    avatar_url: null,
+    bio: null,
+    created_at: "2026-01-01T00:00:00Z",
+  };
+  const profile = async (username = "alex") =>
+    (await import("@/app/api/app/v1/users/[username]/route")).GET(
+      request(`users/${username}`),
+      params({ username }),
+    );
+
+  beforeEach(() => {
+    lib.getProfileByUsername.mockResolvedValue(PROFILE);
+    lib.isHidden.mockResolvedValue(false);
+    lib.getProfileStats.mockResolvedValue({
+      followers: 1,
+      following: 2,
+      ratings: 3,
+      averageScore: 7,
+    });
+    lib.getFollowState.mockResolvedValue({ signedIn: false, isSelf: false, isFollowing: false });
+    lib.getUserFeed.mockResolvedValue([]);
+    lib.getHighestRatedAlbums.mockResolvedValue([]);
+  });
+
+  it("answers the profile's core, signed out", async () => {
+    const body = await (await profile()).json();
+    expect(body).toMatchObject({
+      profile: PROFILE,
+      stats: { ratings: 3 },
+      follow: { isFollowing: false },
+      recent: [],
+      highest: [],
+    });
+    expect(lib.getUserFeed).toHaveBeenCalledWith(OTHER);
+    expect(lib.getHighestRatedAlbums).toHaveBeenCalledWith(OTHER, 12);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await profile()).status).toBe(401);
+  });
+
+  it("is 404 for nobody by that name", async () => {
+    lib.getProfileByUsername.mockResolvedValue(null);
+    expect((await profile()).status).toBe(404);
+  });
+
+  it("is 404 for somebody blocked either way round", async () => {
+    lib.isHidden.mockResolvedValue(true);
+    expect((await profile()).status).toBe(404);
+    expect(lib.getUserFeed).not.toHaveBeenCalled();
+  });
+
+  it("is 404 for a username that can't exist, without looking", async () => {
+    expect((await profile("no!")).status).toBe(404);
+    expect(lib.getProfileByUsername).not.toHaveBeenCalled();
+  });
+});
