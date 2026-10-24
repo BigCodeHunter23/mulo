@@ -361,3 +361,61 @@ describe("GET albums/[mbid]/tracks", () => {
     expect(lib.getSongScores).toHaveBeenCalledWith([OTHER]);
   });
 });
+
+describe("GET artists/[mbid]", () => {
+  const artist = async (mbid = OTHER) =>
+    (await import("@/app/api/app/v1/artists/[mbid]/route")).GET(
+      request(`artists/${mbid}`),
+      params({ mbid }),
+    );
+
+  beforeEach(() => {
+    lib.getCachedArtist.mockResolvedValue(ARTIST);
+    lib.getCachedArtistAlbums.mockResolvedValue([RELEASE]);
+    lib.getScores.mockResolvedValue(SCORES);
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([]);
+    lib.getReactions.mockResolvedValue({});
+    lib.getTopSongs.mockResolvedValue([]);
+    lib.getScoresForReleases.mockResolvedValue(new Map([[MBID, 9.1]]));
+    lib.getMyAlbumScores.mockResolvedValue(new Map());
+    lib.getFriendRaters.mockResolvedValue({});
+    lib.getSetProgress.mockResolvedValue({ total: 1, rated: 0, remaining: [MBID] });
+  });
+
+  it("answers signed out, with album scores as plain objects", async () => {
+    const body = await (await artist()).json();
+    expect(body).toMatchObject({ artist: ARTIST, albums: [RELEASE], setProgress: null });
+    expect(body.albumScores).toEqual({ [MBID]: 9.1 });
+    expect(body.myAlbumScores).toEqual({});
+    expect(lib.getFriendRaters).toHaveBeenCalledWith("album", [MBID]);
+    expect(lib.getSetProgress).not.toHaveBeenCalled();
+  });
+
+  it("adds how much of the discography you've rated when signed in", async () => {
+    signIn();
+    const body = await (await artist()).json();
+    expect(body.setProgress).toEqual({ total: 1, rated: 0, remaining: [MBID] });
+    expect(lib.getSetProgress).toHaveBeenCalledWith(OTHER, [MBID]);
+  });
+
+  it("is 404 for an artist that isn't there", async () => {
+    lib.getCachedArtist.mockResolvedValue(null);
+    expect((await artist()).status).toBe(404);
+  });
+
+  it("is 404 for something that isn't an id, without looking", async () => {
+    expect((await artist("nope")).status).toBe(404);
+    expect(lib.getCachedArtist).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET artists/[mbid]/similar", () => {
+  it("answers Where Next", async () => {
+    lib.similarArtists.mockResolvedValue([ARTIST]);
+    const { GET } = await import("@/app/api/app/v1/artists/[mbid]/similar/route");
+    const response = await GET(request(`artists/${OTHER}/similar`), params({ mbid: OTHER }));
+    expect(await response.json()).toEqual({ artists: [ARTIST] });
+    expect(lib.similarArtists).toHaveBeenCalledWith(OTHER, 6);
+  });
+});
