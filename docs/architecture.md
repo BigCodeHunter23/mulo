@@ -39,7 +39,8 @@ somebody's website session. Handlers are thin and built from
 where an account is needed), read the input, call the same lib function or
 action a page uses, answer JSON. A token that doesn't verify is a 401
 everywhere, so the app knows to refresh it; writes answer with the action's
-own `{ ok, error }`. Every shape they answer with is declared in
+own `{ ok, error }`. Reads that cost the database something call
+`limitReads` (the `read` limit, per person or per address). Every shape they answer with is declared in
 `src/lib/app-api.ts`, which the app copies, so it stays framework-free (its
 test says how). New endpoints go in `test/app-api.test.ts`.
 
