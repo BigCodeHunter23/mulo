@@ -2,25 +2,9 @@ import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
 import { readAll } from "@/lib/supabase/read-all";
 import { isMilestone } from "@/lib/milestones";
+import type { MilestoneCard } from "@/lib/app-api";
 
-export type MilestoneCard = {
-  count: number;
-  profile: {
-    id: string;
-    username: string;
-    name: string;
-    avatarUrl: string | null;
-  };
-  average: number | null;
-  /** Their highest-scored albums, for the cover row. */
-  top: {
-    mbid: string;
-    title: string;
-    artist: string | null;
-    cover: string | null;
-    score: number;
-  }[];
-};
+export type { MilestoneCard };
 
 /**
  * What a milestone share card shows: who, how many, and their best-scored

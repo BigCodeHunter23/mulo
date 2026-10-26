@@ -1,5 +1,8 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import type { Clash, BlindSpot, HeadToHead } from "@/lib/app-api";
+
+export type { Clash, BlindSpot, HeadToHead };
 
 /**
  * You against one other person, on everything you have both rated.
@@ -13,42 +16,6 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
  * Nothing is stored. It is a query over two people's ratings, the same way
  * the feed and the taste match already work.
  */
-
-export type Clash = {
-  title: string;
-  subtitle: string | null;
-  href: string;
-  coverUrl: string | null;
-  yours: number;
-  theirs: number;
-};
-
-export type BlindSpot = {
-  title: string;
-  subtitle: string | null;
-  href: string;
-  coverUrl: string | null;
-  score: number;
-};
-
-export type HeadToHead = {
-  /** False when there isn't enough in common yet; only `shared` means anything. */
-  ready: boolean;
-  percent: number;
-  shared: number;
-  /** Rated exactly the same. */
-  identical: number;
-  /** Within a point of each other. */
-  close: number;
-  /** Three or more apart — the arguments. */
-  apart: number;
-  clashes: Clash[];
-  agreements: Clash[];
-  /** They rate it highly and you have never rated it. */
-  fromThem: BlindSpot[];
-  /** You rate it highly and they have never rated it. */
-  fromYou: BlindSpot[];
-};
 
 /** Below this there is not enough in common for any of it to mean anything. */
 export const MINIMUM = 8;

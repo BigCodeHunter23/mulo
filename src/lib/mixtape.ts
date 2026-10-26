@@ -4,47 +4,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import type { MixtapePick, RankOffKind, Tie, Mixtape } from "@/lib/app-api";
 
-export type MixtapePick = {
-  key: string;
-  /** The album, song or artist. */
-  mbid: string;
-  title: string;
-  subtitle: string | null;
-  image: string | null;
-  href: string;
-  score: number;
-};
-
-export type RankOffKind = "album" | "song";
-
-/** Albums or songs sharing the month's top score, which can be ranked off. */
-export type Tie = {
-  contenders: MixtapePick[];
-  /** A rank-off already crowned one of them. */
-  settled: boolean;
-};
-
-export type Mixtape = {
-  /** "2026-09" */
-  month: string;
-  /** "September 2026" */
-  label: string;
-  albums: number;
-  songs: number;
-  artists: number;
-  average: number | null;
-  topAlbum: MixtapePick | null;
-  topSong: MixtapePick | null;
-  topArtist: (MixtapePick & { rated: number }) | null;
-  /** Set only when more than one album, or song, shares the top score. */
-  albumTie: Tie | null;
-  songTie: Tie | null;
-  /** Whether rank-off results can be saved yet. */
-  rankOffs: boolean;
-  /** The best of the month, across all three, highest first. */
-  highlights: MixtapePick[];
-};
+export type { MixtapePick, RankOffKind, Tie, Mixtape };
 
 export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 

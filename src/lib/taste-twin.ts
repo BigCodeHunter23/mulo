@@ -2,6 +2,9 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
 import { currentDrop } from "@/lib/drop";
+import type { TasteTwin } from "@/lib/app-api";
+
+export type { TasteTwin };
 
 /**
  * Taste twin of the week: the person on MULO who scores music most like you.
@@ -13,18 +16,6 @@ import { currentDrop } from "@/lib/drop";
  * introducing people. Nothing is stored: it's worked out from ratings on
  * each view, and the week number is The Drop's.
  */
-
-export type TasteTwin = {
-  id: string;
-  username: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  percent: number;
-  shared: number;
-  /** Something you both love, to open the conversation with. */
-  agreement: { title: string; href: string; yours: number; theirs: number } | null;
-  following: boolean;
-};
 
 /** Below this there isn't enough in common to call anybody a twin. */
 const MINIMUM = 5;

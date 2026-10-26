@@ -12,6 +12,7 @@ const imports = [...source.matchAll(/^import\s+(type\s+)?[^;]*?from\s+"([^"]+)";
 
 /** Framework-free files the app copies alongside this one. */
 const SHARED = [
+  "@/lib/badge-catalog",
   "@/lib/friend-scores",
   "@/lib/drop-lineup",
   "@/lib/rating-kinds",

@@ -1,3 +1,4 @@
+import type { Badge } from "@/lib/badge-catalog";
 import type { FriendScore, SearchFriends } from "@/lib/friend-scores";
 import type { RatingKind } from "@/lib/rating-kinds";
 import type { DropAlbum } from "@/lib/drop-lineup";
@@ -552,6 +553,13 @@ export type ProfilePage = {
   highest: AlbumRating[];
   /** Days in a row they've done something on MULO. */
   streak: Streak;
+  /** Their GOAT lists, best first. */
+  goat: { artists: TopPick[]; albums: TopPick[] };
+  /**
+   * How closely the signed-in person and this one score the same records.
+   * Null signed out, on your own profile, or with too little in common.
+   */
+  taste: TasteMatch | null;
 };
 
 /**
@@ -639,3 +647,287 @@ export type DropPage = {
 
 /** `GET guess`, a fresh game of Guess the score. */
 export type GuessGame = { albums: GuessAlbum[] };
+
+// --- Collection (badges.ts, milestone-card.ts, top-picks.ts, mixtape.ts, gauntlet.ts, rating-style.ts, taste.ts, head-to-head.ts, taste-twin.ts, receipts.ts) ---
+
+export type BoardBadge = {
+  slug: string;
+  name: string;
+  earned: boolean;
+  /** Only filled in once earned. Locked ones keep their secret. */
+  description: string | null;
+};
+
+export type BoardGroup = { id: string; title: string; badges: BoardBadge[] };
+
+export type BoardLadder = {
+  id: string;
+  name: string;
+  /** Albums rated in this genre so far. */
+  rated: number;
+  tiers: { slug: string; name: string; earned: boolean }[];
+};
+
+export type BadgeBoard = {
+  earned: number;
+  total: number;
+  groups: BoardGroup[];
+  ladders: BoardLadder[];
+};
+
+export type MilestoneCard = {
+  count: number;
+  profile: {
+    id: string;
+    username: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+  average: number | null;
+  /** Their highest-scored albums, for the cover row. */
+  top: {
+    mbid: string;
+    title: string;
+    artist: string | null;
+    cover: string | null;
+    score: number;
+  }[];
+};
+
+export type PickKind = "artist" | "album";
+
+/** One entry in somebody's ranked top ten, ready to render. */
+export type TopPick = {
+  mbid: string;
+  title: string;
+  subtitle: string | null;
+  image: string | null;
+};
+
+export type PickSuggestions = {
+  /** "rated": their own ratings, best first. "popular": a start for new accounts. */
+  source: "rated" | "popular";
+  picks: (TopPick & { score: number | null })[];
+};
+
+export type MixtapePick = {
+  key: string;
+  /** The album, song or artist. */
+  mbid: string;
+  title: string;
+  subtitle: string | null;
+  image: string | null;
+  href: string;
+  score: number;
+};
+
+export type RankOffKind = "album" | "song";
+
+/** Albums or songs sharing the month's top score, which can be ranked off. */
+export type Tie = {
+  contenders: MixtapePick[];
+  /** A rank-off already crowned one of them. */
+  settled: boolean;
+};
+
+export type Mixtape = {
+  /** "2026-09" */
+  month: string;
+  /** "September 2026" */
+  label: string;
+  albums: number;
+  songs: number;
+  artists: number;
+  average: number | null;
+  topAlbum: MixtapePick | null;
+  topSong: MixtapePick | null;
+  topArtist: (MixtapePick & { rated: number }) | null;
+  /** Set only when more than one album, or song, shares the top score. */
+  albumTie: Tie | null;
+  songTie: Tie | null;
+  /** Whether rank-off results can be saved yet. */
+  rankOffs: boolean;
+  /** The best of the month, across all three, highest first. */
+  highlights: MixtapePick[];
+};
+
+export type RankedAlbum = {
+  mbid: string;
+  title: string;
+  year: string | null;
+  cover: string | null;
+  score: number;
+};
+
+export type Standout = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover_art_url: string | null;
+  yours: number;
+  theirs: number;
+  gap: number;
+};
+
+export type RatingStyle = {
+  /** Albums they've rated that anybody else has rated too. */
+  compared: number;
+  /** Their average on those, and everyone else's. */
+  yours: number;
+  everyone: number;
+  /** Positive: kinder than the crowd. Negative: harsher. */
+  gap: number;
+  /** The record they're furthest above the crowd on, and furthest below. */
+  champion: Standout | null;
+  sceptic: Standout | null;
+  /** Decades and genres they're kindest and hardest on, with enough rated to mean it. */
+  decades: { label: string; gap: number; count: number }[];
+  genres: { label: string; gap: number; count: number }[];
+};
+
+export type TasteMatch = {
+  /** Out of 100: how closely two people score the same records. */
+  percent: number;
+  /** How many things they have both rated. */
+  shared: number;
+  /** Where they disagree most, which is the fun part. */
+  clash: {
+    title: string;
+    subtitle: string | null;
+    href: string;
+    yours: number;
+    theirs: number;
+  } | null;
+};
+
+export type Clash = {
+  title: string;
+  subtitle: string | null;
+  href: string;
+  coverUrl: string | null;
+  yours: number;
+  theirs: number;
+};
+
+export type BlindSpot = {
+  title: string;
+  subtitle: string | null;
+  href: string;
+  coverUrl: string | null;
+  score: number;
+};
+
+export type HeadToHead = {
+  /** False when there isn't enough in common yet; only `shared` means anything. */
+  ready: boolean;
+  percent: number;
+  shared: number;
+  /** Rated exactly the same. */
+  identical: number;
+  /** Within a point of each other. */
+  close: number;
+  /** Three or more apart — the arguments. */
+  apart: number;
+  clashes: Clash[];
+  agreements: Clash[];
+  /** They rate it highly and you have never rated it. */
+  fromThem: BlindSpot[];
+  /** You rate it highly and they have never rated it. */
+  fromYou: BlindSpot[];
+};
+
+export type TasteTwin = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  percent: number;
+  shared: number;
+  /** Something you both love, to open the conversation with. */
+  agreement: { title: string; href: string; yours: number; theirs: number } | null;
+  following: boolean;
+};
+
+export type Receipt = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover_art_url: string | null;
+  /** What they gave it, and when. */
+  score: number;
+  rated_at: string;
+  /** Everybody else's average now, if anybody else has rated it. */
+  everyone: number | null;
+};
+
+/** `GET users/[username]/badges`: the profile's badges row and the whole board. */
+export type BadgesPage = {
+  profile: PublicProfile;
+  isSelf: boolean;
+  /** The row on the profile: each ladder's highest tier, then the solo badges. */
+  badges: Badge[];
+  board: BadgeBoard;
+};
+
+/** `GET users/[username]/milestone/[count]`, a milestone's share card. */
+export type MilestonePage = { card: MilestoneCard; isSelf: boolean };
+
+/** `GET users/[username]/mixtape/[month]` */
+export type MixtapePage = {
+  profile: PublicProfile;
+  isSelf: boolean;
+  mixtape: Mixtape;
+  /** The month before, always there. */
+  previous: string;
+  /** The month after; null when that would be in the future. */
+  next: string | null;
+};
+
+/** `GET users/[username]/ranks/[artist]`, one person's ranking of an artist's albums. */
+export type RankingPage = {
+  profile: PublicProfile;
+  isSelf: boolean;
+  artist: ArtistRef;
+  /** Best first; a tie goes to the older record. */
+  ranked: RankedAlbum[];
+  /** How many albums the artist has, so a ranking can say how complete it is. */
+  total: number;
+};
+
+/** `GET users/[username]/taste`, how somebody rates. */
+export type TastePage = {
+  profile: PublicProfile;
+  isSelf: boolean;
+  /** Null until there's enough to judge. */
+  style: RatingStyle | null;
+  /** How many records with other scores it takes before there is. */
+  enough: number;
+};
+
+/** `GET users/[username]/vs`, the signed-in person against somebody else. */
+export type HeadToHeadPage = {
+  profile: PublicProfile;
+  head: HeadToHead | null;
+  /** How many records in common it takes before it's ready. */
+  minimum: number;
+};
+
+/** `GET goat?kind=`, the GOAT builder. */
+export type GoatPage = { kind: PickKind; picks: TopPick[]; suggestions: PickSuggestions };
+
+/** `GET artists/[mbid]/gauntlet`, what's left of a Gauntlet run. */
+export type GauntletPage = {
+  artist: ArtistRef;
+  /** The albums still to rate, oldest first, as Stack cards. */
+  run: StackAlbum[];
+  /** Every album the artist has. */
+  total: number;
+};
+
+/** `GET me/home`, what Home adds to the feed. */
+export type HomeExtras = {
+  /** This week's taste twin; null when nobody's close enough. */
+  twin: TasteTwin | null;
+  /** An old score to stand by or change; null when there isn't one old enough. */
+  receipt: (Receipt & { howLongAgo: string }) | null;
+};

@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedArtistAlbums } from "@/lib/catalog";
 import { hitsForAlbums, type StackAlbum } from "@/lib/stack";
 import type { SetProgress } from "@/lib/app-api";
+import type { RankedAlbum } from "@/lib/app-api";
+
+export type { RankedAlbum };
 
 export type { SetProgress };
 
@@ -15,14 +18,6 @@ export type { SetProgress };
  * album ratings, so a Gauntlet run and rating albums one page at a time end in
  * exactly the same place.
  */
-
-export type RankedAlbum = {
-  mbid: string;
-  title: string;
-  year: string | null;
-  cover: string | null;
-  score: number;
-};
 
 /** How many of an artist's albums somebody has rated. */
 export async function getSetProgress(userId: string, albumMbids: string[]): Promise<SetProgress> {

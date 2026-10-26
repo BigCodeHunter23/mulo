@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
+import type { Receipt } from "@/lib/app-api";
+
+export type { Receipt };
 
 /**
  * Receipts: a score you gave a while ago, put back in front of you.
@@ -22,18 +25,6 @@ const SETTLED_DAYS = 30;
 
 /** How many of the oldest to choose between, so it isn't the same one daily. */
 const CANDIDATES = 8;
-
-export type Receipt = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover_art_url: string | null;
-  /** What they gave it, and when. */
-  score: number;
-  rated_at: string;
-  /** Everybody else's average now, if anybody else has rated it. */
-  everyone: number | null;
-};
 
 type Row = {
   release_mbid: string;

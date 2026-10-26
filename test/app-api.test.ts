@@ -82,6 +82,9 @@ const lib = vi.hoisted(() => ({
   currentDrop: vi.fn(),
   getDropResults: vi.fn(),
   getGuessGame: vi.fn(),
+  // collection
+  getTopPicks: vi.fn(),
+  getTasteMatch: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -177,6 +180,8 @@ vi.mock("@/lib/drop", () => ({
   getDropResults: lib.getDropResults,
 }));
 vi.mock("@/lib/guess", () => ({ getGuessGame: lib.getGuessGame }));
+vi.mock("@/lib/top-picks", () => ({ getTopPicks: lib.getTopPicks }));
+vi.mock("@/lib/taste", () => ({ getTasteMatch: lib.getTasteMatch }));
 
 /** Stand-ins for the website's own actions, which the writes hand straight to. */
 const actions = vi.hoisted(() => ({
@@ -1162,6 +1167,47 @@ describe("GET users/[username]", () => {
     lib.getUserFeed.mockResolvedValue([]);
     lib.getHighestRatedAlbums.mockResolvedValue([]);
     lib.getStreak.mockResolvedValue({ days: 3, today: true, best: 9 });
+    lib.getTopPicks.mockResolvedValue([]);
+    lib.getTasteMatch.mockResolvedValue(null);
+  });
+
+  const PICK = { mbid: MBID, title: "Kid A", subtitle: "Radiohead", image: null };
+  const MATCH = { percent: 81, shared: 12, clash: null };
+  const SOMEONE = { id: "a3d0a1c4-0000-4000-8000-000000000001", email: null };
+
+  it("answers their GOAT to anyone, as the page shows it", async () => {
+    lib.getTopPicks.mockImplementation(async (_id: string, kind: string) =>
+      kind === "album" ? [PICK] : [],
+    );
+    const body = await (await profile()).json();
+    expect(body.goat).toEqual({ artists: [], albums: [PICK] });
+    expect(lib.getTopPicks).toHaveBeenCalledWith(OTHER, "artist");
+  });
+
+  it("answers the taste match to somebody signed in looking at someone else", async () => {
+    caller.token = "good";
+    caller.user = SOMEONE;
+    lib.getTasteMatch.mockResolvedValue(MATCH);
+    const body = await (await profile()).json();
+    expect(body.taste).toEqual(MATCH);
+    expect(lib.getTasteMatch).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("leaves the taste match out signed out and on your own profile", async () => {
+    lib.getTasteMatch.mockResolvedValue(MATCH);
+    expect((await (await profile()).json()).taste).toBeNull();
+    signIn(); // USER is OTHER, the profile's own id
+    expect((await (await profile()).json()).taste).toBeNull();
+    expect(lib.getTasteMatch).not.toHaveBeenCalled();
+  });
+
+  it("shows no taste match, rather than no profile, when it can't be worked out", async () => {
+    caller.token = "good";
+    caller.user = SOMEONE;
+    lib.getTasteMatch.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).taste).toBeNull();
   });
 
   it("answers the profile's core signed out, without their listening", async () => {
