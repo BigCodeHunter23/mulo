@@ -185,6 +185,11 @@ const actions = vi.hoisted(() => ({
   saveReview: vi.fn(),
   setFollowing: vi.fn(),
   saveProfile: vi.fn(),
+  castVote: vi.fn(),
+  postTake: vi.fn(),
+  deleteTake: vi.fn(),
+  nominateMatchup: vi.fn(),
+  backNomination: vi.fn(),
 }));
 
 vi.mock("@/app/profile/actions", () => ({ saveProfile: actions.saveProfile }));
@@ -195,6 +200,13 @@ vi.mock("@/app/ratings/actions", () => ({
   saveReview: actions.saveReview,
 }));
 vi.mock("@/app/u/[username]/actions", () => ({ setFollowing: actions.setFollowing }));
+vi.mock("@/app/versus/actions", () => ({
+  castVote: actions.castVote,
+  postTake: actions.postTake,
+  deleteTake: actions.deleteTake,
+  nominateMatchup: actions.nominateMatchup,
+  backNomination: actions.backNomination,
+}));
 
 const { TOO_MANY } = await import("@/lib/rate-limit");
 
@@ -1103,6 +1115,51 @@ describe("writes", () => {
           params({ userId: OTHER }),
         ),
     ],
+    [
+      "POST versus/picks",
+      async () =>
+        (await import("@/app/api/app/v1/versus/picks/route")).POST(
+          json("versus/picks", "POST", { matchupId: 7, pick: "left" }),
+        ),
+    ],
+    [
+      "POST versus/takes",
+      async () =>
+        (await import("@/app/api/app/v1/versus/takes/route")).POST(
+          json("versus/takes", "POST", { matchupId: 7, body: "Easy." }),
+        ),
+    ],
+    [
+      "DELETE versus/takes/[id]",
+      async () =>
+        (await import("@/app/api/app/v1/versus/takes/[id]/route")).DELETE(
+          request("versus/takes/3", { method: "DELETE" }),
+          params({ id: "3" }),
+        ),
+    ],
+    [
+      "POST versus/nominations",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/route")).POST(
+          json("versus/nominations", "POST", { left: MBID, right: OTHER }),
+        ),
+    ],
+    [
+      "PUT versus/nominations/[id]/back",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/[id]/back/route")).PUT(
+          request("versus/nominations/5/back", { method: "PUT" }),
+          params({ id: "5" }),
+        ),
+    ],
+    [
+      "DELETE versus/nominations/[id]/back",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/[id]/back/route")).DELETE(
+          request("versus/nominations/5/back", { method: "DELETE" }),
+          params({ id: "5" }),
+        ),
+    ],
   ];
 
   it.each(writes)("%s needs a token, and touches nothing without one", async (_name, call) => {
@@ -1154,6 +1211,67 @@ describe("writes", () => {
       params({ userId: MBID }),
     );
     expect(actions.setFollowing).toHaveBeenCalledWith(MBID, "sam", false);
+  });
+
+  it("hands a pick straight to castVote", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    await POST(json("versus/picks", "POST", { matchupId: 7, pick: "right" }));
+    expect(actions.castVote).toHaveBeenCalledWith(7, "right");
+  });
+
+  it("refuses a pick of neither side, without asking castVote", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 7, pick: "middle" }));
+    expect(response.status).toBe(400);
+    expect(actions.castVote).not.toHaveBeenCalled();
+  });
+
+  it("passes on an earlier pick and the split with the refusal", async () => {
+    signIn();
+    const refusal = {
+      ok: false,
+      error: "You already picked in this one.",
+      mine: "left",
+      tally: { left: 2, right: 1, friends: { left: [], right: [] } },
+    };
+    actions.castVote.mockResolvedValueOnce(refusal);
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 7, pick: "right" }));
+    expect(await response.json()).toEqual(refusal);
+  });
+
+  it("hands a take straight to postTake, and its removal to deleteTake", async () => {
+    signIn();
+    const takes = await import("@/app/api/app/v1/versus/takes/route");
+    await takes.POST(json("versus/takes", "POST", { matchupId: 7, body: "Easy." }));
+    expect(actions.postTake).toHaveBeenCalledWith(7, "Easy.");
+
+    const take = await import("@/app/api/app/v1/versus/takes/[id]/route");
+    await take.DELETE(request("versus/takes/3", { method: "DELETE" }), params({ id: "3" }));
+    expect(actions.deleteTake).toHaveBeenCalledWith(3);
+  });
+
+  it("hands a nomination straight to nominateMatchup", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/nominations/route");
+    await POST(json("versus/nominations", "POST", { left: MBID, right: OTHER }));
+    expect(actions.nominateMatchup).toHaveBeenCalledWith(MBID, OTHER);
+  });
+
+  it("backs a nomination, and takes the backing back", async () => {
+    signIn();
+    const back = await import("@/app/api/app/v1/versus/nominations/[id]/back/route");
+    await back.PUT(request("versus/nominations/5/back", { method: "PUT" }), params({ id: "5" }));
+    await back.DELETE(
+      request("versus/nominations/5/back", { method: "DELETE" }),
+      params({ id: "5" }),
+    );
+    expect(actions.backNomination.mock.calls).toEqual([
+      [5, true],
+      [5, false],
+    ]);
   });
 
   it("passes on the action's own refusal, in its words", async () => {
