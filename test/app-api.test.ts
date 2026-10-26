@@ -73,6 +73,15 @@ const lib = vi.hoisted(() => ({
   isHidden: vi.fn(),
   // daily habits
   getStreak: vi.fn(),
+  sydneyDay: vi.fn(),
+  getTodaysMatchup: vi.fn(),
+  getMatchupForDay: vi.fn(),
+  getVersusView: vi.fn(),
+  getTakes: vi.fn(),
+  getNominations: vi.fn(),
+  currentDrop: vi.fn(),
+  getDropResults: vi.fn(),
+  getGuessGame: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -153,6 +162,21 @@ vi.mock("@/lib/social", () => ({
 }));
 vi.mock("@/lib/blocks", () => ({ isHidden: lib.isHidden }));
 vi.mock("@/lib/streak", () => ({ getStreak: lib.getStreak }));
+vi.mock("@/lib/versus", async (original) => ({
+  // The day arithmetic is the real one; the clock and the reads are stand-ins.
+  ...(await original<typeof import("@/lib/versus")>()),
+  sydneyDay: lib.sydneyDay,
+  getTodaysMatchup: lib.getTodaysMatchup,
+  getMatchupForDay: lib.getMatchupForDay,
+  getVersusView: lib.getVersusView,
+}));
+vi.mock("@/lib/versus-takes", () => ({ getTakes: lib.getTakes }));
+vi.mock("@/lib/nominations", () => ({ getNominations: lib.getNominations }));
+vi.mock("@/lib/drop", () => ({
+  currentDrop: lib.currentDrop,
+  getDropResults: lib.getDropResults,
+}));
+vi.mock("@/lib/guess", () => ({ getGuessGame: lib.getGuessGame }));
 
 /** Stand-ins for the website's own actions, which the writes hand straight to. */
 const actions = vi.hoisted(() => ({
@@ -753,6 +777,153 @@ describe("read limit", () => {
     const stack = (await import("@/app/api/app/v1/stack/route")).GET(request("stack"));
     expect((await stack).status).toBe(429);
     expect(lib.getStack).not.toHaveBeenCalled();
+  });
+});
+
+const TODAY = "2026-10-26";
+
+function matchup(day: string, id = 7) {
+  const side = (mbid: string, name: string) => ({ mbid, name, image: null });
+  return {
+    id,
+    day,
+    title: "King of New York",
+    tagline: "Two kings, one city",
+    left: side(MBID, "Nas"),
+    right: side(OTHER, "Jay-Z"),
+  };
+}
+
+function view(day: string, over: Record<string, unknown> = {}) {
+  return {
+    matchup: matchup(day),
+    closed: day < TODAY,
+    closesAt: "2026-10-26T13:00:00.000Z",
+    now: 0,
+    signedIn: false,
+    mine: null,
+    tally: null,
+    friendsPicked: 0,
+    ...over,
+  };
+}
+
+const TAKE = (id: number) => ({ id, body: `take ${id}` });
+const SPLIT = { left: 3, right: 1, friends: { left: [], right: [] } };
+
+describe("GET versus", () => {
+  const versus = async () => (await import("@/app/api/app/v1/versus/route")).GET();
+
+  beforeEach(() => {
+    lib.sydneyDay.mockReturnValue(TODAY);
+    lib.getTodaysMatchup.mockResolvedValue(matchup(TODAY));
+    lib.getMatchupForDay.mockResolvedValue(matchup("2026-10-25", 6));
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      m.day === TODAY ? view(TODAY) : view(m.day, { tally: SPLIT }),
+    );
+    lib.getTakes.mockResolvedValue({ available: true, takes: [TAKE(1), TAKE(2)] });
+    lib.getNominations.mockResolvedValue([{ id: 5 }]);
+  });
+
+  it("answers today's matchup, yesterday's result and the nominations", async () => {
+    const body = await (await versus()).json();
+    expect(body.today).toEqual(view(TODAY));
+    expect(body.yesterday).toEqual(view("2026-10-25", { tally: SPLIT }));
+    expect(body.nominations).toEqual([{ id: 5 }]);
+    expect(lib.getMatchupForDay).toHaveBeenCalledWith("2026-10-25");
+    expect(lib.getNominations).toHaveBeenCalledWith(null);
+  });
+
+  it("asks for the nominations as the signed-in person, to mark the ones they back", async () => {
+    signIn();
+    await versus();
+    expect(lib.getNominations).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("holds the takes back until you pick, but says how many there are", async () => {
+    const body = await (await versus()).json();
+    expect(body.takes).toEqual({ available: true, count: 2, takes: [] });
+  });
+
+  it("shows the takes once you've picked", async () => {
+    lib.getVersusView.mockResolvedValue(view(TODAY, { mine: "left", tally: SPLIT }));
+    const body = await (await versus()).json();
+    expect(body.takes).toEqual({ available: true, count: 2, takes: [TAKE(1), TAKE(2)] });
+    expect(lib.getTakes).toHaveBeenCalledWith(7);
+  });
+
+  it("leaves yesterday out when nobody picked in it", async () => {
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      view(m.day, { tally: { left: 0, right: 0, friends: { left: [], right: [] } } }),
+    );
+    expect((await (await versus()).json()).yesterday).toBeNull();
+  });
+
+  it("leaves yesterday out when there was no matchup", async () => {
+    lib.getMatchupForDay.mockResolvedValue(null);
+    expect((await (await versus()).json()).yesterday).toBeNull();
+  });
+
+  it("answers an empty page when today's matchup couldn't be set up", async () => {
+    lib.getTodaysMatchup.mockResolvedValue(null);
+    expect(await (await versus()).json()).toEqual({
+      today: null,
+      takes: { available: false, count: 0, takes: [] },
+      yesterday: null,
+      nominations: [],
+    });
+    expect(lib.getTakes).not.toHaveBeenCalled();
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await versus()).status).toBe(429);
+    expect(lib.getTodaysMatchup).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET versus/[day]", () => {
+  const day = async (value: string) =>
+    (await import("@/app/api/app/v1/versus/[day]/route")).GET(
+      request(`versus/${value}`),
+      params({ day: value }),
+    );
+
+  beforeEach(() => {
+    lib.sydneyDay.mockReturnValue(TODAY);
+    lib.getTodaysMatchup.mockResolvedValue(matchup(TODAY));
+    lib.getMatchupForDay.mockResolvedValue(matchup("2026-10-20"));
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      view(m.day, { tally: SPLIT }),
+    );
+    lib.getTakes.mockResolvedValue({ available: true, takes: [TAKE(1)] });
+  });
+
+  it("answers a finished day with its result and every take", async () => {
+    const body = await (await day("2026-10-20")).json();
+    expect(lib.getMatchupForDay).toHaveBeenCalledWith("2026-10-20");
+    expect(body).toEqual({
+      view: view("2026-10-20", { tally: SPLIT }),
+      takes: { available: true, count: 1, takes: [TAKE(1)] },
+    });
+  });
+
+  it("answers today from today's matchup", async () => {
+    await day(TODAY);
+    expect(lib.getTodaysMatchup).toHaveBeenCalled();
+    expect(lib.getMatchupForDay).not.toHaveBeenCalled();
+  });
+
+  it.each(["2026-10-27", "yesterday", "2026-1-5"])("is 404 for %s", async (value) => {
+    const response = await day(value);
+    expect(response.status).toBe(404);
+    expect(lib.getMatchupForDay).not.toHaveBeenCalled();
+  });
+
+  it("is 404 for a day with no matchup, without reading takes", async () => {
+    lib.getMatchupForDay.mockResolvedValue(null);
+    expect((await day("2026-10-20")).status).toBe(404);
+    expect(lib.getTakes).not.toHaveBeenCalled();
   });
 });
 
