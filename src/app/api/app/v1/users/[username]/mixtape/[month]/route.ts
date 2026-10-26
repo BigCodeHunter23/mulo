@@ -15,7 +15,8 @@ export const GET = appRoute(
 
     const { username, month } = await params;
     const now = currentMonth();
-    // Months are YYYY-MM, so they compare as strings; nothing's rated in the future.
+    // Months are YYYY-MM, so they compare as strings. Nothing's rated in the
+    // future, so unlike the page (an empty tape) a future month is a 404.
     if (!MONTH_PATTERN.test(month) || month > now) return appError(404, NO_MONTH);
 
     const profile = await visibleProfile(username);

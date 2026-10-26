@@ -5,7 +5,7 @@ import type { SaveResult } from "@/lib/app-api";
 import { appJson, appRoute, readBody, signedInCaller, type Params } from "@/lib/app-route";
 
 /** The shape only; `saveRankOff` checks the month and the record, as it does for the website. */
-const rankOffBody = z.object({ kind: z.enum(["album", "song"]), mbid: z.string() });
+const rankOffBody = z.object({ kind: z.enum(["album", "song"]), mbid: z.string().max(64) });
 
 /** Crowns a rank-off's winner on your own Mixtape, as its last round does. */
 export const PUT = appRoute(async (request: NextRequest, { params }: Params<{ month: string }>) => {

@@ -248,6 +248,12 @@ describe("GET users/[username]/milestone/[count]", () => {
     expect(lib.getMilestoneCard).toHaveBeenCalledWith("alex", 10);
   });
 
+  it.each(["1e1", " 10", "0x0a"])("is 404 for %s, without looking", async (count) => {
+    lib.getMilestoneCard.mockResolvedValue(CARD);
+    expect((await milestone(count)).status).toBe(404);
+    expect(lib.getMilestoneCard).not.toHaveBeenCalled();
+  });
+
   it("is 404 for a count that isn't one, or that they haven't reached", async () => {
     lib.getMilestoneCard.mockResolvedValue(null);
     const response = await milestone("11");
@@ -468,6 +474,7 @@ describe("goat", () => {
     signIn();
     expect((await save({ kind: "artist", mbids: "x" })).status).toBe(400);
     expect((await save({ kind: "artist", mbids: Array(51).fill(MBID) })).status).toBe(400);
+    expect((await save({ kind: "artist", mbids: ["x".repeat(65)] })).status).toBe(400);
     expect(actions.saveTopPicks).not.toHaveBeenCalled();
   });
 });

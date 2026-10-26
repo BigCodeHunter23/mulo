@@ -16,7 +16,9 @@ const NOT_FOUND = "We couldn't find that artist.";
 
 /**
  * The albums an artist's Gauntlet still has to get through, oldest first
- * (`artist/[mbid]/gauntlet`). Rating them is ordinary rating.
+ * (`artist/[mbid]/gauntlet`). Rating them is ordinary rating. An empty run
+ * with a `total` above nothing means every album is rated: where the page
+ * redirects to the ranking, the app goes to `users/[you]/ranks/[mbid]`.
  */
 export const GET = appRoute(async (_request: NextRequest, { params }: Params<{ mbid: string }>) => {
   const user = await signedInCaller();

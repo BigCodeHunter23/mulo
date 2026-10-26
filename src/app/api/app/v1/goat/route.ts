@@ -34,7 +34,7 @@ export const GET = appRoute(async (request: NextRequest) => {
 });
 
 /** The same limit as the action, which keeps the first ten real ids. */
-const saveBody = z.object({ kind: kindSchema, mbids: z.array(z.string()).max(50) });
+const saveBody = z.object({ kind: kindSchema, mbids: z.array(z.string().max(64)).max(50) });
 
 /** Saves the whole ranked list, as the builder does after every change. */
 export const PUT = appRoute(async (request: NextRequest) => {
