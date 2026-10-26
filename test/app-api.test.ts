@@ -939,6 +939,138 @@ describe("GET versus/[day]", () => {
   });
 });
 
+describe("GET drop", () => {
+  const drop = async () => (await import("@/app/api/app/v1/drop/route")).GET();
+  const DROP = {
+    week: 3,
+    album: { mbid: MBID, title: "Blonde", artist: "Frank Ocean" },
+    opensAt: "2026-10-25T13:00:00.000Z",
+    closesAt: "2026-11-01T13:00:00.000Z",
+    now: 0,
+  };
+  const SPREAD = [0, 0, 0, 0, 0, 1, 1, 2, 0, 0];
+  const review = (id: number) => ({ id, username: `r${id}`, review: "Good" });
+
+  beforeEach(() => {
+    lib.currentDrop.mockReturnValue(DROP);
+    lib.getCachedRelease.mockResolvedValue({ cover_art_url: "c", release_date: "2016-08-20" });
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: null,
+    });
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([review(1), review(2), review(3)]);
+    lib.getReactions.mockResolvedValue({
+      1: { love: 1, dislike: 0, mine: null },
+      2: { love: 0, dislike: 0, mine: null },
+      3: { love: 5, dislike: 0, mine: null },
+    });
+  });
+
+  it("holds the spread, the average and the reviews back until you've rated it", async () => {
+    const body = await (await drop()).json();
+    expect(body).toEqual({
+      drop: DROP,
+      cover: "c",
+      year: "2016",
+      own: null,
+      results: { count: 4, thisWeek: 2, yours: null, average: null, spread: null },
+      reviews: [],
+      reactions: {},
+    });
+    expect(lib.getDropResults).toHaveBeenCalledWith(DROP);
+    expect(lib.getReactions).not.toHaveBeenCalled();
+  });
+
+  it("shows how it's landing, and the most loved reviews, once you have", async () => {
+    signIn();
+    lib.getOwnRating.mockResolvedValue({ score: 8, review: null });
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: 8,
+    });
+    const body = await (await drop()).json();
+    expect(body.own).toEqual({ score: 8, review: null });
+    expect(body.results).toEqual({ count: 4, thisWeek: 2, yours: 8, average: 7.5, spread: SPREAD });
+    expect(body.reviews.map((r: { id: number }) => r.id)).toEqual([3, 1, 2]);
+    expect(Object.keys(body.reactions)).toEqual(["1", "2", "3"]);
+    expect(lib.getOwnRating).toHaveBeenCalledWith("album", MBID);
+    expect(lib.getReviews).toHaveBeenCalledWith("album", MBID);
+    expect(lib.getReactions).toHaveBeenCalledWith("album", [1, 2, 3]);
+  });
+
+  it("keeps the six most loved reviews, and only their reactions", async () => {
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: 8,
+    });
+    const reviews = [1, 2, 3, 4, 5, 6, 7, 8].map(review);
+    lib.getReviews.mockResolvedValue(reviews);
+    lib.getReactions.mockResolvedValue(
+      Object.fromEntries(reviews.map(({ id }) => [id, { love: id, dislike: 0, mine: null }])),
+    );
+    const body = await (await drop()).json();
+    expect(body.reviews.map((r: { id: number }) => r.id)).toEqual([8, 7, 6, 5, 4, 3]);
+    expect(Object.keys(body.reactions).sort()).toEqual(["3", "4", "5", "6", "7", "8"]);
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await drop()).status).toBe(429);
+    expect(lib.getDropResults).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET guess", () => {
+  const guess = async () => (await import("@/app/api/app/v1/guess/route")).GET();
+
+  it("deals a fresh game of ten", async () => {
+    lib.getGuessGame.mockResolvedValue([{ mbid: MBID, score: 7.4 }]);
+    const response = await guess();
+    expect(await response.json()).toEqual({ albums: [{ mbid: MBID, score: 7.4 }] });
+    expect(lib.getGuessGame).toHaveBeenCalledWith(10);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await guess()).status).toBe(429);
+    expect(lib.getGuessGame).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET me/streak", () => {
+  const streak = async () => (await import("@/app/api/app/v1/me/streak/route")).GET();
+
+  it("answers the signed-in person's streak", async () => {
+    signIn();
+    lib.getStreak.mockResolvedValue({ days: 4, today: false, best: 6 });
+    expect(await (await streak()).json()).toEqual({ days: 4, today: false, best: 6 });
+    expect(lib.getStreak).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("needs somebody signed in", async () => {
+    expect((await streak()).status).toBe(401);
+    expect(lib.getStreak).not.toHaveBeenCalled();
+  });
+
+  it("is limited like the other reads", async () => {
+    signIn();
+    caller.limited = true;
+    expect((await streak()).status).toBe(429);
+    expect(lib.getStreak).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET ratings", () => {
   const ratings = async (query = "") =>
     (await import("@/app/api/app/v1/ratings/route")).GET(request(`ratings${query}`));
