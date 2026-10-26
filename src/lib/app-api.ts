@@ -1,6 +1,7 @@
 import type { FriendScore, SearchFriends } from "@/lib/friend-scores";
 import type { RatingKind } from "@/lib/rating-kinds";
-import type { VersusMatchup, VersusSideKey } from "@/lib/versus-shared";
+import type { DropAlbum } from "@/lib/drop-lineup";
+import type { VersusMatchup, VersusSideKey, VersusTally, VersusView } from "@/lib/versus-shared";
 
 /**
  * Every shape the app API (`src/app/api/app/v1`) answers with, and the ones
@@ -350,7 +351,62 @@ export type SetProgress = {
   remaining: string[];
 };
 
-// --- What the website's actions answer (ratings/actions.ts, u/[username]/actions.ts) ---
+// --- Daily habits (versus-takes.ts, nominations.ts, drop.ts, guess.ts, streak.ts) ---
+
+export type VersusTake = {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+  /** The side they picked. */
+  side: VersusSideKey | null;
+  reactions: ReactionSummary;
+  mine: boolean;
+};
+
+export type Nomination = {
+  id: number;
+  left: { mbid: string; name: string; image: string | null };
+  right: { mbid: string; name: string; image: string | null };
+  backers: number;
+  /** Whether the signed-in person backs it. */
+  mine: boolean;
+};
+
+export type Drop = {
+  /** Counting from one, forever — the lineup loops but the weeks don't. */
+  week: number;
+  album: DropAlbum;
+  opensAt: string;
+  closesAt: string;
+  /** The moment this was worked out, for the countdown to start from. */
+  now: number;
+};
+
+export type GuessAlbum = {
+  mbid: string;
+  title: string;
+  artist: string | null;
+  cover: string | null;
+  year: string | null;
+  score: number;
+};
+
+export type Streak = {
+  /** Consecutive days, ending today or yesterday. */
+  days: number;
+  /** Whether today already counts. If not, the streak ends at midnight. */
+  today: boolean;
+  /** The longest run in the window looked at. */
+  best: number;
+};
+
+// --- What the website's actions answer (ratings/actions.ts, u/[username]/actions.ts, versus/actions.ts) ---
 
 export type RatingResult =
   | {
@@ -382,6 +438,11 @@ export type RatingResult =
     };
 
 export type FollowResult = { ok: true } | { ok: false; error: string; needsLogin?: boolean };
+
+/** A Versus pick. A refusal for having already picked carries that pick and the split. */
+export type PickResult =
+  | { ok: true; mine: VersusSideKey; tally: VersusTally }
+  | { ok: false; error: string; mine?: VersusSideKey; tally?: VersusTally };
 
 // --- The app API's own answers ---
 
@@ -489,6 +550,8 @@ export type ProfilePage = {
   recent: FeedItem[];
   /** Their highest-rated albums, the top shelf. */
   highest: AlbumRating[];
+  /** Days in a row they've done something on MULO. */
+  streak: Streak;
 };
 
 /**
@@ -527,3 +590,52 @@ export type StackRun = {
   decades: number[];
   genres: FilterOption[];
 };
+
+/** A Versus's takes, as far as the viewer may see them. */
+export type VersusTakes = {
+  /** False until the takes table exists, so the section stays hidden. */
+  available: boolean;
+  /** How many there are, shown even before the viewer picks. */
+  count: number;
+  /** Empty until the viewer picks or the matchup closes, so nobody's talked into a side. */
+  takes: VersusTake[];
+};
+
+/** `GET versus`, the Versus page (`versus/VersusScreen.tsx`). */
+export type VersusPage = {
+  /** Null when today's matchup couldn't be set up. */
+  today: VersusView | null;
+  takes: VersusTakes;
+  /** Yesterday's result; null when there wasn't one or nobody picked. */
+  yesterday: VersusView | null;
+  /** The most-backed nominations. */
+  nominations: Nomination[];
+};
+
+/** `GET versus/[day]`, one day's matchup: today's, or a finished one. */
+export type VersusDayPage = { view: VersusView; takes: VersusTakes };
+
+/** `GET drop`, The Drop (`drop/page.tsx`). */
+export type DropPage = {
+  drop: Drop;
+  cover: string | null;
+  year: string | null;
+  /** The signed-in person's rating of the week's album. */
+  own: OwnRating;
+  results: {
+    count: number;
+    /** How many rated it during this drop's week. */
+    thisWeek: number;
+    /** The viewer's score; until there is one, the spread and average stay hidden. */
+    yours: number | null;
+    average: number | null;
+    /** How many gave each score, 1 to 10. */
+    spread: number[] | null;
+  };
+  /** The six most loved reviews, once the viewer has rated. */
+  reviews: Review[];
+  reactions: Record<number, ReactionSummary>;
+};
+
+/** `GET guess`, a fresh game of Guess the score. */
+export type GuessGame = { albums: GuessAlbum[] };

@@ -11,7 +11,12 @@ const source = readFileSync(new URL("./app-api.ts", import.meta.url), "utf8");
 const imports = [...source.matchAll(/^import\s+(type\s+)?[^;]*?from\s+"([^"]+)";/gm)];
 
 /** Framework-free files the app copies alongside this one. */
-const SHARED = ["@/lib/friend-scores", "@/lib/rating-kinds", "@/lib/versus-shared"];
+const SHARED = [
+  "@/lib/friend-scores",
+  "@/lib/drop-lineup",
+  "@/lib/rating-kinds",
+  "@/lib/versus-shared",
+];
 
 describe("app-api.ts", () => {
   it("imports types only, and only from files the app also copies", () => {

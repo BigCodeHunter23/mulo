@@ -3,16 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, getTally } from "@/lib/versus";
-import { TAKE_LIMIT, type VersusSideKey, type VersusTally } from "@/lib/versus-shared";
+import { TAKE_LIMIT, type VersusSideKey } from "@/lib/versus-shared";
+import type { PickResult } from "@/lib/app-api";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 const isRowId = (value: unknown) => rowIdSchema.safeParse(value).success;
 const isMbid = (value: unknown): value is string => mbidSchema.safeParse(value).success;
 
-export type PickResult =
-  | { ok: true; mine: VersusSideKey; tally: VersusTally }
-  | { ok: false; error: string; mine?: VersusSideKey; tally?: VersusTally };
+export type { PickResult };
 
 const TRY_AGAIN = "Couldn't save that. Please try again.";
 

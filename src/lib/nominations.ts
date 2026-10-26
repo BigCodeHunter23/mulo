@@ -1,5 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import type { Nomination } from "@/lib/app-api";
+
+export type { Nomination };
 
 /**
  * Versus nominations: matchups people want to see, most-backed first
@@ -7,15 +10,6 @@ import { createClient } from "@/lib/supabase/server";
  * on the left; nominating one that already exists simply backs it. The owner
  * reads this list when choosing the next pairs for `versus-pairs.ts`.
  */
-
-export type Nomination = {
-  id: number;
-  left: { mbid: string; name: string; image: string | null };
-  right: { mbid: string; name: string; image: string | null };
-  backers: number;
-  /** Whether the signed-in person backs it. */
-  mine: boolean;
-};
 
 export async function getNominations(userId: string | null, limit = 20): Promise<Nomination[]> {
   const supabase = await createClient();

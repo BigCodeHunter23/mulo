@@ -5,6 +5,7 @@ import { isHidden } from "@/lib/blocks";
 import { getUserFeed } from "@/lib/feed";
 import { getHighestRatedAlbums } from "@/lib/ratings";
 import { getFollowState, getProfileByUsername, getProfileStats } from "@/lib/social";
+import { getStreak } from "@/lib/streak";
 import { usernameSchema } from "@/lib/validation";
 
 const NOT_FOUND = "We couldn't find that person.";
@@ -29,12 +30,14 @@ export const GET = appRoute(
     if (!profile || (await isHidden(profile.id))) return appError(404, NOT_FOUND);
 
     const signedIn = Boolean(caller.user);
-    const [stats, follow, recent, highest] = await Promise.all([
+    const [stats, follow, recent, highest, streak] = await Promise.all([
       getProfileStats(profile.id),
       getFollowState(profile.id),
       signedIn ? getUserFeed(profile.id) : [],
       signedIn ? getHighestRatedAlbums(profile.id, 12) : [],
+      // Shown to anyone, as the flame on the page is.
+      getStreak(profile.id),
     ]);
-    return appJson<ProfilePage>({ profile, stats, follow, recent, highest });
+    return appJson<ProfilePage>({ profile, stats, follow, recent, highest, streak });
   },
 );

@@ -2,7 +2,10 @@ import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
 import { shiftDay, sydneyDay, sydneyMidnight } from "@/lib/versus";
-import { DROP_LINEUP, type DropAlbum } from "@/lib/drop-lineup";
+import { DROP_LINEUP } from "@/lib/drop-lineup";
+import type { Drop } from "@/lib/app-api";
+
+export type { Drop };
 
 /**
  * The Drop: one album a week that everybody rates together.
@@ -18,16 +21,6 @@ import { DROP_LINEUP, type DropAlbum } from "@/lib/drop-lineup";
 
 /** The Monday the first drop opened. Weeks count on from here. */
 const DROP_START = "2026-09-14";
-
-export type Drop = {
-  /** Counting from one, forever — the lineup loops but the weeks don't. */
-  week: number;
-  album: DropAlbum;
-  opensAt: string;
-  closesAt: string;
-  /** The moment this was worked out, for the countdown to start from. */
-  now: number;
-};
 
 export function currentDrop(now = new Date()): Drop {
   const today = sydneyDay(now);

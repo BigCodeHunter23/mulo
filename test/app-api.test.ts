@@ -71,6 +71,8 @@ const lib = vi.hoisted(() => ({
   listProfiles: vi.fn(),
   getFollowingIds: vi.fn(),
   isHidden: vi.fn(),
+  // daily habits
+  getStreak: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -150,6 +152,7 @@ vi.mock("@/lib/social", () => ({
   getFollowingIds: lib.getFollowingIds,
 }));
 vi.mock("@/lib/blocks", () => ({ isHidden: lib.isHidden }));
+vi.mock("@/lib/streak", () => ({ getStreak: lib.getStreak }));
 
 /** Stand-ins for the website's own actions, which the writes hand straight to. */
 const actions = vi.hoisted(() => ({
@@ -842,6 +845,7 @@ describe("GET users/[username]", () => {
     lib.getFollowState.mockResolvedValue({ signedIn: false, isSelf: false, isFollowing: false });
     lib.getUserFeed.mockResolvedValue([]);
     lib.getHighestRatedAlbums.mockResolvedValue([]);
+    lib.getStreak.mockResolvedValue({ days: 3, today: true, best: 9 });
   });
 
   it("answers the profile's core signed out, without their listening", async () => {
@@ -872,6 +876,12 @@ describe("GET users/[username]", () => {
   it("refuses a token that doesn't verify", async () => {
     caller.token = "expired";
     expect((await profile()).status).toBe(401);
+  });
+
+  it("answers their streak to anyone, as the flame on the page shows", async () => {
+    const body = await (await profile()).json();
+    expect(body.streak).toEqual({ days: 3, today: true, best: 9 });
+    expect(lib.getStreak).toHaveBeenCalledWith(OTHER);
   });
 
   it("is 404 for nobody by that name", async () => {

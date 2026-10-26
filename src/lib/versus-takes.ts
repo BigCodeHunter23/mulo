@@ -1,24 +1,11 @@
 import "server-only";
-import { getReactions, type ReactionSummary } from "@/lib/reactions";
+import type { VersusTake } from "@/lib/app-api";
+import { getReactions } from "@/lib/reactions";
 import { createPublicClient } from "@/lib/supabase/public";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { VersusSideKey } from "@/lib/versus-shared";
 
-export type VersusTake = {
-  id: number;
-  body: string;
-  createdAt: string;
-  author: {
-    id: string;
-    username: string;
-    display_name: string | null;
-    avatar_url: string | null;
-  };
-  /** The side they picked. */
-  side: VersusSideKey | null;
-  reactions: ReactionSummary;
-  mine: boolean;
-};
+export type { VersusTake };
 
 export type Takes = {
   /** False until the takes table exists, so the section can stay hidden. */
