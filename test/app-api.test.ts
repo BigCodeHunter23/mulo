@@ -982,6 +982,7 @@ describe("GET drop", () => {
       reactions: {},
     });
     expect(lib.getDropResults).toHaveBeenCalledWith(DROP);
+    expect(lib.getReviews).not.toHaveBeenCalled();
     expect(lib.getReactions).not.toHaveBeenCalled();
   });
 
@@ -1199,6 +1200,19 @@ describe("GET users/[username]", () => {
     expect(lib.getStreak).toHaveBeenCalledWith(OTHER);
   });
 
+  it("shows no flame, rather than no profile, when the streak can't be read", async () => {
+    lib.getStreak.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).streak).toEqual({ days: 0, today: false, best: 0 });
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await profile()).status).toBe(429);
+    expect(lib.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
   it("is 404 for nobody by that name", async () => {
     lib.getProfileByUsername.mockResolvedValue(null);
     expect((await profile()).status).toBe(404);
@@ -1404,6 +1418,31 @@ describe("writes", () => {
       [5, true],
       [5, false],
     ]);
+  });
+
+  it.each(["abc", "1e2", "0", ""])("refuses a take or nomination id of %j", async (id) => {
+    signIn();
+    const take = await import("@/app/api/app/v1/versus/takes/[id]/route");
+    const back = await import("@/app/api/app/v1/versus/nominations/[id]/back/route");
+    const removed = await take.DELETE(
+      request("versus/takes/x", { method: "DELETE" }),
+      params({ id }),
+    );
+    const backed = await back.PUT(
+      request("versus/nominations/x/back", { method: "PUT" }),
+      params({ id }),
+    );
+    expect([removed.status, backed.status]).toEqual([400, 400]);
+    expect(actions.deleteTake).not.toHaveBeenCalled();
+    expect(actions.backNomination).not.toHaveBeenCalled();
+  });
+
+  it("refuses a matchup that can't be one", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 1.5, pick: "left" }));
+    expect(response.status).toBe(400);
+    expect(actions.castVote).not.toHaveBeenCalled();
   });
 
   it("passes on the action's own refusal, in its words", async () => {

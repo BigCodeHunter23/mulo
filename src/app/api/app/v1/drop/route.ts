@@ -1,4 +1,4 @@
-import type { DropPage, ReactionSummary } from "@/lib/app-api";
+import type { DropPage, ReactionSummary, Review } from "@/lib/app-api";
 import { appCaller, appJson, appRoute, limitReads } from "@/lib/app-route";
 import { getCachedRelease } from "@/lib/catalog";
 import { currentDrop, getDropResults } from "@/lib/drop";
@@ -22,17 +22,18 @@ export const GET = appRoute(async () => {
 
   const drop = currentDrop();
   const { mbid } = drop.album;
-  const [release, results, own, reviews] = await Promise.all([
+  const [release, results, own] = await Promise.all([
     getCachedRelease(mbid),
     getDropResults(drop),
     getOwnRating("album", mbid),
-    getReviews("album", mbid),
   ]);
   const revealed = results.yours !== null;
 
-  let best: typeof reviews = [];
+  // The reviews are only read for somebody who'll see them.
+  let best: Review[] = [];
   let reactions: Record<number, ReactionSummary> = {};
   if (revealed) {
+    const reviews = await getReviews("album", mbid);
     const all = await getReactions(
       "album",
       reviews.map((review) => review.id),

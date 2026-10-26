@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type { ProfilePage } from "@/lib/app-api";
-import { appCaller, appError, appJson, appRoute, type Params } from "@/lib/app-route";
+import type { Streak } from "@/lib/app-api";
+import { appCaller, appError, appJson, appRoute, limitReads, type Params } from "@/lib/app-route";
 import { isHidden } from "@/lib/blocks";
 import { getUserFeed } from "@/lib/feed";
 import { getHighestRatedAlbums } from "@/lib/ratings";
@@ -9,6 +10,9 @@ import { getStreak } from "@/lib/streak";
 import { usernameSchema } from "@/lib/validation";
 
 const NOT_FOUND = "We couldn't find that person.";
+
+/** What the flame shows when the streak couldn't be worked out: nothing. */
+const NO_STREAK: Streak = { days: 0, today: false, best: 0 };
 
 /**
  * Somebody's profile: who they are, their numbers, whether you follow them,
@@ -22,6 +26,7 @@ export const GET = appRoute(
   async (_request: NextRequest, { params }: Params<{ username: string }>) => {
     const caller = await appCaller();
     if (caller instanceof Response) return caller;
+    await limitReads(caller.user);
 
     const { username } = await params;
     if (!usernameSchema.safeParse(username).success) return appError(404, NOT_FOUND);
@@ -35,8 +40,12 @@ export const GET = appRoute(
       getFollowState(profile.id),
       signedIn ? getUserFeed(profile.id) : [],
       signedIn ? getHighestRatedAlbums(profile.id, 12) : [],
-      // Shown to anyone, as the flame on the page is.
-      getStreak(profile.id),
+      // Shown to anyone, as the flame on the page is. It's decoration, so a
+      // failed read shows no flame rather than no profile.
+      getStreak(profile.id).catch((error: unknown) => {
+        console.error("[app-api] a streak failed:", error);
+        return NO_STREAK;
+      }),
     ]);
     return appJson<ProfilePage>({ profile, stats, follow, recent, highest, streak });
   },
