@@ -169,6 +169,8 @@ vi.mock("@/app/ratings/actions", () => ({
 }));
 vi.mock("@/app/u/[username]/actions", () => ({ setFollowing: actions.setFollowing }));
 
+const { TOO_MANY } = await import("@/lib/rate-limit");
+
 const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
 const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
 const USER = { id: OTHER, email: "someone@example.com" };
@@ -691,6 +693,63 @@ describe("GET stack", () => {
 
   it("is never kept by a cache: every run is new", async () => {
     expect((await stack()).headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
+describe("read limit", () => {
+  const discover = async () => (await import("@/app/api/app/v1/discover/route")).GET();
+
+  beforeEach(async () => {
+    const limits = await import("@/lib/rate-limit");
+    vi.mocked(limits.allowAddress).mockClear();
+    vi.mocked(limits.allowUser).mockClear();
+    lib.getHeavyRotation.mockResolvedValue(null);
+    for (const shelf of [
+      lib.newReleases,
+      lib.topRatedOnMulo,
+      lib.mostPlayedAlbums,
+      lib.artistsToExplore,
+      lib.getGlobalFeed,
+    ]) {
+      shelf.mockResolvedValue([]);
+    }
+    lib.getMyAlbumScores.mockResolvedValue(new Map());
+  });
+
+  it("turns a caller away past the limit, before reading anything", async () => {
+    caller.limited = true;
+    const response = await discover();
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({ ok: false, error: TOO_MANY });
+    expect(lib.newReleases).not.toHaveBeenCalled();
+  });
+
+  it("counts somebody signed out by their address", async () => {
+    const { allowAddress, allowUser } = await import("@/lib/rate-limit");
+    await discover();
+    expect(allowAddress).toHaveBeenCalledWith("read");
+    expect(allowUser).not.toHaveBeenCalled();
+  });
+
+  it("counts somebody signed in as themselves", async () => {
+    signIn();
+    const { allowAddress, allowUser } = await import("@/lib/rate-limit");
+    await discover();
+    expect(allowUser).toHaveBeenCalledWith("read", OTHER);
+    expect(allowAddress).not.toHaveBeenCalled();
+  });
+
+  it("covers the Charts and The Stack too", async () => {
+    caller.limited = true;
+    const charts = (await import("@/app/api/app/v1/charts/route")).GET(request("charts"));
+    expect((await charts).status).toBe(429);
+    expect(lib.getChart).not.toHaveBeenCalled();
+
+    signIn();
+    const stack = (await import("@/app/api/app/v1/stack/route")).GET(request("stack"));
+    expect((await stack).status).toBe(429);
+    expect(lib.getStack).not.toHaveBeenCalled();
   });
 });
 

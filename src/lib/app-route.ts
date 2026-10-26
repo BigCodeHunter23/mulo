@@ -2,7 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 import type { AppError, AppSession } from "@/lib/app-api";
-import { RateLimitedError, TOO_MANY } from "@/lib/rate-limit";
+import { allowAddress, allowUser, RateLimitedError, TOO_MANY } from "@/lib/rate-limit";
 import { bearerToken, getCurrentUser, type CurrentUser } from "@/lib/supabase/server";
 
 /**
@@ -48,6 +48,15 @@ export async function signedInCaller(): Promise<CurrentUser | NextResponse<AppEr
   const [token, user] = await Promise.all([bearerToken(), getCurrentUser()]);
   if (user) return user;
   return appError(401, token ? SESSION_ENDED : SIGN_IN_FIRST);
+}
+
+/**
+ * The app's reads, limited per person when signed in and per address
+ * otherwise. Throws, so `appRoute` answers 429.
+ */
+export async function limitReads(user: CurrentUser | null): Promise<void> {
+  const allowed = user ? await allowUser("read", user.id) : await allowAddress("read");
+  if (!allowed) throw new RateLimitedError("read");
 }
 
 /**

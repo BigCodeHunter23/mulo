@@ -1,5 +1,5 @@
 import type { DiscoverPage } from "@/lib/app-api";
-import { appCaller, appJson, appRoute } from "@/lib/app-route";
+import { appCaller, appJson, appRoute, limitReads } from "@/lib/app-route";
 import {
   artistsToExplore,
   mostPlayedAlbums,
@@ -28,6 +28,7 @@ function shelf<T>(read: PromiseSettledResult<T[]>, minimum: number): T[] {
 export const GET = appRoute(async () => {
   const caller = await appCaller();
   if (caller instanceof Response) return caller;
+  await limitReads(caller.user);
 
   const [rotation, fresh, best, played, artists, recent] = await Promise.allSettled([
     getHeavyRotation(SHELVES.rotation.limit),

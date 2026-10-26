@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { StackRun } from "@/lib/app-api";
-import { appJson, appRoute, signedInCaller } from "@/lib/app-route";
+import { appJson, appRoute, limitReads, signedInCaller } from "@/lib/app-route";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getStack, STACK_DECADES, STACK_RUN } from "@/lib/stack";
 
@@ -12,6 +12,7 @@ import { getStack, STACK_DECADES, STACK_RUN } from "@/lib/stack";
 export const GET = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  await limitReads(user);
 
   // Anything unknown is no filter at all, as on the page.
   const search = request.nextUrl.searchParams;

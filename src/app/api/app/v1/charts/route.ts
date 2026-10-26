@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { ChartKind, ChartPage } from "@/lib/app-api";
-import { appCaller, appJson, appRoute } from "@/lib/app-route";
+import { appCaller, appJson, appRoute, limitReads } from "@/lib/app-route";
 import { CHART_GENRES, CHART_KINDS, getChart, getChartProgress, isChartKind } from "@/lib/charts";
 
 /** The Charts page's hundred, as `charts/page.tsx` reads them. */
@@ -10,6 +10,7 @@ const HOW_MANY = 100;
 export const GET = appRoute(async (request: NextRequest) => {
   const caller = await appCaller();
   if (caller instanceof Response) return caller;
+  await limitReads(caller.user);
 
   // Anything unknown falls back to the page's defaults, as its address does.
   const search = request.nextUrl.searchParams;
