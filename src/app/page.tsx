@@ -17,18 +17,38 @@ import CoverWall from "@/components/CoverWall";
 import TasteTwin from "@/components/TasteTwin";
 import ReceiptCard from "@/components/ReceiptCard";
 import { getReceipt, howLongAgo } from "@/lib/receipts";
-import { ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+import { ButtonLink, EmptyState, Notice, SectionHeading } from "@/components/ui";
 
 /** How much of the feed to show before the first break, and between breaks. */
 const OPENING = 6;
 const MIDDLE = 8;
 
-export default async function Home() {
-  const user = await getCurrentUser();
+/**
+ * After deleting an account (`/?goodbye=1`). When Apple couldn't be told
+ * (`goodbye=apple`), how to cancel the Sign in with Apple link by hand.
+ */
+function Goodbye({ apple }: { apple: boolean }) {
+  return (
+    <div className="mx-auto mb-8 max-w-md">
+      <Notice tone="info">
+        Your account is gone.
+        {apple && " You can also remove MULO under Settings › Apple Account › Sign in with Apple."}
+      </Notice>
+    </div>
+  );
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ goodbye?: string }>;
+}) {
+  const [user, { goodbye }] = await Promise.all([getCurrentUser(), searchParams]);
 
   if (!user) {
     return (
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
+        {goodbye && <Goodbye apple={goodbye === "apple"} />}
         <section className="mx-auto max-w-3xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
             For music lovers

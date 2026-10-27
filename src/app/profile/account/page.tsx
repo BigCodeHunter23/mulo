@@ -2,14 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listBlocked } from "@/lib/blocks";
+import { OAUTH_PROVIDERS } from "@/lib/oauth";
+import { getSessionFacts } from "@/lib/session-facts";
 import BlockedList from "@/components/BlockedList";
-import { DeleteSection, EmailSection, PasswordSection } from "./AccountForms";
+import { DeleteSection, EmailSection, PasswordSection, type AccountKind } from "./AccountForms";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const user = await requireUser("/profile/account");
-  const blocked = await listBlocked();
+  const [blocked, facts] = await Promise.all([listBlocked(), getSessionFacts()]);
+  // How it signs in decides what proves it's them: the password, or for an
+  // account without one, a sign-in in the last few minutes with Apple or Google.
+  const account: AccountKind = {
+    hasPassword: facts.hasPassword,
+    freshSignIn: facts.freshSignIn,
+    confirmWith: OAUTH_PROVIDERS.find((provider) => facts.signInMethods.includes(provider)) ?? null,
+  };
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 pb-20 pt-12 sm:px-6">
@@ -27,8 +36,8 @@ export default async function AccountPage() {
       </div>
 
       <div className="flex flex-col gap-5">
-        <PasswordSection />
-        <EmailSection current={user.email ?? "this account"} />
+        <PasswordSection account={account} />
+        <EmailSection current={user.email ?? "this account"} account={account} />
 
         <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="display-sm text-lg text-text">Your data</h2>
@@ -53,7 +62,7 @@ export default async function AccountPage() {
           <BlockedList people={blocked} />
         </section>
 
-        <DeleteSection />
+        <DeleteSection account={account} />
       </div>
     </main>
   );
