@@ -224,6 +224,17 @@ describe("continuing with Apple or Google", () => {
     expect(call.options.redirectTo).not.toContain("evil");
   });
 
+  it("makes Google ask which account when confirming it's them, and only then", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    await expect(
+      continueWith({}, form({ provider: "google", next: "/profile/account", confirm: "1" })),
+    ).rejects.toThrow("redirect:");
+    await expect(continueWith({}, form({ provider: "google" }))).rejects.toThrow("redirect:");
+    const [confirming, plain] = oauth.calls as { options: Record<string, unknown> }[];
+    expect(confirming?.options.queryParams).toEqual({ prompt: "select_account" });
+    expect(plain?.options.queryParams).toBeUndefined();
+  });
+
   it("answers plainly when Supabase can't start it", async () => {
     const { continueWith } = await import("@/app/login/actions");
     oauth.result = { data: { url: null }, error: { message: "boom" } };

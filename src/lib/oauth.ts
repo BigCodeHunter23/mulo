@@ -29,6 +29,22 @@ const STATE_MAX = 8000;
 const VERIFIER_KEY = new RegExp(`^${STORAGE_KEY}-(flow-[\\w-]{8,64}-|flows-)?code-verifier$`);
 const FLOW_SLOT = new RegExp(`^${STORAGE_KEY}-flow-([\\w-]{8,64})-code-verifier$`);
 
+/**
+ * What to ask each provider for. Apple only shares a name and email when
+ * asked, and only the first time. When somebody is confirming it's them
+ * (`confirm`), Google is told to show its account chooser rather than sign
+ * straight back in, so a Google session left open on a borrowed laptop or
+ * phone can't confirm it with nobody looking. Apple's sign-in in the browser
+ * always asks.
+ */
+export function providerOptions(
+  provider: (typeof OAUTH_PROVIDERS)[number],
+  confirm: boolean,
+): { scopes?: string; queryParams?: Record<string, string> } {
+  if (provider === "apple") return { scopes: "name email" };
+  return confirm ? { queryParams: { prompt: "select_account" } } : {};
+}
+
 /** Whether this sign-in is open yet. */
 export function providerOn(provider: OAuthProvider): provider is (typeof OAUTH_PROVIDERS)[number] {
   return OAUTH_PROVIDERS.some((on) => on === provider);

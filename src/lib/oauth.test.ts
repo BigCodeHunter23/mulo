@@ -7,6 +7,7 @@ import {
   memoryStorage,
   oauthClient,
   pendingFlow,
+  providerOptions,
   restoreStorage,
 } from "./oauth";
 
@@ -196,5 +197,20 @@ describe("oauthClient", () => {
     expect(body.auth_code).toBe("the-code");
     const challenge = createHash("sha256").update(body.code_verifier).digest("base64url");
     expect(challenge).toBe(url.searchParams.get("code_challenge"));
+  });
+});
+
+describe("providerOptions", () => {
+  it("asks Apple for the name and email, and nothing of Google", () => {
+    expect(providerOptions("apple", false)).toEqual({ scopes: "name email" });
+    expect(providerOptions("google", false)).toEqual({});
+  });
+
+  it("makes Google ask which account when somebody is confirming it's them", () => {
+    expect(providerOptions("google", true)).toEqual({
+      queryParams: { prompt: "select_account" },
+    });
+    // Apple's sign-in in the browser always asks.
+    expect(providerOptions("apple", true)).toEqual({ scopes: "name email" });
   });
 });

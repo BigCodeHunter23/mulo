@@ -253,6 +253,28 @@ describe("POST auth/oauth/start", () => {
     );
   });
 
+  it("makes Google ask which account when the app is confirming it's them", async () => {
+    startsSigningIn();
+    expect((await start({ ...google, confirm: true })).status).toBe(200);
+    expect(oauth.signInWithOAuth).toHaveBeenCalledWith(
+      {
+        provider: "google",
+        options: {
+          redirectTo: "mulo://auth/callback",
+          skipBrowserRedirect: true,
+          queryParams: { prompt: "select_account" },
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it("refuses a confirm that isn't true or false", async () => {
+    startsSigningIn();
+    expect((await start({ ...google, confirm: "yes" })).status).toBe(400);
+    expect(oauth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
   it("refuses Expo Go's address on a preview too", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     startsSigningIn();

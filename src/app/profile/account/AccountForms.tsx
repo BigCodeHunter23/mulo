@@ -92,6 +92,8 @@ function ConfirmItsYou({ provider }: { provider: AccountKind["confirmWith"] }) {
       <form action={action}>
         <input type="hidden" name="provider" value={provider} />
         <input type="hidden" name="next" value="/profile/account" />
+        {/* Makes Google ask which account, rather than sign straight back in. */}
+        <input type="hidden" name="confirm" value="1" />
         {/* Apple allows only its own wording on its sign-in buttons. */}
         <Submit label={`Continue with ${PROVIDER_NAMES[provider]}`} busy="Opening…" />
       </form>

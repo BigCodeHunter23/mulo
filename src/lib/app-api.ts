@@ -488,9 +488,11 @@ export type OAuthProvider = "apple" | "google" | "facebook";
 
 /**
  * `POST auth/oauth/start` body. `redirectTo` is where the browser comes back to:
- * `mulo://auth/callback`, or Expo's development address outside production.
+ * exactly `mulo://auth/callback`. `confirm` is true when signing in again to
+ * confirm it's them (before deleting, or setting a first password), which
+ * makes Google ask which account rather than sign straight back in.
  */
-export type OAuthStartInput = { provider: OAuthProvider; redirectTo: string };
+export type OAuthStartInput = { provider: OAuthProvider; redirectTo: string; confirm?: boolean };
 
 /**
  * `POST auth/oauth/start`: the page to open in the browser, and `state` to hand

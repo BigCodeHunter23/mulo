@@ -3,12 +3,20 @@ import { z } from "zod";
 import type { OAuthStartResult } from "@/lib/app-api";
 import { appError, appJson, appRoute, BAD_REQUEST, readBody } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
-import { allowedRedirect, memoryStorage, oauthClient, PROVIDER_OFF, providerOn } from "@/lib/oauth";
+import {
+  allowedRedirect,
+  memoryStorage,
+  oauthClient,
+  PROVIDER_OFF,
+  providerOn,
+  providerOptions,
+} from "@/lib/oauth";
 import { allowAddress } from "@/lib/rate-limit";
 
 const startBody = z.object({
   provider: z.enum(["apple", "google", "facebook"]),
   redirectTo: z.string().max(300),
+  confirm: z.boolean().optional(),
 });
 
 /**
@@ -30,8 +38,7 @@ export const POST = appRoute(async (request: NextRequest) => {
     options: {
       redirectTo: body.redirectTo,
       skipBrowserRedirect: true,
-      // Apple only shares a name and email when asked, and only the first time.
-      ...(body.provider === "apple" ? { scopes: "name email" } : {}),
+      ...providerOptions(body.provider, body.confirm === true),
     },
   });
   if (error || !data.url) return appError(400, "Couldn't start signing in. Try again.");

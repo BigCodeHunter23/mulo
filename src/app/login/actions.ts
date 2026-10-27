@@ -7,7 +7,7 @@ import { authCallbackUrl } from "@/lib/auth";
 import { consumeInviteCookie } from "@/lib/invites";
 import { safeRedirectPath } from "@/lib/redirects";
 import { allowAddress } from "@/lib/rate-limit";
-import { OAUTH_PROVIDERS, PROVIDER_OFF } from "@/lib/oauth";
+import { OAUTH_PROVIDERS, PROVIDER_OFF, providerOptions } from "@/lib/oauth";
 import { field, firstError } from "@/lib/validation";
 import {
   AFTER_SIGNUP,
@@ -73,6 +73,7 @@ const providerInput = z.enum(OAUTH_PROVIDERS);
  * "Continue with Apple" or "Continue with Google": sends the browser to the
  * provider, which returns through /auth/confirm to finish signing in. The
  * button's own `provider` value says which; `next` is where to land after.
+ * `confirm=1` comes from the account page's "confirm it's you" button.
  */
 export async function continueWith(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const provider = providerInput.safeParse(field(formData, "provider"));
@@ -84,7 +85,7 @@ export async function continueWith(_prev: AuthState, formData: FormData): Promis
     provider: provider.data,
     options: {
       redirectTo: authCallbackUrl(safeRedirectPath(field(formData, "next")) ?? "/"),
-      ...(provider.data === "apple" ? { scopes: "name email" } : {}),
+      ...providerOptions(provider.data, field(formData, "confirm") === "1"),
     },
   });
   if (error || !data.url) return { error: "Couldn't start signing in. Try again." };
