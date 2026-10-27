@@ -88,7 +88,11 @@ vi.mock("@/lib/account", () => ({
   changeEmailFor: lib.changeEmailFor,
   deleteAccountFor: lib.deleteAccountFor,
 }));
-vi.mock("@/lib/export", () => ({ exportFor: lib.exportFor }));
+vi.mock("@/lib/export", async (original) => ({
+  // The headers are the real ones; the read is a stand-in.
+  ...(await original<typeof import("@/lib/export")>()),
+  exportFor: lib.exportFor,
+}));
 vi.mock("@/app/lists/actions", () => ({
   createList: actions.createList,
   updateList: actions.updateList,
@@ -701,5 +705,84 @@ describe("PUT me/raised-on", () => {
     );
     signIn();
     expect((await save({ mbid: MBID })).status).toBe(400);
+  });
+});
+
+// ── The account ────────────────────────────────────────────────────────
+
+describe("the account", () => {
+  it("changes the password through the shared check", async () => {
+    signIn();
+    lib.changePasswordFor.mockResolvedValue({ ok: true, message: "Password changed." });
+    const body = { current: "old-one", next: "new-one" };
+    const response = await (
+      await import("@/app/api/app/v1/me/password/route")
+    ).PUT(json("me/password", "PUT", body));
+    expect(await response.json()).toEqual({ ok: true, message: "Password changed." });
+    expect(lib.changePasswordFor).toHaveBeenCalledWith(ME, body);
+  });
+
+  it("changes the email through the shared check", async () => {
+    signIn();
+    lib.changeEmailFor.mockResolvedValue({ ok: false, error: "That isn't your current password." });
+    const body = { email: "new@example.com", current: "wrong" };
+    const response = await (
+      await import("@/app/api/app/v1/me/email/route")
+    ).PUT(json("me/email", "PUT", body));
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: "That isn't your current password.",
+    });
+    expect(lib.changeEmailFor).toHaveBeenCalledWith(ME, body);
+  });
+
+  it("deletes the account through the shared check", async () => {
+    signIn();
+    lib.deleteAccountFor.mockResolvedValue({ ok: true, message: "Your account is gone." });
+    const body = { current: "right", confirm: "DELETE" };
+    const response = await (
+      await import("@/app/api/app/v1/me/route")
+    ).DELETE(json("me", "DELETE", body));
+    expect(await response.json()).toEqual({ ok: true });
+    expect(lib.deleteAccountFor).toHaveBeenCalledWith(ME, body);
+  });
+
+  it("passes on a refused delete, in its words", async () => {
+    signIn();
+    lib.deleteAccountFor.mockResolvedValue({ ok: false, error: "That isn't your password." });
+    const response = await (
+      await import("@/app/api/app/v1/me/route")
+    ).DELETE(json("me", "DELETE", { current: "wrong", confirm: "DELETE" }));
+    expect(await response.json()).toEqual({ ok: false, error: "That isn't your password." });
+  });
+
+  it("answers a copy of your data as a file", async () => {
+    signIn();
+    lib.exportFor.mockResolvedValue({ body: '{"profile":null}', filename: "mulo-2026-10-27.json" });
+    const response = await (await import("@/app/api/app/v1/me/export/route")).GET();
+    expect(await response.json()).toEqual({ profile: null });
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="mulo-2026-10-27.json"',
+    );
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(lib.exportFor).toHaveBeenCalledWith(ME);
+  });
+
+  it("limits the copy like a change", async () => {
+    signIn();
+    caller.limited = true;
+    expect((await (await import("@/app/api/app/v1/me/export/route")).GET()).status).toBe(429);
+    expect(lib.exportFor).not.toHaveBeenCalled();
+  });
+
+  it("needs a token for all of it, and a body it can read", async () => {
+    const me = await import("@/app/api/app/v1/me/route");
+    expect(
+      (await me.DELETE(json("me", "DELETE", { current: "x", confirm: "DELETE" }))).status,
+    ).toBe(401);
+    expect((await (await import("@/app/api/app/v1/me/export/route")).GET()).status).toBe(401);
+    signIn();
+    expect((await me.DELETE(json("me", "DELETE", { current: 1 }))).status).toBe(400);
+    expect(lib.deleteAccountFor).not.toHaveBeenCalled();
   });
 });
