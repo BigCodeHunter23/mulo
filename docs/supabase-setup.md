@@ -4,23 +4,45 @@ For whoever has access to the Supabase dashboard. Do these once for the
 production project, and again for the test project. Nothing here needs code
 changes; each step says how to check it worked.
 
-## 1. Allow the new email link address
+## 1. Allow the return addresses
 
-Sign-up confirmation and password reset emails now link to `/auth/confirm` on
-the site. Supabase only sends people to addresses on its allow list.
+Sign-up confirmation and password reset emails link to `/auth/confirm` on the
+site, and so does signing in with Apple or Google on the website. The phone
+app comes back to `mulo://auth/callback`. Supabase only sends people to
+addresses on its allow list, and that list is what stops a sign-in being sent
+anywhere else, so keep it short and exact.
 
 Dashboard → **Authentication → URL Configuration**:
 
 - **Site URL**: `https://mulo-plum.vercel.app` (or the custom domain, once
   there is one). It must not still say `http://localhost:3000`.
-- **Redirect URLs**: add
+- **Redirect URLs**: the list should hold exactly these
   - `https://mulo-plum.vercel.app/auth/confirm**`
-  - `https://*-<your-vercel-team>.vercel.app/auth/confirm**`, for preview
-    deployments (copy the team part from any preview address in Vercel)
+  - `mulo://auth/callback`, for the phone app, written exactly like that
   - `http://localhost:3000/auth/confirm**`, for local development
 
-Check: sign up with a new address on a preview deployment. The confirmation
-email's link should finish signing you in and land on "Your profile".
+**Never add `exp://**`** (or any address starting `exp://`). Those are Expo
+Go's, the app used to try things out during development, and any Expo Go
+project can open them. With one on the list, somebody else's app could
+receive a MULO sign-in. The website refuses them too, but this list is the
+lock that counts.
+
+**Don't add a wildcard for Vercel previews** such as
+`https://*-<your-vercel-team>.vercel.app/auth/confirm**`. Anybody can make
+their own Vercel project whose address ends the same way. Once Apple and
+Google sign-in are on, a link to their look-alike page could sign them in as
+whoever clicked it. If you added that wildcard before, delete it. Instead,
+either:
+
+- add the one preview address you're testing, written out in full (for
+  example `https://mulo-git-my-branch-<your-vercel-team>.vercel.app/auth/confirm**`),
+  and delete it again when you're done; or, better,
+- point previews at the separate test Supabase project (Vercel → Settings →
+  Environment Variables, the Preview ones), so they never touch real accounts.
+
+Check: sign up with a new address on the live site (or a preview you've
+listed). The confirmation email's link should finish signing you in and land
+on "Your profile".
 
 ## 2. Recommended: email links that work in any browser
 
@@ -90,3 +112,41 @@ anything.
   emails. The app adds its own on top; the defaults are fine.
 - **API settings → Max rows**: note the number (default 1,000). Phase 2 fixes
   charts and profile stats that are wrong past it.
+
+## 6. Sign in with Apple and Google
+
+Do section 1 first, so the return addresses are right before these go on.
+
+Dashboard → **Authentication → Sign In / Providers**:
+
+- **Email → Confirm email**: keep it **on**. Supabase joins a Google or Apple
+  sign-in to an existing account with the same email address. With
+  confirming off, somebody could join first with your address and a password
+  of their own, and keep a way into your account after you sign in with
+  Google.
+- **Apple**: turn it on, then
+  - **Client IDs**: `com.mulo.app` (the iPhone app) and the website's
+    Services ID (the same value as `APPLE_SERVICES_ID` in Vercel), with a
+    comma between them. **Never add `host.exp.Exponent`**: that's Expo Go's
+    id, and it would let any Expo Go project's Apple sign-ins into MULO.
+  - **Secret Key (for OAuth)**: the key Apple's instructions have you make
+    from the `.p8` file. Apple lets it last **six months at most**, and when it
+    runs out, signing in with Apple on the website stops working. Put a
+    reminder in your calendar for five months after the day you make it, to
+    make a fresh one and paste it in here.
+  - In Apple's developer site, the Services ID's **Return URL** is the
+    callback address Supabase shows on this screen
+    (`https://<project>.supabase.co/auth/v1/callback`).
+- **Google**: turn it on, and paste the **Client ID** and **Client Secret** of
+  the **Web application** OAuth client from Google Cloud Console (APIs &
+  Services → Credentials). That client's **Authorized redirect URI** is the
+  same Supabase callback address.
+- **Facebook**: leave it **off** until Meta has approved the app. MULO says
+  "That sign-in isn't available yet" until then.
+
+The `APPLE_…` settings in Vercel (which let MULO cancel an Apple link when an
+account is deleted, as Apple requires) are explained in `.env.example`.
+
+Check: on the live site's log-in page, Continue with Google and Continue with
+Apple should each come back signed in. In the app, the same with Continue
+with Google.
