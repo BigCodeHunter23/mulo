@@ -25,7 +25,7 @@ export const POST = appRoute(async (request: NextRequest) => {
   if (body instanceof Response) return body;
   const restored = restoreStorage(body.state);
   if (!restored) return appError(400, BAD_REQUEST);
-  if (!(await allowAddress("login"))) return appError(429, TOO_MANY_ATTEMPTS);
+  if (!(await allowAddress("social"))) return appError(429, TOO_MANY_ATTEMPTS);
 
   const flowId = body.flowId ?? pendingFlow(restored);
   const { data, error } = await oauthClient(memoryStorage(restored)).auth.exchangeCodeForSession(

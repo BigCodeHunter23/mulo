@@ -24,7 +24,7 @@ export const POST = appRoute(async (request: NextRequest) => {
   // A malformed body is a fault in the app, not something to word for people.
   const body = await readBody(request, appleBody);
   if (body instanceof Response) return body;
-  if (!(await allowAddress("login"))) return appError(429, TOO_MANY_ATTEMPTS);
+  if (!(await allowAddress("social"))) return appError(429, TOO_MANY_ATTEMPTS);
 
   const { data, error } = await createPublicClient().auth.signInWithIdToken({
     provider: "apple",

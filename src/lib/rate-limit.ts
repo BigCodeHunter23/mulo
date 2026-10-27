@@ -9,6 +9,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const LIMITS = {
   /** Per address. Supabase limits these too; this stops guessing sooner. */
   login: { limit: 10, windowSeconds: 5 * 60 },
+  /**
+   * Per address: signing in with Apple or Google. Nothing here can be guessed
+   * (Apple or Google check the person), and a browser sign-in from the app
+   * costs two calls, while many phones on one mobile network can share an
+   * address. So it's roomier than `login`, and kept apart so it never uses
+   * up anybody's password attempts.
+   */
+  social: { limit: 30, windowSeconds: 5 * 60 },
   signup: { limit: 5, windowSeconds: 60 * 60 },
   reset: { limit: 5, windowSeconds: 60 * 60 },
   /** Per address: albums and artists MULO hasn't cached, fetched from MusicBrainz. */

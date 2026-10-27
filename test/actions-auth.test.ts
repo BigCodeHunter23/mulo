@@ -13,6 +13,8 @@ const session = vi.hoisted(() => ({
   db: { touched: 0 },
   /** Whether the rate limiter says no. */
   limited: false,
+  /** The buckets the rate limiter was asked about, in order. */
+  buckets: [] as string[],
 }));
 
 /**
@@ -38,10 +40,11 @@ function emptyClient() {
     );
   return {
     from: query,
-    rpc: (name: string) =>
-      name === "rate_limit_hit"
-        ? Promise.resolve({ data: !session.limited, error: null })
-        : query(),
+    rpc: (name: string, args?: { p_bucket?: string }) => {
+      if (name !== "rate_limit_hit") return query();
+      session.buckets.push(args?.p_bucket ?? "");
+      return Promise.resolve({ data: !session.limited, error: null });
+    },
     storage: { from: query },
     auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) },
   };
@@ -80,6 +83,7 @@ beforeEach(() => {
   session.user = null;
   session.db.touched = 0;
   session.limited = false;
+  session.buckets = [];
 });
 
 describe("over the rate limit", () => {
@@ -168,6 +172,8 @@ describe("continuing with Apple or Google", () => {
       /Too many attempts/,
     );
     expect(oauth.calls).toHaveLength(0);
+    // Its own bucket, so a shared address isn't shut out of logging in.
+    expect(session.buckets).toEqual(["social"]);
   });
 
   it("sends the browser to the provider, back through /auth/confirm to a safe page", async () => {

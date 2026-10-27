@@ -24,6 +24,12 @@ describe("rate limits", () => {
     });
   });
 
+  it("gives social sign-in its own, roomier bucket than password log-ins", async () => {
+    const { LIMITS } = await import("./rate-limit");
+    expect(LIMITS.social).toEqual({ limit: 30, windowSeconds: 300 });
+    expect(LIMITS.social.limit).toBeGreaterThan(LIMITS.login.limit);
+  });
+
   it("says no when Postgres does", async () => {
     rpc.mockResolvedValue({ data: false, error: null });
     const { allowUser } = await import("./rate-limit");

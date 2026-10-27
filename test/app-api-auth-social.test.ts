@@ -53,6 +53,7 @@ vi.mock("@/lib/apple-tokens", async (original) => ({
 }));
 
 import { BAD_REQUEST } from "@/lib/app-route";
+import { allowAddress } from "@/lib/rate-limit";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
 
 const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
@@ -194,6 +195,7 @@ describe("POST auth/apple", () => {
     const response = await signIn(ok);
     expect(response.status).toBe(429);
     expect((await response.json()).error).toBe(TOO_MANY_ATTEMPTS);
+    expect(allowAddress).toHaveBeenCalledWith("social");
     expect(auth.signInWithIdToken).not.toHaveBeenCalled();
   });
 });
@@ -291,6 +293,7 @@ describe("POST auth/oauth/start", () => {
     const response = await start(google);
     expect(response.status).toBe(429);
     expect((await response.json()).error).toBe(TOO_MANY_ATTEMPTS);
+    expect(allowAddress).toHaveBeenCalledWith("social");
     expect(oauth.signInWithOAuth).not.toHaveBeenCalled();
   });
 
@@ -427,6 +430,7 @@ describe("POST auth/oauth/exchange", () => {
     const response = await exchange(ok);
     expect(response.status).toBe(429);
     expect((await response.json()).error).toBe(TOO_MANY_ATTEMPTS);
+    expect(allowAddress).toHaveBeenCalledWith("social");
     expect(oauth.exchangeCodeForSession).not.toHaveBeenCalled();
   });
 });

@@ -77,7 +77,7 @@ const providerInput = z.enum(OAUTH_PROVIDERS);
 export async function continueWith(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const provider = providerInput.safeParse(field(formData, "provider"));
   if (!provider.success) return { error: PROVIDER_OFF };
-  if (!(await allowAddress("login"))) return { error: TOO_MANY_ATTEMPTS };
+  if (!(await allowAddress("social"))) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({

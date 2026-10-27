@@ -22,7 +22,7 @@ export const POST = appRoute(async (request: NextRequest) => {
   if (body instanceof Response) return body;
   if (!providerOn(body.provider)) return appError(400, PROVIDER_OFF);
   if (!allowedRedirect(body.redirectTo)) return appError(400, BAD_REQUEST);
-  if (!(await allowAddress("login"))) return appError(429, TOO_MANY_ATTEMPTS);
+  if (!(await allowAddress("social"))) return appError(429, TOO_MANY_ATTEMPTS);
 
   const storage = memoryStorage();
   const { data, error } = await oauthClient(storage).auth.signInWithOAuth({
