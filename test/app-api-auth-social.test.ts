@@ -43,7 +43,10 @@ vi.mock("@/lib/rate-limit", async (original) => ({
   ...(await original<typeof import("@/lib/rate-limit")>()),
   allowAddress: vi.fn(async () => !caller.limited),
 }));
-vi.mock("@/lib/apple", () => ({ exchangeAppleCode: apple.exchangeAppleCode }));
+vi.mock("@/lib/apple", async (original) => ({
+  ...(await original<typeof import("@/lib/apple")>()),
+  exchangeAppleCode: apple.exchangeAppleCode,
+}));
 vi.mock("@/lib/apple-tokens", async (original) => ({
   ...(await original<typeof import("@/lib/apple-tokens")>()),
   rememberAppleToken: apple.rememberAppleToken,
@@ -60,6 +63,14 @@ const SESSION = {
   user: { id: OTHER, email: "someone@example.com" },
 };
 const NONCE = "a-raw-nonce-of-enough-length";
+
+/** A JWT shaped like Apple's identity token; Supabase checks it, so the tests don't sign it. */
+const jwt = (payload: unknown) =>
+  ["{}", JSON.stringify(payload), "sig"]
+    .map((part) => Buffer.from(part).toString("base64url"))
+    .join(".");
+const APPLE_USER = "001234.abcdef0123456789.0123";
+const IDENTITY_TOKEN = jwt({ iss: "https://appleid.apple.com", sub: APPLE_USER });
 
 function json(path: string, body: unknown) {
   return new NextRequest(`https://mulo.test/api/app/v1/${path}`, {
@@ -88,7 +99,7 @@ beforeEach(() => {
 describe("POST auth/apple", () => {
   const signIn = async (body: unknown) =>
     (await import("@/app/api/app/v1/auth/apple/route")).POST(json("auth/apple", body));
-  const ok = { identityToken: "apple-token", nonce: NONCE };
+  const ok = { identityToken: IDENTITY_TOKEN, nonce: NONCE };
 
   it("hands back the session, asking Supabase to check the token and nonce", async () => {
     auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null });
@@ -97,7 +108,7 @@ describe("POST auth/apple", () => {
     expect(await response.json()).toEqual({ ok: true, session: SESSION });
     expect(auth.signInWithIdToken).toHaveBeenCalledWith({
       provider: "apple",
-      token: "apple-token",
+      token: IDENTITY_TOKEN,
       nonce: NONCE,
     });
   });
@@ -105,11 +116,43 @@ describe("POST auth/apple", () => {
   it("keeps Apple's refresh token when it has the one-time code", async () => {
     vi.stubEnv("APPLE_BUNDLE_ID", "com.mulo.app");
     auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null });
-    apple.exchangeAppleCode.mockResolvedValue("apple-refresh");
+    apple.exchangeAppleCode.mockResolvedValue({ refreshToken: "apple-refresh", sub: APPLE_USER });
     const response = await signIn({ ...ok, authorizationCode: "one-time" });
     expect(response.status).toBe(200);
     expect(apple.exchangeAppleCode).toHaveBeenCalledWith("one-time", "com.mulo.app");
     expect(apple.rememberAppleToken).toHaveBeenCalledWith(OTHER, "apple-refresh", "com.mulo.app");
+  });
+
+  it("keeps no token when the code belongs to another Apple user, but still signs in", async () => {
+    vi.stubEnv("APPLE_BUNDLE_ID", "com.mulo.app");
+    auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null });
+    apple.exchangeAppleCode.mockResolvedValue({
+      refreshToken: "someone-elses-refresh",
+      sub: "009999.fedcba9876543210.9999",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const response = await signIn({ ...ok, authorizationCode: "someone-elses-code" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+    expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(warn).toHaveBeenCalled();
+    for (const secret of ["someone-elses", APPLE_USER, IDENTITY_TOKEN]) {
+      expect(logged).not.toContain(secret);
+    }
+  });
+
+  it("keeps no token when the identity token's user can't be read", async () => {
+    vi.stubEnv("APPLE_BUNDLE_ID", "com.mulo.app");
+    auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null });
+    apple.exchangeAppleCode.mockResolvedValue({ refreshToken: "apple-refresh", sub: APPLE_USER });
+    const response = await signIn({
+      ...ok,
+      identityToken: jwt({ iss: "x" }),
+      authorizationCode: "c",
+    });
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+    expect(apple.rememberAppleToken).not.toHaveBeenCalled();
   });
 
   it("still signs in when Apple won't swap the code", async () => {

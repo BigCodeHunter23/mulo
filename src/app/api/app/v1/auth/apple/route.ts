@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { exchangeAppleCode } from "@/lib/apple";
+import { exchangeAppleCode, jwtSubject } from "@/lib/apple";
 import { rememberAppleToken } from "@/lib/apple-tokens";
 import type { AuthResponse } from "@/lib/app-api";
 import { appError, appJson, appRoute, readBody, toAppSession } from "@/lib/app-route";
@@ -17,7 +17,8 @@ const appleBody = z.object({
 /**
  * Signs in with the token from the iPhone's own Apple sheet. Supabase checks
  * it with Apple and that its nonce matches. The one-time code is swapped for
- * Apple's refresh token, kept so deleting the account can cancel the link.
+ * Apple's refresh token, kept so deleting the account can cancel the link,
+ * when the code belongs to the same Apple user as the token.
  */
 export const POST = appRoute(async (request: NextRequest) => {
   // A malformed body is a fault in the app, not something to word for people.
@@ -34,8 +35,21 @@ export const POST = appRoute(async (request: NextRequest) => {
 
   const bundleId = process.env.APPLE_BUNDLE_ID;
   if (body.authorizationCode && bundleId) {
-    const refresh = await exchangeAppleCode(body.authorizationCode, bundleId);
-    if (refresh) await rememberAppleToken(data.session.user.id, refresh, bundleId);
+    const grant = await exchangeAppleCode(body.authorizationCode, bundleId);
+    // Keep the token only if the code was issued to the same Apple user as the
+    // identity token Supabase has just accepted, so somebody can't attach
+    // another Apple account's token to theirs. The identity token's `sub` is
+    // read rather than the user's identities: Supabase has just checked that
+    // very token (Apple's signature, our bundle id, the nonce), and it came
+    // from the same Apple sheet as the code.
+    const appleUser = jwtSubject(body.identityToken);
+    if (grant && appleUser && grant.sub === appleUser) {
+      await rememberAppleToken(data.session.user.id, grant.refreshToken, bundleId);
+    } else if (grant) {
+      console.warn(
+        "[apple] the one-time code isn't for the identity token's Apple user; token not kept.",
+      );
+    }
   }
   return appJson<AuthResponse>({ ok: true, session: toAppSession(data.session) });
 });

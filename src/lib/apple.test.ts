@@ -4,6 +4,7 @@ import {
   clientSecret,
   exchangeAppleCode,
   hasTokenKey,
+  jwtSubject,
   openToken,
   revokeAppleToken,
   sealToken,
@@ -36,6 +37,25 @@ function sentForm(fetchMock: ReturnType<typeof vi.fn>) {
 }
 
 const fetchMock = vi.fn();
+
+/** A JWT shaped like Apple's id_token. Only the payload is read; Apple's signature isn't checked here. */
+const idToken = (payload: unknown) =>
+  `${Buffer.from('{"alg":"RS256","kid":"k"}').toString("base64url")}.${Buffer.from(
+    JSON.stringify(payload),
+  ).toString("base64url")}.c2lnbmF0dXJl`;
+const APPLE_USER = "001234.abcdef0123456789.0123";
+
+/** Apple's answer to a code swap. */
+const swapped = (extra: Record<string, unknown> = {}) =>
+  new Response(
+    JSON.stringify({
+      refresh_token: "r-token",
+      access_token: "a",
+      id_token: idToken({ iss: "https://appleid.apple.com", sub: APPLE_USER }),
+      ...extra,
+    }),
+    { status: 200 },
+  );
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -100,14 +120,13 @@ describe("clientSecret", () => {
 });
 
 describe("exchangeAppleCode", () => {
-  it("swaps the code for Apple's refresh token", async () => {
+  it("swaps the code for Apple's refresh token and the Apple user it belongs to", async () => {
     setSettings();
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ refresh_token: "r-token", access_token: "a" }), {
-        status: 200,
-      }),
-    );
-    expect(await exchangeAppleCode("the-code", CLIENT)).toBe("r-token");
+    fetchMock.mockResolvedValue(swapped());
+    expect(await exchangeAppleCode("the-code", CLIENT)).toEqual({
+      refreshToken: "r-token",
+      sub: APPLE_USER,
+    });
     const { url, init, form } = sentForm(fetchMock);
     expect(url).toBe("https://appleid.apple.com/auth/token");
     expect(init.method).toBe("POST");
@@ -131,6 +150,22 @@ describe("exchangeAppleCode", () => {
     expect(await exchangeAppleCode("the-code", CLIENT)).toBeNull();
   });
 
+  it("answers null when it can't tell whose code it was", async () => {
+    setSettings();
+    for (const answer of [
+      { id_token: undefined },
+      { id_token: "not-a-jwt" },
+      { id_token: "a.%%%.c" },
+      { id_token: idToken("just a string") },
+      { id_token: idToken({ iss: "https://appleid.apple.com" }) },
+      { id_token: idToken({ sub: "" }) },
+      { id_token: idToken({ sub: 42 }) },
+    ]) {
+      fetchMock.mockResolvedValueOnce(swapped(answer));
+      expect(await exchangeAppleCode("the-code", CLIENT)).toBeNull();
+    }
+  });
+
   it("answers null when Apple can't be reached", async () => {
     setSettings();
     fetchMock.mockRejectedValue(new TypeError("fetch failed"));
@@ -143,12 +178,15 @@ describe("exchangeAppleCode", () => {
       new Response('{"error":"invalid_grant","echo":"the-code"}', { status: 400 }),
     );
     await exchangeAppleCode("the-code", CLIENT);
+    fetchMock.mockResolvedValueOnce(swapped({ id_token: idToken({ sub: 42, who: APPLE_USER }) }));
+    await exchangeAppleCode("the-code", CLIENT);
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
     await revokeAppleToken("r-token", CLIENT);
     const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(logged).toContain("invalid_grant");
     expect(logged).not.toContain("the-code");
     expect(logged).not.toContain("r-token");
+    expect(logged).not.toContain(APPLE_USER);
     expect(logged).not.toContain("PRIVATE KEY");
     expect(logged).not.toMatch(/eyJ/);
   });
@@ -157,6 +195,30 @@ describe("exchangeAppleCode", () => {
     setSettings({ APPLE_TEAM_ID: "" });
     expect(await exchangeAppleCode("the-code", CLIENT)).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("jwtSubject", () => {
+  it("reads the sub from a JWT's payload", () => {
+    expect(jwtSubject(idToken({ sub: APPLE_USER, aud: "com.mulo.app" }))).toBe(APPLE_USER);
+  });
+
+  it("answers null for anything without a readable sub", () => {
+    for (const token of [
+      "",
+      "not-a-jwt",
+      "a.b",
+      "a.b.c.d",
+      "a.%%%.c",
+      idToken(null),
+      idToken(["sub"]),
+      idToken({}),
+      idToken({ sub: "" }),
+      idToken({ sub: 7 }),
+      idToken({ sub: "x".repeat(256) }),
+    ]) {
+      expect(jwtSubject(token)).toBeNull();
+    }
   });
 });
 

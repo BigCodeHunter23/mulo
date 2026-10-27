@@ -122,14 +122,46 @@ async function appleError(response: Response): Promise<string> {
   return parsed.success ? parsed.data.error : "no error code";
 }
 
-const TokenAnswer = z.object({ refresh_token: z.string().min(1).max(2000) });
+const TokenAnswer = z.object({
+  refresh_token: z.string().min(1).max(2000),
+  id_token: z.string().min(1).max(4000),
+});
+
+const Subject = z.object({ sub: z.string().min(1).max(255) });
+
+/**
+ * The `sub` (for Apple, the Apple user's id) in a JWT's payload, or null if
+ * it can't be read. The signature is NOT checked, so only use this on a token
+ * that has already been trusted: one straight from Apple over TLS, or one
+ * Supabase has just accepted.
+ */
+export function jwtSubject(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !parts[1]) return null;
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    const parsed = Subject.safeParse(payload);
+    return parsed.success ? parsed.data.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What a code swap gives: Apple's refresh token, and the Apple user it belongs to. */
+export type AppleGrant = { refreshToken: string; sub: string };
 
 /**
  * Swaps the one-time authorization code from Apple's sign-in sheet for
- * Apple's refresh token. `clientId` is the client the code was issued to.
- * Null on any failure.
+ * Apple's refresh token, with the Apple user it was issued for (the `sub` of
+ * the id_token Apple answers with, read without checking its signature since
+ * it came straight from Apple over TLS). `clientId` is the client the code
+ * was issued to. Null on any failure, or when Apple's answer doesn't say
+ * whose code it was.
  */
-export async function exchangeAppleCode(code: string, clientId: string): Promise<string | null> {
+export async function exchangeAppleCode(
+  code: string,
+  clientId: string,
+): Promise<AppleGrant | null> {
   const secret = clientSecret(clientId);
   if (!secret) return null;
   const response = await postToApple("token", {
@@ -148,10 +180,15 @@ export async function exchangeAppleCode(code: string, clientId: string): Promise
   }
   const parsed = TokenAnswer.safeParse(await response.json().catch(() => null));
   if (!parsed.success) {
-    console.error("[apple] code exchange answered without a refresh token.");
+    console.error("[apple] code exchange answered without a refresh token or identity token.");
     return null;
   }
-  return parsed.data.refresh_token;
+  const sub = jwtSubject(parsed.data.id_token);
+  if (!sub) {
+    console.error("[apple] code exchange's identity token couldn't be read.");
+    return null;
+  }
+  return { refreshToken: parsed.data.refresh_token, sub };
 }
 
 /**
