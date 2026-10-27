@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient as createFreshClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { NOT_FRESH } from "@/lib/app-api";
 import { forgetAppleLink } from "@/lib/apple-tokens";
 import { authCallbackUrl } from "@/lib/auth";
 import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
@@ -35,8 +36,6 @@ export type AccountOutcome =
   | { ok: false; error: string };
 
 const NO_EMAIL = "This account has no email address to check against.";
-/** The answer when an account without a password last signed in too long ago. */
-export const NOT_FRESH = "Please confirm it's you again.";
 const HAS_PASSWORD = "You already have a password. Change it instead.";
 
 const passwordInput = z.object({ current: passwordSchema, next: newPasswordSchema });

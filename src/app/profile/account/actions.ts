@@ -6,10 +6,10 @@ import {
   changeEmailFor,
   changePasswordFor,
   deleteAccountFor,
-  NOT_FRESH,
   setPasswordFor,
   type AccountOutcome,
 } from "@/lib/account";
+import { NOT_FRESH } from "@/lib/app-api";
 import { getSessionFacts } from "@/lib/session-facts";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { field } from "@/lib/validation";

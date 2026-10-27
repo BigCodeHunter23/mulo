@@ -29,7 +29,18 @@ describe("app-api.ts", () => {
     }
   });
 
-  it("has no runtime code", () => {
-    expect(source).not.toMatch(/^export (const|function|class|async|default)/m);
+  it("has no runtime code beyond plain strings the app matches on", () => {
+    expect(source).not.toMatch(/^export (function|class|async|default|let|var)/m);
+    // One line each, a string and nothing else, so the app's copy has nothing to run.
+    const constants = source.split(/\r?\n/).filter((line) => line.startsWith("export const "));
+    for (const line of constants) {
+      expect(line).toMatch(/^export const [A-Z_]+ = "[^"\\]*";$/);
+    }
+    expect(source).not.toMatch(/^(const|let|var|function|class) /m);
+  });
+
+  it("holds the words the app compares an answer with", async () => {
+    const { NOT_FRESH } = await import("./app-api");
+    expect(NOT_FRESH).toBe("Please confirm it's you again.");
   });
 });

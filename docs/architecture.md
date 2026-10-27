@@ -42,7 +42,8 @@ everywhere, so the app knows to refresh it; writes answer with the action's
 own `{ ok, error }`. Reads that cost the database something call
 `limitReads` (the `read` limit, per person or per address). Every shape they answer with is declared in
 `src/lib/app-api.ts`, which the app copies, so it stays framework-free (its
-test says how). New endpoints go in `test/app-api.test.ts`; Collection's
+test says how): types, plus the few plain strings the app matches an answer
+on (`NOT_FRESH`). New endpoints go in `test/app-api.test.ts`; Collection's
 (badges, GOAT, Mixtape, the Gauntlet, taste) are in
 `test/app-api-collection.test.ts`, and Social and account's (lists,
 notifications, reactions, reports, blocks, follows, invites, profile

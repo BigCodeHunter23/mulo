@@ -457,6 +457,13 @@ export type PickResult =
 /** What every endpoint answers when something goes wrong. */
 export type AppError = { ok: false; error: string };
 
+/**
+ * The refusal when an account without a password last signed in too long ago
+ * to delete itself or set a first password. The app matches on this exact text
+ * to offer "confirm it's you" again, so change it here and sync the app.
+ */
+export const NOT_FRESH = "Please confirm it's you again.";
+
 /** The ways somebody can sign in. */
 export type SignInMethod = "email" | "apple" | "google" | "facebook";
 
@@ -522,8 +529,8 @@ export type SaveResult = { ok: true } | AppError;
 /**
  * `DELETE me`. Body: `{ confirm: "DELETE", current? }`, where `current` is the
  * password, needed only when `Me.hasPassword`; an account without one must
- * have signed in within the last five minutes instead (refused with "Please
- * confirm it's you again." otherwise). `appleLinkLeft` means Apple couldn't be
+ * have signed in within the last five minutes instead (refused with
+ * `NOT_FRESH` otherwise). `appleLinkLeft` means Apple couldn't be
  * told: ask the person to remove MULO under Settings › Apple Account › Sign in
  * with Apple.
  */
