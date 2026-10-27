@@ -24,6 +24,8 @@ describe("isRespectful (reviews, takes, list notes)", () => {
   it("blocks slurs, disguised or not", () => {
     expect(isRespectful("what a f4ggot")).toBe(false);
     expect(isRespectful("n1gger")).toBe(false);
+    expect(isRespectful("chingchong")).toBe(false);
+    expect(isRespectful("Negro Swan is a masterpiece")).toBe(true);
   });
   it("has plain messages", () => {
     expect(NOT_CLEAN).toBe("Please choose something else.");

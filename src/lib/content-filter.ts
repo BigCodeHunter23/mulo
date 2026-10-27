@@ -12,8 +12,25 @@ import { DataSet, englishDataset, englishRecommendedTransformers, RegExpMatcher 
 export const NOT_CLEAN = "Please choose something else.";
 export const NOT_RESPECTFUL = "Please keep it respectful.";
 
-/** Slurs and hate words in obscenity's English data set, by its `originalWord`. */
-const HATEFUL = new Set(["nigger", "fag", "retard", "chink", "kike", "tranny"]);
+/**
+ * Slurs and hate words in obscenity's English data set, by its `originalWord`.
+ * "negro" and "dyke" are left out on purpose (album titles, reclaimed use); names still block them.
+ */
+const HATEFUL = new Set([
+  "nigger",
+  "fag",
+  "retard",
+  "chink",
+  "kike",
+  "tranny",
+  "abeed",
+  "africoon",
+  "arabush",
+  "boonga",
+  "chingchong",
+  "abo",
+  "spastic",
+]);
 
 const everything = new RegExpMatcher({
   ...englishDataset.build(),
