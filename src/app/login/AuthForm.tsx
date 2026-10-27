@@ -58,7 +58,13 @@ function GoogleMark() {
   );
 }
 
-/** Apple first, as its guidelines ask; each is the same size. */
+/**
+ * Apple first, as its guidelines ask; each is the same size. The colours are
+ * Apple's and Google's own, not MULO's tokens, on purpose: Apple's button is
+ * black with white (its Human Interface Guidelines), and Google's is white
+ * with its four-colour mark (its sign-in branding guidelines). Both stay
+ * readable on the dark page.
+ */
 function SocialButtons({ next }: { next: string }) {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(continueWith, {});
 
