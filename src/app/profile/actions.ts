@@ -9,7 +9,8 @@ import { safeRedirectPath } from "@/lib/redirects";
 import { field, firstError, textSchema, usernameSchema } from "@/lib/validation";
 import { imageTypeOf } from "@/lib/image-type";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
-import { isClean, NOT_CLEAN } from "@/lib/content-filter";
+import { isClean } from "@/lib/content-filter";
+import { getEditableProfile } from "@/lib/social";
 
 export type ProfileState = { error?: string; message?: string };
 
@@ -26,6 +27,31 @@ const profileInput = z.object({
  * Uploads with the service role from the server, so the storage bucket needs
  * no client-facing write policy. Returns the public URL, or an error string.
  */
+/** What to say when a field doesn't pass the word filter, naming the field. */
+const NOT_CLEAN_FOR = {
+  username: "That username isn't allowed. Please choose something else.",
+  display_name: "That display name isn't allowed. Please choose something else.",
+  bio: "Your bio has words that aren't allowed. Please change them.",
+} as const;
+
+/**
+ * The first field that doesn't pass the word filter, or null. A value that's
+ * already saved is let through as it is: a name from before the filter mustn't
+ * stop somebody saving a new photo (the app re-sends the stored name with
+ * one). The stored profile is only read when something fails.
+ */
+async function uncleanField(
+  userId: string,
+  values: Record<keyof typeof NOT_CLEAN_FOR, string>,
+): Promise<keyof typeof NOT_CLEAN_FOR | null> {
+  const failing = (["username", "display_name", "bio"] as const).filter(
+    (name) => !isClean(values[name]),
+  );
+  if (failing.length === 0) return null;
+  const stored = await getEditableProfile(userId);
+  return failing.find((name) => (stored?.[name] ?? "") !== values[name]) ?? null;
+}
+
 async function uploadAvatar(userId: string, file: File): Promise<{ url?: string; error?: string }> {
   if (file.size > MAX_AVATAR_BYTES) {
     return { error: "That image is over 2MB. Please pick a smaller one." };
@@ -69,7 +95,8 @@ export async function saveProfile(_prev: ProfileState, formData: FormData): Prom
   });
   if (!input.success) return { error: firstError(input.error) };
   const { username, display_name, bio } = input.data;
-  if (![username, display_name, bio].every(isClean)) return { error: NOT_CLEAN };
+  const unclean = await uncleanField(user.id, { username, display_name, bio });
+  if (unclean) return { error: NOT_CLEAN_FOR[unclean] };
   if (!(await allowUser("write", user.id))) return { error: TOO_MANY };
 
   let avatarUrl: string | undefined;

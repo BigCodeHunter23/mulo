@@ -11,6 +11,13 @@ const session = vi.hoisted(() => ({
   user: null as { id: string; email: string | null } | null,
   /** How many tables were queried: nothing is written when it stays 0. */
   queries: 0,
+  /** The profile as it's stored, before this save. */
+  stored: null as {
+    username: string;
+    display_name: string | null;
+    bio: string | null;
+    avatar_url: string | null;
+  } | null,
 }));
 
 /** A stand-in Supabase client: every query finds nothing. */
@@ -48,6 +55,10 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => emptyClient()) }));
 vi.mock("@/lib/supabase/public", () => ({ createPublicClient: vi.fn(() => emptyClient()) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/social", async (original) => ({
+  ...(await original<typeof import("@/lib/social")>()),
+  getEditableProfile: vi.fn(async () => session.stored),
+}));
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: () => undefined, set: vi.fn(), delete: vi.fn() })),
   headers: vi.fn(async () => new Headers()),
@@ -75,6 +86,7 @@ function form(fields: Record<string, string>) {
 beforeEach(() => {
   session.user = { id: USER, email: "someone@example.com" };
   session.queries = 0;
+  session.stored = null;
 });
 
 describe("saveProfile", () => {
@@ -86,12 +98,26 @@ describe("saveProfile", () => {
   }
 
   it.each([
-    ["username", { username: "fuckface" }],
-    ["display name", { display_name: "sh1t" }],
-    ["bio", { bio: "total faggot" }],
-  ])("refuses a %s that isn't clean, and saves nothing", async (_name, fields) => {
-    expect(await save(fields)).toEqual({ error: NOT_CLEAN });
+    [{ username: "fuckface" }, "That username isn't allowed. Please choose something else."],
+    [{ display_name: "sh1t" }, "That display name isn't allowed. Please choose something else."],
+    [{ bio: "total faggot" }, "Your bio has words that aren't allowed. Please change them."],
+  ])("refuses %o, naming the field, and saves nothing", async (fields, error) => {
+    expect(await save(fields)).toEqual({ error });
     expect(session.queries).toBe(0);
+  });
+
+  it("keeps what's already saved, so a name from before the filter can't block a new photo", async () => {
+    session.stored = { username: "alex", display_name: "sh1t", bio: null, avatar_url: null };
+    const result = await save({ display_name: "sh1t", bio: "" });
+    expect(result.error).toBeUndefined();
+    expect(session.queries).toBeGreaterThan(0);
+  });
+
+  it("still refuses a change to another word that isn't clean", async () => {
+    session.stored = { username: "alex", display_name: "sh1t", bio: null, avatar_url: null };
+    expect(await save({ display_name: "fuckface" })).toEqual({
+      error: "That display name isn't allowed. Please choose something else.",
+    });
   });
 
   it("saves clean words", async () => {
