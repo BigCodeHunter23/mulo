@@ -12,11 +12,13 @@ import {
   providerOptions,
 } from "@/lib/oauth";
 import { allowAddress } from "@/lib/rate-limit";
+import { emailSchema } from "@/lib/validation";
 
 const startBody = z.object({
   provider: z.enum(["apple", "google", "facebook"]),
   redirectTo: z.string().max(300),
   confirm: z.boolean().optional(),
+  loginHint: emailSchema.optional(),
 });
 
 /**
@@ -38,7 +40,7 @@ export const POST = appRoute(async (request: NextRequest) => {
     options: {
       redirectTo: body.redirectTo,
       skipBrowserRedirect: true,
-      ...providerOptions(body.provider, body.confirm === true),
+      ...providerOptions(body.provider, body.confirm === true, body.loginHint),
     },
   });
   if (error || !data.url) return appError(400, "Couldn't start signing in. Try again.");

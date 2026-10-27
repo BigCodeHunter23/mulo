@@ -40,7 +40,8 @@ describe("app-api.ts", () => {
   });
 
   it("holds the words the app compares an answer with", async () => {
-    const { NOT_FRESH } = await import("./app-api");
+    const { NOT_FRESH, OTHER_ACCOUNT } = await import("./app-api");
     expect(NOT_FRESH).toBe("Please confirm it's you again.");
+    expect(OTHER_ACCOUNT).toBe("That's a different account. Use the one you're signed in with.");
   });
 });

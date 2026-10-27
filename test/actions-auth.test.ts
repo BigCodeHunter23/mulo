@@ -235,6 +235,35 @@ describe("continuing with Apple or Google", () => {
     expect(plain?.options.queryParams).toBeUndefined();
   });
 
+  it("names the signed-in account to Google when confirming, never one from the form", async () => {
+    session.user = { id: OTHER, email: "someone@example.com" };
+    const { continueWith } = await import("@/app/login/actions");
+    await expect(
+      continueWith(
+        {},
+        form({ provider: "google", confirm: "1", login_hint: "attacker@example.com" }),
+      ),
+    ).rejects.toThrow("redirect:");
+    await expect(
+      continueWith({}, form({ provider: "google", login_hint: "attacker@example.com" })),
+    ).rejects.toThrow("redirect:");
+    const [confirming, plain] = oauth.calls as { options: Record<string, unknown> }[];
+    expect(confirming?.options.queryParams).toEqual({
+      prompt: "select_account",
+      login_hint: "someone@example.com",
+    });
+    expect(plain?.options.queryParams).toBeUndefined();
+  });
+
+  it("asks which account without a hint when nobody is signed in", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    await expect(continueWith({}, form({ provider: "google", confirm: "1" }))).rejects.toThrow(
+      "redirect:",
+    );
+    const [call] = oauth.calls as { options: Record<string, unknown> }[];
+    expect(call?.options.queryParams).toEqual({ prompt: "select_account" });
+  });
+
   it("answers plainly when Supabase can't start it", async () => {
     const { continueWith } = await import("@/app/login/actions");
     oauth.result = { data: { url: null }, error: { message: "boom" } };

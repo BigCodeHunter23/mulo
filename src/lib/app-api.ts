@@ -464,6 +464,14 @@ export type AppError = { ok: false; error: string };
  */
 export const NOT_FRESH = "Please confirm it's you again.";
 
+/**
+ * The 409 from `auth/apple` and `auth/oauth/exchange` when confirming it's
+ * them (`expectedUserId`) signed in to some other account. That sign-in is
+ * already undone: its session ended, and the account removed if this sign-in
+ * had just made it. The app keeps the session it had.
+ */
+export const OTHER_ACCOUNT = "That's a different account. Use the one you're signed in with.";
+
 /** The ways somebody can sign in. */
 export type SignInMethod = "email" | "apple" | "google" | "facebook";
 
@@ -483,11 +491,14 @@ export type AuthResponse = { ok: true; session: AppSession | null; message?: str
  * `POST auth/apple` body: what the iPhone's own Apple sheet hands back. The nonce
  * is the raw one whose SHA-256 hash the sheet was opened with. The one-time
  * code, when sent, is swapped for Apple's refresh token. Answers `AuthResponse`.
+ * `expectedUserId`, the signed-in account's id, is sent when confirming it's
+ * them: another account is refused with `OTHER_ACCOUNT` (409).
  */
 export type AppleSignInInput = {
   identityToken: string;
   nonce: string;
   authorizationCode?: string;
+  expectedUserId?: string;
 };
 
 /** The sign-ins that go through the browser. Facebook is refused until Meta approves it. */
@@ -498,8 +509,15 @@ export type OAuthProvider = "apple" | "google" | "facebook";
  * exactly `mulo://auth/callback`. `confirm` is true when signing in again to
  * confirm it's them (before deleting, or setting a first password), which
  * makes Google ask which account rather than sign straight back in.
+ * `loginHint`, the signed-in account's email, is passed to Google then too,
+ * so its chooser starts on that account; it's ignored otherwise.
  */
-export type OAuthStartInput = { provider: OAuthProvider; redirectTo: string; confirm?: boolean };
+export type OAuthStartInput = {
+  provider: OAuthProvider;
+  redirectTo: string;
+  confirm?: boolean;
+  loginHint?: string;
+};
 
 /**
  * `POST auth/oauth/start`: the page to open in the browser, and `state` to hand
@@ -512,8 +530,14 @@ export type OAuthStartResult = { ok: true; url: string; state: string } | AppErr
  * `POST auth/oauth/exchange` body: the `code` (and `sb_flow_id`, as `flowId`,
  * when the return address carries one) from the address the browser came back
  * to, with `state` from `auth/oauth/start`. Answers `AuthResponse`.
+ * `expectedUserId` works as in `AppleSignInInput`.
  */
-export type OAuthExchangeInput = { code: string; flowId?: string; state: string };
+export type OAuthExchangeInput = {
+  code: string;
+  flowId?: string;
+  state: string;
+  expectedUserId?: string;
+};
 
 /** The signed-in person's own profile. Null until they've picked a username. */
 export type OwnProfile = {

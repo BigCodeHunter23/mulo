@@ -2,9 +2,10 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { exchangeAppleCode, jwtSubject } from "@/lib/apple";
 import { rememberAppleToken } from "@/lib/apple-tokens";
-import type { AuthResponse } from "@/lib/app-api";
+import { OTHER_ACCOUNT, type AuthResponse } from "@/lib/app-api";
 import { appError, appJson, appRoute, readBody, toAppSession } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
+import { isOtherAccount, undoSignIn } from "@/lib/other-account";
 import { allowAddress } from "@/lib/rate-limit";
 import { createPublicClient } from "@/lib/supabase/public";
 
@@ -12,13 +13,16 @@ const appleBody = z.object({
   identityToken: z.string().min(1).max(4000),
   nonce: z.string().min(16).max(200),
   authorizationCode: z.string().min(1).max(1000).optional(),
+  expectedUserId: z.uuid().optional(),
 });
 
 /**
  * Signs in with the token from the iPhone's own Apple sheet. Supabase checks
  * it with Apple and that its nonce matches. The one-time code is swapped for
  * Apple's refresh token, kept so deleting the account can cancel the link,
- * when the code belongs to the same Apple user as the token.
+ * when the code belongs to the same Apple user as the token. When confirming
+ * it's them (`expectedUserId`), another account is signed straight back out,
+ * before any of its tokens are kept, and refused.
  */
 export const POST = appRoute(async (request: NextRequest) => {
   // A malformed body is a fault in the app, not something to word for people.
@@ -32,6 +36,10 @@ export const POST = appRoute(async (request: NextRequest) => {
     nonce: body.nonce,
   });
   if (error || !data.session) return appError(401, "Apple sign-in didn't work. Try again.");
+  if (isOtherAccount(data.session, body.expectedUserId)) {
+    await undoSignIn(data.session);
+    return appError(409, OTHER_ACCOUNT);
+  }
 
   const bundleId = process.env.APPLE_BUNDLE_ID;
   if (body.authorizationCode && bundleId) {

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { authCallbackUrl } from "@/lib/auth";
 import { consumeInviteCookie } from "@/lib/invites";
 import { safeRedirectPath } from "@/lib/redirects";
@@ -73,19 +73,24 @@ const providerInput = z.enum(OAUTH_PROVIDERS);
  * "Continue with Apple" or "Continue with Google": sends the browser to the
  * provider, which returns through /auth/confirm to finish signing in. The
  * button's own `provider` value says which; `next` is where to land after.
- * `confirm=1` comes from the account page's "confirm it's you" button.
+ * `confirm=1` comes from the account page's "confirm it's you" button, which
+ * names the signed-in account to Google (read from the session, never the
+ * form). Picking another account there signs that one in, as any sign-in in
+ * the browser would.
  */
 export async function continueWith(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const provider = providerInput.safeParse(field(formData, "provider"));
   if (!provider.success) return { error: PROVIDER_OFF };
   if (!(await allowAddress("social"))) return { error: TOO_MANY_ATTEMPTS };
 
+  const confirm = field(formData, "confirm") === "1";
+  const loginHint = confirm ? (await getCurrentUser())?.email : null;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: provider.data,
     options: {
       redirectTo: authCallbackUrl(safeRedirectPath(field(formData, "next")) ?? "/"),
-      ...providerOptions(provider.data, field(formData, "confirm") === "1"),
+      ...providerOptions(provider.data, confirm, loginHint),
     },
   });
   if (error || !data.url) return { error: "Couldn't start signing in. Try again." };

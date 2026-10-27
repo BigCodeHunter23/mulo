@@ -213,4 +213,16 @@ describe("providerOptions", () => {
     // Apple's sign-in in the browser always asks.
     expect(providerOptions("apple", true)).toEqual({ scopes: "name email" });
   });
+
+  it("names the account to Google when confirming, and only then", () => {
+    const hint = "someone@example.com";
+    expect(providerOptions("google", true, hint)).toEqual({
+      queryParams: { prompt: "select_account", login_hint: hint },
+    });
+    expect(providerOptions("google", false, hint)).toEqual({});
+    expect(providerOptions("apple", true, hint)).toEqual({ scopes: "name email" });
+    expect(providerOptions("google", true, null)).toEqual({
+      queryParams: { prompt: "select_account" },
+    });
+  });
 });

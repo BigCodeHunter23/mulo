@@ -1,23 +1,27 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { keepAppleTokenFrom } from "@/lib/apple-tokens";
-import type { AuthResponse } from "@/lib/app-api";
+import { OTHER_ACCOUNT, type AuthResponse } from "@/lib/app-api";
 import { appError, appJson, appRoute, BAD_REQUEST, readBody, toAppSession } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
 import { memoryStorage, oauthClient, pendingFlow, restoreStorage } from "@/lib/oauth";
+import { isOtherAccount, undoSignIn } from "@/lib/other-account";
 import { allowAddress } from "@/lib/rate-limit";
 
 const exchangeBody = z.object({
   code: z.string().min(1).max(512),
   flowId: z.string().max(64).optional(),
   state: z.string().max(8000),
+  expectedUserId: z.uuid().optional(),
 });
 
 /**
  * Finishes signing in through the browser: swaps the code the browser came
  * back with for a session, using the verifier in the `state` that
  * `auth/oauth/start` handed out. An Apple sign-in's refresh token is kept, so
- * deleting the account can cancel the link.
+ * deleting the account can cancel the link. When confirming it's them
+ * (`expectedUserId`), another account is signed straight back out, before any
+ * of its tokens are kept, and refused.
  */
 export const POST = appRoute(async (request: NextRequest) => {
   // A malformed body is a fault in the app, not something to word for people.
@@ -33,6 +37,10 @@ export const POST = appRoute(async (request: NextRequest) => {
     flowId ? { flowId } : undefined,
   );
   if (error || !data.session) return appError(401, "Couldn't finish signing in. Try again.");
+  if (isOtherAccount(data.session, body.expectedUserId)) {
+    await undoSignIn(data.session);
+    return appError(409, OTHER_ACCOUNT);
+  }
 
   await keepAppleTokenFrom(data.session);
   return appJson<AuthResponse>({ ok: true, session: toAppSession(data.session) });

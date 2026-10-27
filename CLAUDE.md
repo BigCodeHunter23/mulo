@@ -94,7 +94,8 @@ in plain language, and give them links and exact steps when they need to act.
   `session-facts.ts` (how somebody signed in: methods, password, fresh
   sign-in, a reset link's session), `apple.ts` + `apple-tokens.ts` (Sign in with Apple's secret and
   tokens; `apple_tokens` table, migration 0021), `oauth.ts` (the app's
-  Google and Apple-off-iPhone sign-in through the browser).
+  Google and Apple-off-iPhone sign-in through the browser), `other-account.ts`
+  (undoing a sign-in to another account while confirming it's you).
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),
   `goat`, `ratings`, `discover`, `charts`, `search`, `welcome` (onboarding, with intro
   cards after signup), `profile` (settings), `notifications`, and

@@ -35,14 +35,20 @@ const FLOW_SLOT = new RegExp(`^${STORAGE_KEY}-flow-([\\w-]{8,64})-code-verifier$
  * (`confirm`), Google is told to show its account chooser rather than sign
  * straight back in, so a Google session left open on a borrowed laptop or
  * phone can't confirm it with nobody looking. Apple's sign-in in the browser
- * always asks.
+ * always asks. `loginHint`, the signed-in account's email, starts Google's
+ * chooser on that account. It's only a hint: the app's sign-in still checks
+ * which account came back (`expectedUserId`).
  */
 export function providerOptions(
   provider: (typeof OAUTH_PROVIDERS)[number],
   confirm: boolean,
+  loginHint?: string | null,
 ): { scopes?: string; queryParams?: Record<string, string> } {
   if (provider === "apple") return { scopes: "name email" };
-  return confirm ? { queryParams: { prompt: "select_account" } } : {};
+  if (!confirm) return {};
+  return {
+    queryParams: { prompt: "select_account", ...(loginHint ? { login_hint: loginHint } : {}) },
+  };
 }
 
 /** Whether this sign-in is open yet. */

@@ -16,6 +16,16 @@ const apple = vi.hoisted(() => ({
   upsert: vi.fn(async () => ({ error: null })),
 }));
 
+/** The service role: undoing a sign-in to somebody else while confirming it's you. */
+const admin = vi.hoisted(() => ({
+  signOut: vi.fn(),
+  deleteUser: vi.fn(),
+  /** What reading the new user's profile answers. */
+  profile: { data: null as { id: string } | null, error: null as { message: string } | null },
+  /** The profile reads made, as "table.column=value". */
+  profileReads: new Array<string>(),
+}));
+
 /** Browser sign-ins build their own client over storage the route hands it. */
 type OAuthStorage = {
   getItem(key: string): string | null;
@@ -54,13 +64,27 @@ vi.mock("@/lib/apple", async (original) => ({
   sealToken: (token: string) => `sealed:${token}`,
 }));
 vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: () => ({ from: () => ({ upsert: apple.upsert }) }),
+  createAdminClient: () => ({
+    from: (table: string) => ({
+      upsert: apple.upsert,
+      select: () => ({
+        eq: (column: string, value: string) => ({
+          maybeSingle: async () => {
+            admin.profileReads.push(`${table}.${column}=${value}`);
+            return admin.profile;
+          },
+        }),
+      }),
+    }),
+    auth: { admin: { signOut: admin.signOut, deleteUser: admin.deleteUser } },
+  }),
 }));
 vi.mock("@/lib/apple-tokens", async (original) => ({
   ...(await original<typeof import("@/lib/apple-tokens")>()),
   rememberAppleToken: apple.rememberAppleToken,
 }));
 
+import { OTHER_ACCOUNT } from "@/lib/app-api";
 import { BAD_REQUEST } from "@/lib/app-route";
 import { allowAddress } from "@/lib/rate-limit";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
@@ -73,6 +97,15 @@ const SESSION = {
   user: { id: OTHER, email: "someone@example.com" },
 };
 const NONCE = "a-raw-nonce-of-enough-length";
+/** The account the app is signed in with, confirming it's them. */
+const ME = "7d0c1f8e-3b9a-4c2d-9e6f-5a4b3c2d1e0f";
+const SECONDS = 1000;
+const MINUTES = 60 * SECONDS;
+/** `SESSION`, for a user made `ago` milliseconds before now. */
+const madeAgo = (ago: number) => ({
+  ...SESSION,
+  user: { ...SESSION.user, created_at: new Date(Date.now() - ago).toISOString() },
+});
 
 /** A JWT shaped like Apple's identity token; Supabase checks it, so the tests don't sign it. */
 const jwt = (payload: unknown) =>
@@ -99,6 +132,10 @@ beforeEach(() => {
   oauth.storages = [];
   oauth.signInWithOAuth.mockReset();
   oauth.exchangeCodeForSession.mockReset();
+  admin.signOut.mockReset().mockResolvedValue({ data: null, error: null });
+  admin.deleteUser.mockReset().mockResolvedValue({ data: { user: null }, error: null });
+  admin.profile = { data: null, error: null };
+  admin.profileReads = [];
   vi.unstubAllEnvs();
   vi.stubEnv("APPLE_BUNDLE_ID", "");
   vi.stubEnv("APPLE_SERVICES_ID", "");
@@ -193,6 +230,103 @@ describe("POST auth/apple", () => {
     expect(apple.exchangeAppleCode).not.toHaveBeenCalled();
   });
 
+  describe("confirming it's them", () => {
+    const confirming = { ...ok, authorizationCode: "one-time", expectedUserId: ME };
+
+    beforeEach(() => {
+      vi.stubEnv("APPLE_BUNDLE_ID", "com.mulo.app");
+      apple.exchangeAppleCode.mockResolvedValue({ refreshToken: "apple-refresh", sub: APPLE_USER });
+    });
+
+    it("signs in as before when it's the same account", async () => {
+      const mine = { ...SESSION, user: { ...SESSION.user, id: ME } };
+      auth.signInWithIdToken.mockResolvedValue({ data: { session: mine }, error: null });
+      const response = await signIn(confirming);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true, session: mine });
+      expect(apple.rememberAppleToken).toHaveBeenCalledWith(ME, "apple-refresh", "com.mulo.app");
+      expect(admin.signOut).not.toHaveBeenCalled();
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("refuses another account, ends its session and keeps no Apple token", async () => {
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(30 * MINUTES) },
+        error: null,
+      });
+      const response = await signIn(confirming);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ ok: false, error: OTHER_ACCOUNT });
+      expect(admin.signOut).toHaveBeenCalledWith("access", "local");
+      expect(apple.exchangeAppleCode).not.toHaveBeenCalled();
+      expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+      // An account that was already there is somebody's, so it stays.
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("deletes the other account when this sign-in just made it", async () => {
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(5 * SECONDS) },
+        error: null,
+      });
+      const response = await signIn(confirming);
+      expect(response.status).toBe(409);
+      expect(admin.profileReads).toEqual([`profiles.id=${OTHER}`]);
+      expect(admin.deleteUser).toHaveBeenCalledWith(OTHER);
+      expect(admin.signOut).toHaveBeenCalledWith("access", "local");
+      expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+    });
+
+    it("never deletes an account with a profile, however new", async () => {
+      admin.profile = { data: { id: OTHER }, error: null };
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(5 * SECONDS) },
+        error: null,
+      });
+      expect((await signIn(confirming)).status).toBe(409);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("never deletes an account made more than two minutes ago", async () => {
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(3 * MINUTES) },
+        error: null,
+      });
+      expect((await signIn(confirming)).status).toBe(409);
+      expect(admin.profileReads).toEqual([]);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("keeps the account when its profile can't be read", async () => {
+      admin.profile = { data: null, error: { message: "boom" } };
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(5 * SECONDS) },
+        error: null,
+      });
+      expect((await signIn(confirming)).status).toBe(409);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("still refuses when the session can't be ended", async () => {
+      admin.signOut.mockResolvedValue({ data: null, error: { message: "gone" } });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      auth.signInWithIdToken.mockResolvedValue({
+        data: { session: madeAgo(30 * MINUTES) },
+        error: null,
+      });
+      const response = await signIn(confirming);
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe(OTHER_ACCOUNT);
+    });
+
+    it("refuses an expected user that isn't an id", async () => {
+      const response = await signIn({ ...confirming, expectedUserId: "me" });
+      expect(response.status).toBe(400);
+      expect(auth.signInWithIdToken).not.toHaveBeenCalled();
+    });
+  });
+
   it("refuses a body with no identity token", async () => {
     const response = await signIn({ nonce: NONCE });
     expect(response.status).toBe(400);
@@ -277,6 +411,44 @@ describe("POST auth/oauth/start", () => {
       },
       expect.anything(),
     );
+  });
+
+  it("names the signed-in account to Google when confirming", async () => {
+    startsSigningIn();
+    const loginHint = "someone@example.com";
+    expect((await start({ ...google, confirm: true, loginHint })).status).toBe(200);
+    expect(oauth.signInWithOAuth).toHaveBeenCalledWith(
+      {
+        provider: "google",
+        options: {
+          redirectTo: "mulo://auth/callback",
+          skipBrowserRedirect: true,
+          queryParams: { prompt: "select_account", login_hint: loginHint },
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it("passes the hint only to Google, and only when confirming", async () => {
+    startsSigningIn();
+    const loginHint = "someone@example.com";
+    await start({ ...google, loginHint });
+    await start({ ...google, provider: "apple", confirm: true, loginHint });
+    const [plain, appleCall] = oauth.signInWithOAuth.mock.calls.map(
+      (call) => (call[0] as { options: Record<string, unknown> }).options,
+    );
+    expect(plain?.queryParams).toBeUndefined();
+    expect(appleCall?.queryParams).toBeUndefined();
+    expect(appleCall?.scopes).toBe("name email");
+  });
+
+  it("refuses a hint that isn't an email address", async () => {
+    startsSigningIn();
+    for (const loginHint of ["not an email", `${"a".repeat(250)}@example.com`]) {
+      expect((await start({ ...google, confirm: true, loginHint })).status).toBe(400);
+    }
+    expect(oauth.signInWithOAuth).not.toHaveBeenCalled();
   });
 
   it("refuses a confirm that isn't true or false", async () => {
@@ -436,6 +608,63 @@ describe("POST auth/oauth/exchange", () => {
     await exchange(ok);
 
     expect(kept()).toEqual([]);
+  });
+
+  describe("confirming it's them", () => {
+    /** An Apple sign-in, with Apple's token, for a user made `ago` milliseconds before now. */
+    const appleMadeAgo = (ago: number) => {
+      const session = signedIn("apple", "apple-refresh", ["apple", NOW]);
+      return {
+        ...session,
+        user: { ...session.user, created_at: new Date(Date.now() - ago).toISOString() },
+      };
+    };
+
+    beforeEach(() => vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web"));
+
+    it("signs in as before when it's the same account", async () => {
+      const session = appleMadeAgo(30 * MINUTES);
+      oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+      const response = await exchange({ ...ok, expectedUserId: OTHER });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true, session: SESSION });
+      expect(kept()).toEqual([[OTHER, "apple-refresh", "com.mulo.web"]]);
+      expect(admin.signOut).not.toHaveBeenCalled();
+    });
+
+    it("refuses another account, ends its session and keeps no Apple token", async () => {
+      const session = appleMadeAgo(30 * MINUTES);
+      oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+      const response = await exchange({ ...ok, expectedUserId: ME });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ ok: false, error: OTHER_ACCOUNT });
+      expect(admin.signOut).toHaveBeenCalledWith("access", "local");
+      expect(kept()).toEqual([]);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("deletes the other account when this sign-in just made it", async () => {
+      const session = appleMadeAgo(10 * SECONDS);
+      oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+      const response = await exchange({ ...ok, expectedUserId: ME });
+      expect(response.status).toBe(409);
+      expect(admin.deleteUser).toHaveBeenCalledWith(OTHER);
+      expect(kept()).toEqual([]);
+    });
+
+    it("never deletes a new account that already has a profile", async () => {
+      admin.profile = { data: { id: OTHER }, error: null };
+      const session = appleMadeAgo(10 * SECONDS);
+      oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+      expect((await exchange({ ...ok, expectedUserId: ME })).status).toBe(409);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it("refuses an expected user that isn't an id", async () => {
+      const response = await exchange({ ...ok, expectedUserId: "not-a-uuid" });
+      expect(response.status).toBe(400);
+      expect(oauth.exchangeCodeForSession).not.toHaveBeenCalled();
+    });
   });
 
   it("refuses a state that isn't what start handed out", async () => {

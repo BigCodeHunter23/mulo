@@ -43,7 +43,7 @@ own `{ ok, error }`. Reads that cost the database something call
 `limitReads` (the `read` limit, per person or per address). Every shape they answer with is declared in
 `src/lib/app-api.ts`, which the app copies, so it stays framework-free (its
 test says how): types, plus the few plain strings the app matches an answer
-on (`NOT_FRESH`). New endpoints go in `test/app-api.test.ts`; Collection's
+on (`NOT_FRESH`, `OTHER_ACCOUNT`). New endpoints go in `test/app-api.test.ts`; Collection's
 (badges, GOAT, Mixtape, the Gauntlet, taste) are in
 `test/app-api-collection.test.ts`, and Social and account's (lists,
 notifications, reactions, reports, blocks, follows, invites, profile
@@ -54,7 +54,11 @@ the page to open and `state`, Supabase's PKCE storage (`src/lib/oauth.ts`), whic
 the app hands back with the code to `auth/oauth/exchange`, so nothing is kept here and
 a caught `mulo://` link is useless without it. Only `mulo://auth/callback` is
 ever asked for as the return address, and Supabase's Redirect URLs list is the
-real boundary. Every
+real boundary. Confirming it's them sends `expectedUserId` to `auth/apple` or
+`auth/oauth/exchange`: another account is answered 409 `OTHER_ACCOUNT`, its
+session ended and, if the sign-in had just made it (no profile, under two
+minutes old), the account deleted, before any Apple token is kept
+(`src/lib/other-account.ts`). Every
 `users/[username]/*` endpoint finds its person through `visibleProfile`
 (`src/lib/app-profile.ts`), so blocked people are a 404 everywhere; a list by
 somebody blocked is a 404 too, and `lists.ts`, `notifications.ts` and
