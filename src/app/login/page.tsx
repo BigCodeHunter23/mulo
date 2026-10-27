@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Log in" };
 const NOTICES = {
   "link-expired":
     "That link has expired, was already used, or was opened in a different browser from the one you signed up in. If you've already confirmed your email, just log in below.",
+  "sign-in-cancelled": "Sign-in was cancelled or didn't finish. Try again.",
 } as const;
 
 export default async function LoginPage({

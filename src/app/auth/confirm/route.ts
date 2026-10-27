@@ -14,18 +14,35 @@ const params = z.object({
   type: z.enum(OTP_TYPES).optional(),
 });
 
+/** The login page, with one of its notices (`NOTICES` in `src/app/login/page.tsx`). */
+function loginWith(next: string, notice: "link-expired" | "sign-in-cancelled"): string {
+  const login = loginPath(next);
+  return `${login}${login.includes("?") ? "&" : "?"}notice=${notice}`;
+}
+
 /**
- * Where links in Supabase's emails land (sign-up confirmation, password
- * reset).
+ * Where the website's sign-ins finish: links in Supabase's emails (sign-up
+ * confirmation, password reset, email change) and Continue with Apple or
+ * Google in the browser.
  *
- * Supabase hands the session over in one of two shapes depending on the email
- * template: a one-time `code` to exchange (its default template), or a
- * `token_hash` to verify (a customised template). Accept both, so a template
- * change on the dashboard can't silently break the link.
+ * Supabase hands the session over in one of two shapes: a one-time `code` to
+ * exchange (Apple, Google and the default email templates), or a `token_hash`
+ * to verify (a customised email template). Accept both, so a template change
+ * on the dashboard can't silently break the link. A sign-in that was
+ * cancelled or refused at Apple or Google comes back with an `error` and no
+ * code.
  */
 export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams;
   const next = safeRedirectPath(search.get("next")) ?? "/";
+
+  // Supabase's own words (`error_description`) are never shown. An email
+  // link that has run out comes back this way too (`otp_expired`), and falls
+  // through to the expired-link answer below.
+  const emailLinkError = search.get("error_code")?.startsWith("otp_") ?? false;
+  if (search.has("error") && !search.has("code") && !emailLinkError) {
+    redirect(loginWith(next, "sign-in-cancelled"));
+  }
   const parsed = params.safeParse({
     code: search.get("code") ?? undefined,
     token_hash: search.get("token_hash") ?? undefined,
@@ -63,6 +80,5 @@ export async function GET(request: NextRequest) {
   // different browser from the one that asked for it. Supabase has usually
   // confirmed the address by now even so, so logging in is the way on.
   if (next.startsWith("/auth/update-password")) redirect("/auth/reset?expired=1");
-  const login = loginPath(next);
-  redirect(`${login}${login.includes("?") ? "&" : "?"}notice=link-expired`);
+  redirect(loginWith(next, "link-expired"));
 }

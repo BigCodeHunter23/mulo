@@ -100,6 +100,28 @@ describe("/auth/confirm", () => {
     expect(state.remember).not.toHaveBeenCalled();
   });
 
+  it("sends a cancelled sign-in back to log in, saying so plainly", async () => {
+    expect(
+      await visit("?error=access_denied&error_description=User+cancelled&next=%2Fratings"),
+    ).toEqual(new Error("redirect:/login?next=%2Fratings&notice=sign-in-cancelled"));
+    expect(await visit("?error=server_error")).toEqual(
+      new Error("redirect:/login?notice=sign-in-cancelled"),
+    );
+    expect(state.remember).not.toHaveBeenCalled();
+  });
+
+  it("still calls an expired email link expired, even when Supabase sends it back with an error", async () => {
+    expect(await visit("?error=access_denied&error_code=otp_expired&next=%2Fratings")).toEqual(
+      new Error("redirect:/login?next=%2Fratings&notice=link-expired"),
+    );
+    expect(
+      await visit("?error=access_denied&error_code=otp_expired&next=%2Fauth%2Fupdate-password"),
+    ).toEqual(new Error("redirect:/auth/reset?expired=1"));
+    state.exchange = { data: { user: null, session: null }, error: { message: "expired" } };
+    expect(await visit("?code=abc")).toEqual(new Error("redirect:/login?notice=link-expired"));
+    expect(await visit("")).toEqual(new Error("redirect:/login?notice=link-expired"));
+  });
+
   it("leaves the token_hash branch alone", async () => {
     state.exchange = session("apple", "r-token");
     await visit("?token_hash=h&type=recovery");
