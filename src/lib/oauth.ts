@@ -21,9 +21,6 @@ export const APP_REDIRECT = "mulo://auth/callback";
 const STORAGE_KEY = "mulo-app-oauth";
 const STATE_MAX = 8000;
 
-/** Expo Go's address for the app in development: a host, maybe a port, then the path. */
-const EXPO_REDIRECT = /^exp:\/\/[\w.-]+(:\d{1,5})?\/--\/auth\/callback$/;
-
 /**
  * The keys auth-js keeps a PKCE flow under (`lib/helpers.js`): one slot per
  * flow, the list of flows, and the older single key it still writes. A
@@ -37,11 +34,20 @@ export function providerOn(provider: OAuthProvider): provider is (typeof OAUTH_P
   return OAUTH_PROVIDERS.some((on) => on === provider);
 }
 
-/** The app's own return address, or Expo's development one outside production. */
+/**
+ * Whether `address` is the app's own return address, exactly
+ * `mulo://auth/callback`. Expo Go's `exp://` addresses are refused on every
+ * deployment: any app or page can claim one, so a sign-in sent there could be
+ * caught by somebody else. Develop sign-in on a development build, which opens
+ * `mulo://` itself.
+ *
+ * This check only stops the website starting a sign-in for anywhere else. The
+ * real boundary is Supabase's list of Redirect URLs (Authentication → URL
+ * Configuration), which decides where a code is ever sent: it must list
+ * exactly `mulo://auth/callback` for the app, and never `exp://**`.
+ */
 export function allowedRedirect(address: string): boolean {
-  if (address === APP_REDIRECT) return true;
-  if (process.env.VERCEL_ENV === "production") return false;
-  return EXPO_REDIRECT.test(address);
+  return address === APP_REDIRECT;
 }
 
 type Store = Record<string, string>;

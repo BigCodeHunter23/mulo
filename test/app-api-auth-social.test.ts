@@ -205,12 +205,14 @@ describe("POST auth/oauth/start", () => {
     );
   });
 
-  it("allows Expo's development address outside production", async () => {
+  it("refuses Expo Go's address on a preview too", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     startsSigningIn();
     const redirectTo = "exp://192.168.1.7:8081/--/auth/callback";
     const response = await start({ ...google, redirectTo });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(BAD_REQUEST);
+    expect(oauth.signInWithOAuth).not.toHaveBeenCalled();
   });
 
   it("says Facebook isn't available yet", async () => {

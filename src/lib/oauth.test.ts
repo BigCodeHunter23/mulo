@@ -37,18 +37,21 @@ describe("allowedRedirect", () => {
     expect(allowedRedirect("mulo://auth/callback")).toBe(true);
   });
 
-  it("allows Expo's development address outside production only", () => {
+  it("refuses Expo Go's addresses, wherever the website runs", () => {
     const expo = "exp://192.168.1.7:8081/--/auth/callback";
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect(allowedRedirect(expo)).toBe(true);
-    vi.stubEnv("VERCEL_ENV", "production");
-    expect(allowedRedirect(expo)).toBe(false);
-    expect(allowedRedirect(APP_REDIRECT)).toBe(true);
+    for (const env of ["preview", "development", "production", ""]) {
+      vi.stubEnv("VERCEL_ENV", env);
+      expect(allowedRedirect(expo)).toBe(false);
+      expect(allowedRedirect("exp://u.expo.dev/--/auth/callback")).toBe(false);
+      expect(allowedRedirect(APP_REDIRECT)).toBe(true);
+    }
   });
 
   it("refuses anywhere else", () => {
     expect(allowedRedirect("https://evil.example/cb")).toBe(false);
     expect(allowedRedirect("mulo://elsewhere")).toBe(false);
+    expect(allowedRedirect("mulo://auth/callback/")).toBe(false);
+    expect(allowedRedirect("MULO://auth/callback")).toBe(false);
     expect(allowedRedirect("mulo://auth/callback?next=https://evil.example")).toBe(false);
     expect(allowedRedirect("exp://evil.example/--/auth/callback?x=1")).toBe(false);
     expect(allowedRedirect("exp://evil.example/--/auth/callback#x")).toBe(false);
