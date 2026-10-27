@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { markHasPassword } from "@/lib/account";
+import { cameFromResetLink } from "@/lib/session-facts";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { field, firstError, newPasswordSchema } from "@/lib/validation";
 
@@ -10,13 +12,18 @@ export type UpdatePasswordState = {
   expired?: boolean;
 };
 
+/**
+ * A new password, from a reset link. Only a session the link itself made, in
+ * the last few minutes, may set one here: any other session (a laptop left
+ * signed in) has to change it on the account page, with the current password.
+ */
 export async function updatePassword(
   _prev: UpdatePasswordState,
   formData: FormData,
 ): Promise<UpdatePasswordState> {
   const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !(await cameFromResetLink())) {
     return {
       error: "That reset link has expired. Please request a new one.",
       expired: true,
@@ -44,5 +51,11 @@ export async function updatePassword(
     return { error: "Couldn't save your new password. Please try again." };
   }
 
+  // An account made with Apple or Google has a password now too, so the
+  // account page offers to change it. Best effort: the password is saved
+  // either way, and the session is refreshed so its token says so.
+  if (await markHasPassword(user.id)) {
+    await supabase.auth.refreshSession().catch(() => undefined);
+  }
   redirect("/");
 }

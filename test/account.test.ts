@@ -67,7 +67,7 @@ vi.mock("@/lib/rate-limit", async (original) => ({
   allowUser: vi.fn(async () => !limits.limited),
 }));
 
-const { changeEmailFor, changePasswordFor, deleteAccountFor, setPasswordFor } =
+const { changeEmailFor, changePasswordFor, deleteAccountFor, markHasPassword, setPasswordFor } =
   await import("@/lib/account");
 const { createClient } = await import("@supabase/supabase-js");
 const { allowUser } = await import("@/lib/rate-limit");
@@ -469,5 +469,19 @@ describe("setPasswordFor", () => {
       ok: false,
       error: "Couldn't set your password. Please try again.",
     });
+  });
+});
+
+describe("markHasPassword", () => {
+  it("marks the account as having a password, giving only that key for Supabase to merge in", async () => {
+    expect(await markHasPassword(ME.id)).toBe(true);
+    expect(admin.updateUserById).toHaveBeenCalledWith(ME.id, {
+      app_metadata: { has_password: true },
+    });
+  });
+
+  it("says so when it couldn't", async () => {
+    admin.updateUserById.mockResolvedValue({ data: { user: null }, error: { message: "down" } });
+    expect(await markHasPassword(ME.id)).toBe(false);
   });
 });

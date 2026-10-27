@@ -7,6 +7,9 @@ import { bearerToken, createClient } from "@/lib/supabase/server";
 /** How long a sign-in counts as fresh enough to stand in for a password. */
 export const FRESH_SECONDS = 5 * 60;
 
+/** How long after following a password reset link a new password can be set. */
+export const RESET_SECONDS = 15 * 60;
+
 const METHODS = ["email", "apple", "google", "facebook"] as const satisfies readonly SignInMethod[];
 
 export type SessionFacts = {
@@ -35,6 +38,16 @@ const SIGN_IN_METHODS = [
   "sso/saml",
   "id_token",
 ] as const;
+
+/**
+ * What following a link sent to somebody's email signs in with, which is what
+ * a password reset link proves. `/auth/confirm` exchanges the default
+ * template's `code`, which Supabase records as `recovery`; a customised
+ * template's `token_hash` goes through `verifyOtp`, which Supabase records as
+ * `otp` (`magiclink` in some versions). Any of them proves the person opened
+ * a link sent to the account's address just now, as a reset link does.
+ */
+const RESET_METHODS = ["recovery", "otp", "magiclink"] as const;
 
 /** How far ahead of this server's clock a sign-in may be dated, for a slightly fast clock at Supabase. */
 const CLOCK_SKEW_SECONDS = 30;
@@ -83,9 +96,24 @@ export function factsFromClaims(claims: unknown, now = nowInSeconds()): SessionF
   };
 }
 
-/** The caller's facts, from the same verified claims getCurrentUser reads. */
-export const getSessionFacts = cache(async (): Promise<SessionFacts> => {
+/** Pure, for tests: whether the session came from a link sent by email in the last RESET_SECONDS. */
+export function resetLinkFromClaims(claims: unknown, now = nowInSeconds()): boolean {
+  return signedInWithin(claims, RESET_METHODS, RESET_SECONDS, now);
+}
+
+/** The caller's verified claims, the same ones getCurrentUser reads. */
+const callerClaims = cache(async (): Promise<unknown> => {
   const [supabase, token] = await Promise.all([createClient(), bearerToken()]);
   const { data } = token ? await supabase.auth.getClaims(token) : await supabase.auth.getClaims();
-  return factsFromClaims(data?.claims);
+  return data?.claims;
 });
+
+/** The caller's facts. */
+export const getSessionFacts = cache(async (): Promise<SessionFacts> =>
+  factsFromClaims(await callerClaims()),
+);
+
+/** Whether the caller's session came from a password reset link, recently enough to set a new one. */
+export async function cameFromResetLink(): Promise<boolean> {
+  return resetLinkFromClaims(await callerClaims());
+}

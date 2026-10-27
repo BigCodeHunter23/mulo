@@ -77,8 +77,13 @@ const signedIn = vi.hoisted(() => ({
     hasPassword: false,
     freshSignIn: false,
   },
+  /** Whether the session came from a password reset link just now. */
+  fromResetLink: false,
 }));
-vi.mock("@/lib/session-facts", () => ({ getSessionFacts: vi.fn(async () => signedIn.facts) }));
+vi.mock("@/lib/session-facts", () => ({
+  getSessionFacts: vi.fn(async () => signedIn.facts),
+  cameFromResetLink: vi.fn(async () => signedIn.fromResetLink),
+}));
 /** The real account work, watched, so a test can see what the page's actions pass on. */
 vi.mock("@/lib/account", async (original) => {
   const real = await original<typeof import("@/lib/account")>();
@@ -87,6 +92,7 @@ vi.mock("@/lib/account", async (original) => {
     changePasswordFor: vi.fn(real.changePasswordFor),
     setPasswordFor: vi.fn(real.setPasswordFor),
     deleteAccountFor: vi.fn(real.deleteAccountFor),
+    markHasPassword: vi.fn(async () => true),
   };
 });
 
@@ -323,6 +329,50 @@ describe("the account page, for an account without a password", () => {
       error: "Please confirm it's you again.",
     });
     expect(auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe("setting a new password from a reset link", () => {
+  const ME = { id: OTHER, email: "someone@example.com" };
+  const auth = { updateUser: vi.fn(), refreshSession: vi.fn() };
+  const details = form({ password: "longenough", confirm: "longenough" });
+
+  beforeEach(async () => {
+    session.user = ME;
+    signedIn.fromResetLink = true;
+    auth.updateUser.mockReset().mockResolvedValue({ data: {}, error: null });
+    auth.refreshSession.mockReset().mockResolvedValue({ data: {}, error: null });
+    vi.mocked((await import("@/lib/account")).markHasPassword).mockClear();
+    const server = await import("@/lib/supabase/server");
+    vi.mocked(server.createClient).mockImplementation((async () => ({
+      ...emptyClient(),
+      auth,
+    })) as never);
+  });
+
+  it("refuses a session that didn't come from a reset link, changing nothing", async () => {
+    signedIn.fromResetLink = false;
+    const { updatePassword } = await import("@/app/auth/update-password/actions");
+    expect(await updatePassword({}, details)).toEqual({
+      error: "That reset link has expired. Please request a new one.",
+      expired: true,
+    });
+    expect(auth.updateUser).not.toHaveBeenCalled();
+    expect((await import("@/lib/account")).markHasPassword).not.toHaveBeenCalled();
+  });
+
+  it("sets it, and marks the account as having a password", async () => {
+    const { updatePassword } = await import("@/app/auth/update-password/actions");
+    await expect(updatePassword({}, details)).rejects.toThrow("redirect:/");
+    expect(auth.updateUser).toHaveBeenCalledWith({ password: "longenough" });
+    expect((await import("@/lib/account")).markHasPassword).toHaveBeenCalledWith(ME.id);
+  });
+
+  it("marks nothing when the password couldn't be saved", async () => {
+    auth.updateUser.mockResolvedValue({ data: {}, error: { message: "down" } });
+    const { updatePassword } = await import("@/app/auth/update-password/actions");
+    expect((await updatePassword({}, details)).error).toMatch(/Couldn't save/);
+    expect((await import("@/lib/account")).markHasPassword).not.toHaveBeenCalled();
   });
 });
 

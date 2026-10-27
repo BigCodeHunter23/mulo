@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { factsFromClaims, FRESH_SECONDS } from "@/lib/session-facts";
+import {
+  factsFromClaims,
+  FRESH_SECONDS,
+  resetLinkFromClaims,
+  RESET_SECONDS,
+} from "@/lib/session-facts";
 
 const NOW = 1_800_000_000;
 
@@ -110,5 +115,36 @@ describe("factsFromClaims", () => {
     expect(
       factsFromClaims({ app_metadata: { providers: ["github", 7] }, amr: ["password"] }, NOW),
     ).toEqual({ signInMethods: [], hasPassword: false, freshSignIn: false });
+  });
+});
+
+describe("resetLinkFromClaims", () => {
+  const claims = (method: string, ago: number) => ({
+    app_metadata: { providers: ["email"] },
+    amr: [{ method, timestamp: NOW - ago }],
+  });
+
+  it.each(["recovery", "otp", "magiclink"])(
+    "accepts a link sent by email (%s) just now",
+    (method) => {
+      expect(resetLinkFromClaims(claims(method, 60), NOW)).toBe(true);
+    },
+  );
+
+  it("refuses a link opened longer ago than the window", () => {
+    expect(resetLinkFromClaims(claims("recovery", RESET_SECONDS + 1), NOW)).toBe(false);
+    expect(RESET_SECONDS).toBe(15 * 60);
+  });
+
+  it.each(["password", "oauth", "totp", "token_refresh"])(
+    "refuses a session that came from %s rather than a link",
+    (method) => {
+      expect(resetLinkFromClaims(claims(method, 10), NOW)).toBe(false);
+    },
+  );
+
+  it("refuses claims it can't read", () => {
+    expect(resetLinkFromClaims(null, NOW)).toBe(false);
+    expect(resetLinkFromClaims({ amr: ["recovery"] }, NOW)).toBe(false);
   });
 });

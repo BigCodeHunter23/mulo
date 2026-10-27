@@ -138,6 +138,24 @@ export async function setPasswordFor(
   return { ok: true, message: "Password set. You can now log in with your email too." };
 }
 
+/**
+ * Marks the account as having a password (`app_metadata.has_password`, which
+ * `SessionFacts` reads), for one set through a reset link rather than here.
+ * Only this key is sent: Supabase merges the keys it's given into
+ * `app_metadata` (`UpdateAppMetaData` in its auth server), so nothing else the
+ * account's metadata says is lost. True once it's saved.
+ */
+export async function markHasPassword(userId: string): Promise<boolean> {
+  const { error } = await createAdminClient().auth.admin.updateUserById(userId, {
+    app_metadata: { has_password: true },
+  });
+  if (error) {
+    console.error("[account] couldn't mark the account as having a password:", error.message);
+    return false;
+  }
+  return true;
+}
+
 export async function changeEmailFor(
   user: CurrentUser,
   raw: unknown,
