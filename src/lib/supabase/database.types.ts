@@ -15,6 +15,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      apple_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          refresh_token: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          refresh_token: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          refresh_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       artist_ratings: {
         Row: {
           artist_mbid: string
