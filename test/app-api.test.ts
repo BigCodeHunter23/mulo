@@ -85,6 +85,10 @@ const lib = vi.hoisted(() => ({
   // collection
   getTopPicks: vi.fn(),
   getTasteMatch: vi.fn(),
+  // social and account
+  getUserLists: vi.fn(),
+  getRecentLists: vi.fn(),
+  getRaisedOn: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -182,6 +186,11 @@ vi.mock("@/lib/drop", () => ({
 vi.mock("@/lib/guess", () => ({ getGuessGame: lib.getGuessGame }));
 vi.mock("@/lib/top-picks", () => ({ getTopPicks: lib.getTopPicks }));
 vi.mock("@/lib/taste", () => ({ getTasteMatch: lib.getTasteMatch }));
+vi.mock("@/lib/lists", () => ({
+  getUserLists: lib.getUserLists,
+  getRecentLists: lib.getRecentLists,
+}));
+vi.mock("@/lib/raised-on", () => ({ getRaisedOn: lib.getRaisedOn }));
 
 /** Stand-ins for the website's own actions, which the writes hand straight to. */
 const actions = vi.hoisted(() => ({
@@ -609,6 +618,25 @@ describe("GET feed", () => {
   });
 });
 
+/** A list, as a card shows it. */
+const LIST = {
+  id: 1,
+  title: "Debuts",
+  description: null,
+  ranked: true,
+  updatedAt: "2026-10-01T00:00:00Z",
+  count: 3,
+  covers: [],
+  ownerId: OTHER,
+  owner: { username: "alex", name: "Alex", avatarUrl: null },
+};
+
+const RAISED = {
+  era: null,
+  scene: null,
+  album: { mbid: MBID, title: "OK Computer", artist: "Radiohead", cover: null, year: 1997 },
+};
+
 describe("GET discover", () => {
   const discover = async () => (await import("@/app/api/app/v1/discover/route")).GET();
   const album = (mbid: string) => ({
@@ -628,6 +656,7 @@ describe("GET discover", () => {
     lib.artistsToExplore.mockResolvedValue([ARTIST]);
     lib.getGlobalFeed.mockResolvedValue([{ key: "f" }]);
     lib.getMyAlbumScores.mockResolvedValue(new Map([["a", 9]]));
+    lib.getRecentLists.mockResolvedValue([LIST]);
   });
 
   it("answers every shelf, and your own scores for the albums on them", async () => {
@@ -641,8 +670,10 @@ describe("GET discover", () => {
       artistsToExplore: [ARTIST],
       justRated: [{ key: "f" }],
       mine: { a: 9 },
+      lists: [LIST],
     });
     expect(lib.newReleases).toHaveBeenCalledWith(10);
+    expect(lib.getRecentLists).toHaveBeenCalledWith(4);
     expect(lib.getMyAlbumScores.mock.calls[0][0]).toEqual(["a", "b", "c", "d", "e"]);
   });
 
@@ -671,6 +702,19 @@ describe("GET discover", () => {
     expect(body.justRated).toEqual([]);
     expect(body.newReleases).toEqual(four);
     expect(lib.getGlobalFeed).not.toHaveBeenCalled();
+  });
+
+  it("keeps lists to people with an account, as the page does", async () => {
+    expect((await (await discover()).json()).lists).toEqual([]);
+    expect(lib.getRecentLists).not.toHaveBeenCalled();
+  });
+
+  it("leaves lists out, rather than failing, when they can't be read", async () => {
+    signIn();
+    lib.getRecentLists.mockRejectedValue(new Error("down"));
+    const response = await discover();
+    expect(response.status).toBe(200);
+    expect((await response.json()).lists).toEqual([]);
   });
 });
 
@@ -1169,6 +1213,8 @@ describe("GET users/[username]", () => {
     lib.getStreak.mockResolvedValue({ days: 3, today: true, best: 9 });
     lib.getTopPicks.mockResolvedValue([]);
     lib.getTasteMatch.mockResolvedValue(null);
+    lib.getUserLists.mockResolvedValue([]);
+    lib.getRaisedOn.mockResolvedValue(null);
   });
 
   const PICK = { mbid: MBID, title: "Kid A", subtitle: "Radiohead", image: null };
@@ -1268,6 +1314,38 @@ describe("GET users/[username]", () => {
     lib.isHidden.mockResolvedValue(true);
     expect((await profile()).status).toBe(404);
     expect(lib.getUserFeed).not.toHaveBeenCalled();
+  });
+
+  it("answers their first three non-empty lists and how many there are, signed in", async () => {
+    signIn();
+    const lists = [1, 2, 3, 4, 5].map((id) => ({ ...LIST, id, count: id === 2 ? 0 : 3 }));
+    lib.getUserLists.mockResolvedValue(lists);
+    const body = await (await profile()).json();
+    expect(body.lists.top.map((l: { id: number }) => l.id)).toEqual([1, 3, 4]);
+    expect(body.lists.count).toBe(4);
+    expect(lib.getUserLists).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("keeps lists to people with an account, as the page does", async () => {
+    lib.getUserLists.mockResolvedValue([LIST]);
+    expect((await (await profile()).json()).lists).toEqual({ top: [], count: 0 });
+    expect(lib.getUserLists).not.toHaveBeenCalled();
+  });
+
+  it("shows no lists, rather than no profile, when they can't be read", async () => {
+    signIn();
+    lib.getUserLists.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).lists).toEqual({ top: [], count: 0 });
+  });
+
+  it("answers the record they were raised on to anyone, as the page shows it", async () => {
+    lib.getRaisedOn.mockResolvedValue(RAISED);
+    expect((await (await profile()).json()).raisedOn).toEqual(RAISED);
+    expect(lib.getRaisedOn).toHaveBeenCalledWith(OTHER);
+    lib.getRaisedOn.mockRejectedValue(new Error("down"));
+    expect((await (await profile()).json()).raisedOn).toBeNull();
   });
 
   it("is 404 for a username that can't exist, without looking", async () => {

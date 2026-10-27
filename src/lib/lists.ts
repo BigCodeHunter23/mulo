@@ -1,4 +1,6 @@
 import "server-only";
+import type { ListDetail, ListItem, ListSummary } from "@/lib/app-api";
+import { hiddenPeople } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -10,37 +12,13 @@ import { createClient } from "@/lib/supabase/server";
 
 export const LIST_LIMIT = 100;
 
-export type ListSummary = {
-  id: number;
-  title: string;
-  description: string | null;
-  ranked: boolean;
-  updatedAt: string;
-  count: number;
-  /** The first few covers, for a thumbnail. */
-  covers: string[];
-  owner: { username: string; name: string; avatarUrl: string | null };
-};
-
-export type ListItem = {
-  mbid: string;
-  position: number;
-  note: string | null;
-  title: string;
-  artist: string | null;
-  cover: string | null;
-  year: string | null;
-};
-
-export type ListDetail = Omit<ListSummary, "count" | "covers"> & {
-  ownerId: string;
-  items: ListItem[];
-};
+export type { ListDetail, ListItem, ListSummary };
 
 type ProfileRow = { username: string; display_name: string | null; avatar_url: string | null };
 
 type SummaryRow = {
   id: number;
+  user_id: string;
   title: string;
   description: string | null;
   ranked: boolean;
@@ -53,7 +31,7 @@ type SummaryRow = {
 };
 
 const SUMMARY = `
-  id, title, description, ranked, updated_at,
+  id, user_id, title, description, ranked, updated_at,
   profiles ( username, display_name, avatar_url ),
   list_items ( position, releases ( cover_art_url ) )
 `;
@@ -78,8 +56,15 @@ function summarise(row: SummaryRow): ListSummary {
     covers: items
       .flatMap((item) => (item.releases?.cover_art_url ? [item.releases.cover_art_url] : []))
       .slice(0, 4),
+    ownerId: row.user_id,
     owner: owner(row.profiles),
   };
+}
+
+/** Leaves out the lists of anybody blocked, either way round. */
+async function visible(lists: ListSummary[]): Promise<ListSummary[]> {
+  const hidden = await hiddenPeople();
+  return hidden.size === 0 ? lists : lists.filter((list) => !hidden.has(list.ownerId));
 }
 
 /** Somebody's lists, most recently changed first. */
@@ -102,8 +87,7 @@ export async function getRecentLists(limit = 24): Promise<ListSummary[]> {
     .select(SUMMARY)
     .order("updated_at", { ascending: false })
     .limit(limit * 2);
-  return (data ?? [])
-    .map(summarise)
+  return (await visible((data ?? []).map(summarise)))
     .filter((list) => list.count > 0)
     .slice(0, limit);
 }
@@ -124,8 +108,8 @@ export async function getListsWithAlbum(releaseMbid: string, limit = 6): Promise
     .select(SUMMARY)
     .in("id", ids)
     .order("updated_at", { ascending: false })
-    .limit(limit);
-  return (data ?? []).map(summarise);
+    .limit(limit * 2);
+  return (await visible((data ?? []).map(summarise))).slice(0, limit);
 }
 
 /** One list with all its albums, in order. */

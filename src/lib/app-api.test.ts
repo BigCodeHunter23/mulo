@@ -15,6 +15,7 @@ const SHARED = [
   "@/lib/badge-catalog",
   "@/lib/friend-scores",
   "@/lib/drop-lineup",
+  "@/lib/eras",
   "@/lib/rating-kinds",
   "@/lib/versus-shared",
 ];

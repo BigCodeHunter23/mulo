@@ -2,7 +2,14 @@ import type { Badge } from "@/lib/badge-catalog";
 import type { FriendScore, SearchFriends } from "@/lib/friend-scores";
 import type { RatingKind } from "@/lib/rating-kinds";
 import type { DropAlbum } from "@/lib/drop-lineup";
-import type { VersusMatchup, VersusSideKey, VersusTally, VersusView } from "@/lib/versus-shared";
+import type { Era, Scene } from "@/lib/eras";
+import type {
+  VersusMatchup,
+  VersusResult,
+  VersusSideKey,
+  VersusTally,
+  VersusView,
+} from "@/lib/versus-shared";
 
 /**
  * Every shape the app API (`src/app/api/app/v1`) answers with, and the ones
@@ -560,6 +567,10 @@ export type ProfilePage = {
    * Null signed out, on your own profile, or with too little in common.
    */
   taste: TasteMatch | null;
+  /** Their non-empty lists, newest first, for the profile's section (empty signed out). */
+  lists: { top: ListSummary[]; count: number };
+  /** The record they were raised on. */
+  raisedOn: RaisedOn | null;
 };
 
 /**
@@ -578,6 +589,8 @@ export type DiscoverPage = {
   justRated: FeedItem[];
   /** The signed-in person's own scores for the albums above, by mbid. */
   mine: Record<string, number>;
+  /** A few recent lists (empty signed out). */
+  lists: ListSummary[];
 };
 
 /** `GET charts?type=&genre=` */
@@ -931,3 +944,147 @@ export type HomeExtras = {
   /** An old score to stand by or change; null when there isn't one old enough. */
   receipt: (Receipt & { howLongAgo: string }) | null;
 };
+
+// ── Lists ──────────────────────────────────────────────────────────────
+
+/** A list, as a card shows it. */
+export type ListSummary = {
+  id: number;
+  title: string;
+  description: string | null;
+  ranked: boolean;
+  updatedAt: string;
+  count: number;
+  /** The first few covers, for a thumbnail. */
+  covers: string[];
+  ownerId: string;
+  owner: { username: string; name: string; avatarUrl: string | null };
+};
+
+export type ListItem = {
+  mbid: string;
+  position: number;
+  note: string | null;
+  title: string;
+  artist: string | null;
+  cover: string | null;
+  year: string | null;
+};
+
+export type ListDetail = Omit<ListSummary, "count" | "covers"> & { items: ListItem[] };
+
+/** What a list action answers; `id` is the new list's, after creating one. */
+export type ListResult = { ok: true; id?: number } | { ok: false; error: string };
+
+/** `GET lists`: yours, then everyone's latest. */
+export type ListsPage = { mine: ListSummary[]; recent: ListSummary[] };
+
+/** `GET lists/[id]` */
+export type ListPage = { list: ListDetail; isOwner: boolean; limit: number };
+
+/** One of your lists, beside an album: whether it's on it, and whether there's room. */
+export type MyList = { id: number; title: string; has: boolean; full: boolean };
+
+/** `GET albums/[mbid]/lists`: Add to list's ticks, and "On these lists". */
+export type AlbumLists = { mine: MyList[]; featured: ListSummary[] };
+
+// ── Notifications ──────────────────────────────────────────────────────
+
+export type Person = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+export type Notification =
+  | { kind: "follow"; key: string; at: string; person: Person }
+  | {
+      kind: "reaction";
+      key: string;
+      at: string;
+      person: Person;
+      /** 1 for a love, -1 for a nah. */
+      value: 1 | -1;
+      /** What was reacted to: a rating, a Versus pick, or a take. */
+      on: "rating" | "pick" | "take";
+      subject: { title: string; href: string };
+      /** For a pick, the artist they picked. */
+      picked?: string;
+    }
+  /**
+   * Somebody they follow rated a record they have rated too. Both scores ride
+   * along so the line can put the two numbers side by side, which is the whole
+   * reason to tap it.
+   */
+  | {
+      kind: "also-rated";
+      key: string;
+      at: string;
+      person: Person;
+      subject: { title: string; href: string };
+      yours: number;
+      theirs: number;
+    }
+  /** Today's Daily Versus is up and they haven't picked yet. */
+  | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
+  /** A Versus they picked in has closed. */
+  | { kind: "versus-result"; key: string; at: string; result: VersusResult };
+
+/** `GET notifications`; `following` marks who already gets a Follow back. */
+export type NotificationsPage = { notifications: Notification[]; following: string[] };
+
+/** `GET notifications/latest`: the newest one's time, for the bell's dot. */
+export type LatestNotification = { latest: string | null };
+
+// ── Reports, follows, invites, blocks ──────────────────────────────────
+
+/** What a report is about: a review (album or artist), a take, a list or a person. */
+export type ReportTarget =
+  | { kind: "rating" | "artistRating" | "take" | "list"; id: number }
+  | { kind: "profile"; id: string };
+
+/** A report's answer: a thank-you, including for one already sent. */
+export type ReportResult = { ok: true; message: string } | AppError;
+
+/** `GET users/[username]/follows?show=&page=` */
+export type FollowsPage = { people: PublicProfile[]; following: string[]; hasMore: boolean };
+
+/** `POST me/invite`: the full join link. */
+export type InviteResult = { ok: true; url: string } | AppError;
+
+export type BlockedPerson = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+// ── Profile and account ────────────────────────────────────────────────
+
+export type RaisedOn = {
+  era: Era | null;
+  scene: Scene | null;
+  album: {
+    mbid: string;
+    title: string;
+    artist: string | null;
+    cover: string | null;
+    year: number | null;
+  };
+};
+
+/** `GET me/profile`: what the edit screen starts from. */
+export type EditableProfile = {
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  raisedOn: RaisedOn | null;
+};
+
+/** `POST me/avatar` */
+export type AvatarResult = { ok: true; avatarUrl: string } | AppError;
+
+/** Password and email changes answer with the website's own words. */
+export type AccountResult = { ok: true; message: string } | AppError;

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { ListResult } from "@/lib/app-api";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { LIST_LIMIT } from "@/lib/lists";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
@@ -13,7 +14,7 @@ import { allowUser, TOO_MANY } from "@/lib/rate-limit";
  * success that row-level security then refuses underneath.
  */
 
-export type ListResult = { ok: true; id?: number } | { ok: false; error: string };
+export type { ListResult };
 
 const TRY_AGAIN: ListResult = { ok: false, error: "Couldn't save that. Please try again." };
 

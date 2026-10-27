@@ -1,4 +1,5 @@
 import "server-only";
+import { hiddenPeople } from "@/lib/blocks";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import type { ReactionSummary } from "@/lib/app-api";
 
@@ -16,7 +17,10 @@ export const REACTION_COLUMNS = {
 
 export const NO_REACTIONS: ReactionSummary = { love: 0, dislike: 0, mine: null };
 
-/** Loves and dislikes for a page of reviews, in one query. */
+/**
+ * Loves and dislikes for a page of reviews, in one query. Somebody blocked,
+ * either way round, doesn't count.
+ */
 export async function getReactions(
   kind: ReactionKind,
   ratingIds: number[],
@@ -27,7 +31,7 @@ export async function getReactions(
   for (const id of ratingIds) summaries[id] = { ...NO_REACTIONS };
 
   const supabase = await createClient();
-  const user = await getCurrentUser();
+  const [user, hidden] = await Promise.all([getCurrentUser(), hiddenPeople()]);
   const column = REACTION_COLUMNS[kind];
 
   const { data } = await supabase
@@ -41,6 +45,7 @@ export async function getReactions(
     user_id: string;
     value: number;
   } & Partial<Record<(typeof REACTION_COLUMNS)[ReactionKind], number>>)[]) {
+    if (hidden.has(row.user_id)) continue;
     const id = row[column];
     const summary = id === undefined ? undefined : summaries[id];
     if (!summary) continue;

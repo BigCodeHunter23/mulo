@@ -1,4 +1,4 @@
-import type { DiscoverPage } from "@/lib/app-api";
+import type { DiscoverPage, ListSummary } from "@/lib/app-api";
 import { appCaller, appJson, appRoute, limitReads } from "@/lib/app-route";
 import {
   artistsToExplore,
@@ -8,6 +8,7 @@ import {
   topRatedOnMulo,
 } from "@/lib/discover";
 import { getGlobalFeed } from "@/lib/feed";
+import { getRecentLists } from "@/lib/lists";
 import { getMyAlbumScores } from "@/lib/ratings";
 import { getHeavyRotation } from "@/lib/trending";
 
@@ -30,7 +31,7 @@ export const GET = appRoute(async () => {
   if (caller instanceof Response) return caller;
   await limitReads(caller.user);
 
-  const [rotation, fresh, best, played, artists, recent] = await Promise.allSettled([
+  const [rotation, fresh, best, played, artists, recent, lists] = await Promise.allSettled([
     getHeavyRotation(SHELVES.rotation.limit),
     newReleases(SHELVES.newReleases.limit),
     topRatedOnMulo(SHELVES.topRated.limit),
@@ -39,6 +40,8 @@ export const GET = appRoute(async () => {
     // Who rated what, names and faces attached, is for people with an
     // account, as on the page.
     caller.user ? getGlobalFeed(SHELVES.justRated.limit) : Promise.resolve([]),
+    // Lists too, as the page's Lists section is.
+    caller.user ? getRecentLists(4) : Promise.resolve<ListSummary[]>([]),
   ]);
 
   const page: Omit<DiscoverPage, "mine"> = {
@@ -48,6 +51,7 @@ export const GET = appRoute(async () => {
     mostPlayed: shelf(played, SHELVES.mostPlayed.minimum),
     artistsToExplore: shelf(artists, SHELVES.artistsToExplore.minimum),
     justRated: shelf(recent, SHELVES.justRated.minimum),
+    lists: shelf(lists, 1),
   };
 
   // Your own score stamped on every album shown, as the page's cards have it.
