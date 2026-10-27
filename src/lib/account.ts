@@ -36,6 +36,7 @@ export type AccountOutcome =
 
 const NO_EMAIL = "This account has no email address to check against.";
 const NOT_FRESH = "Please confirm it's you again.";
+const HAS_PASSWORD = "You already have a password. Change it instead.";
 
 const passwordInput = z.object({ current: passwordSchema, next: newPasswordSchema });
 const emailInput = z.object({ email: emailSchema, current: passwordSchema });
@@ -105,16 +106,18 @@ export async function changePasswordFor(
  * in with its email too. With no password to check, the caller must have
  * signed in just now. Set through the service role, which alone can mark the
  * account as having one (`app_metadata.has_password`, which `SessionFacts`
- * reads); everything else the account's metadata says is kept.
+ * reads; Supabase merges that key into the rest, as in `markHasPassword`).
+ *
+ * The token's facts can be up to an hour old, so the account itself is read
+ * first: one that has a password by now (set on another device, or through a
+ * reset link) is refused, so this can never replace a password unchecked.
  */
 export async function setPasswordFor(
   user: CurrentUser,
   raw: unknown,
   facts: SessionFacts,
 ): Promise<AccountOutcome> {
-  if (facts.hasPassword) {
-    return { ok: false, error: "You already have a password. Change it instead." };
-  }
+  if (facts.hasPassword) return { ok: false, error: HAS_PASSWORD };
   const input = setPasswordInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
   if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
@@ -127,9 +130,14 @@ export async function setPasswordFor(
     console.error("[account] couldn't read the account to set a password:", readError?.message);
     return failed;
   }
+  const hasOne =
+    data.user.app_metadata.has_password === true ||
+    (data.user.identities ?? []).some((identity) => identity.provider === "email");
+  if (hasOne) return { ok: false, error: HAS_PASSWORD };
+
   const { error } = await admin.auth.admin.updateUserById(user.id, {
     password: input.data.next,
-    app_metadata: { ...data.user.app_metadata, has_password: true },
+    app_metadata: { has_password: true },
   });
   if (error) {
     console.error("[account] setting a password failed:", error.message);

@@ -405,7 +405,7 @@ describe("deleteAccountFor, cancelling the Apple link", () => {
 });
 
 describe("setPasswordFor", () => {
-  it("sets a password for an account without one, keeping what the account already says", async () => {
+  it("sets a password for an account without one, sending only the key Supabase merges in", async () => {
     expect(await setPasswordFor(ME, { next: "brand-new" }, APPLE_FRESH)).toEqual({
       ok: true,
       message: "Password set. You can now log in with your email too.",
@@ -413,9 +413,36 @@ describe("setPasswordFor", () => {
     expect(admin.getUserById).toHaveBeenCalledWith(ME.id);
     expect(admin.updateUserById).toHaveBeenCalledWith(ME.id, {
       password: "brand-new",
-      app_metadata: { ...APPLE_META, has_password: true },
+      app_metadata: { has_password: true },
     });
     expect(fresh.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("checks the account itself, so a token from before a password was set can't replace it", async () => {
+    admin.getUserById.mockResolvedValue({
+      data: { user: { id: ME.id, app_metadata: { ...APPLE_META, has_password: true } } },
+      error: null,
+    });
+    expect(await setPasswordFor(ME, { next: "brand-new" }, APPLE_FRESH)).toEqual({
+      ok: false,
+      error: "You already have a password. Change it instead.",
+    });
+
+    admin.getUserById.mockResolvedValue({
+      data: {
+        user: {
+          id: ME.id,
+          app_metadata: APPLE_META,
+          identities: [{ provider: "apple" }, { provider: "email" }],
+        },
+      },
+      error: null,
+    });
+    expect(await setPasswordFor(ME, { next: "brand-new" }, APPLE_FRESH)).toEqual({
+      ok: false,
+      error: "You already have a password. Change it instead.",
+    });
+    expect(admin.updateUserById).not.toHaveBeenCalled();
   });
 
   it("points to changing it when there's one already", async () => {
