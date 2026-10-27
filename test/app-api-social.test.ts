@@ -30,6 +30,7 @@ const lib = vi.hoisted(() => ({
   getLatestNotificationAt: vi.fn(),
   getRaisedOn: vi.fn(),
   changePasswordFor: vi.fn(),
+  setPasswordFor: vi.fn(),
   changeEmailFor: vi.fn(),
   deleteAccountFor: vi.fn(),
   exportFor: vi.fn(),
@@ -83,8 +84,10 @@ vi.mock("@/lib/notifications", () => ({
   getLatestNotificationAt: lib.getLatestNotificationAt,
 }));
 vi.mock("@/lib/raised-on", () => ({ getRaisedOn: lib.getRaisedOn }));
+vi.mock("@/lib/session-facts", () => ({ getSessionFacts: vi.fn(async () => FACTS) }));
 vi.mock("@/lib/account", () => ({
   changePasswordFor: lib.changePasswordFor,
+  setPasswordFor: lib.setPasswordFor,
   changeEmailFor: lib.changeEmailFor,
   deleteAccountFor: lib.deleteAccountFor,
 }));
@@ -111,6 +114,12 @@ vi.mock("@/app/raised-on/actions", () => ({ saveRaisedOn: actions.saveRaisedOn }
 
 const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
 const ME = { id: "1f9df192-a621-4f54-8850-2c5373b7eac9", email: "me@example.com" };
+/** How the caller signed in, which the account endpoints pass on. */
+const FACTS = vi.hoisted(() => ({
+  signInMethods: ["apple"],
+  hasPassword: false,
+  freshSignIn: true,
+}));
 const THEM = "5b11f4ce-a62d-471e-81fc-a69a8278c7da";
 const PROFILE = {
   id: THEM,
@@ -738,7 +747,25 @@ describe("the account", () => {
       await import("@/app/api/app/v1/me/password/route")
     ).PUT(json("me/password", "PUT", body));
     expect(await response.json()).toEqual({ ok: true, message: "Password changed." });
-    expect(lib.changePasswordFor).toHaveBeenCalledWith(ME, body);
+    expect(lib.changePasswordFor).toHaveBeenCalledWith(ME, body, FACTS);
+  });
+
+  it("sets a first password through the shared check", async () => {
+    signIn();
+    lib.setPasswordFor.mockResolvedValue({ ok: true, message: "Password set." });
+    const response = await (
+      await import("@/app/api/app/v1/me/password/route")
+    ).POST(json("me/password", "POST", { next: "new-one" }));
+    expect(await response.json()).toEqual({ ok: true, message: "Password set." });
+    expect(lib.setPasswordFor).toHaveBeenCalledWith(ME, { next: "new-one" }, FACTS);
+  });
+
+  it("needs a token and a body it can read to set one", async () => {
+    const route = await import("@/app/api/app/v1/me/password/route");
+    expect((await route.POST(json("me/password", "POST", { next: "new-one" }))).status).toBe(401);
+    signIn();
+    expect((await route.POST(json("me/password", "POST", { next: 1 }))).status).toBe(400);
+    expect(lib.setPasswordFor).not.toHaveBeenCalled();
   });
 
   it("changes the email through the shared check", async () => {
@@ -752,7 +779,7 @@ describe("the account", () => {
       ok: false,
       error: "That isn't your current password.",
     });
-    expect(lib.changeEmailFor).toHaveBeenCalledWith(ME, body);
+    expect(lib.changeEmailFor).toHaveBeenCalledWith(ME, body, FACTS);
   });
 
   it("deletes the account through the shared check", async () => {
@@ -763,7 +790,21 @@ describe("the account", () => {
       await import("@/app/api/app/v1/me/route")
     ).DELETE(json("me", "DELETE", body));
     expect(await response.json()).toEqual({ ok: true });
-    expect(lib.deleteAccountFor).toHaveBeenCalledWith(ME, body);
+    expect(lib.deleteAccountFor).toHaveBeenCalledWith(ME, body, FACTS);
+  });
+
+  it("deletes an account without a password, and says when Apple's link is left", async () => {
+    signIn();
+    lib.deleteAccountFor.mockResolvedValue({
+      ok: true,
+      message: "Your account is gone.",
+      appleLinkLeft: true,
+    });
+    const response = await (
+      await import("@/app/api/app/v1/me/route")
+    ).DELETE(json("me", "DELETE", { confirm: "DELETE" }));
+    expect(await response.json()).toEqual({ ok: true, appleLinkLeft: true });
+    expect(lib.deleteAccountFor).toHaveBeenCalledWith(ME, { confirm: "DELETE" }, FACTS);
   });
 
   it("passes on a refused delete, in its words", async () => {

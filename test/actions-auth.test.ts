@@ -70,6 +70,26 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+/** How the caller signed in: an Apple account without a password, unless a test says otherwise. */
+const signedIn = vi.hoisted(() => ({
+  facts: {
+    signInMethods: ["apple"] as ("email" | "apple" | "google" | "facebook")[],
+    hasPassword: false,
+    freshSignIn: false,
+  },
+}));
+vi.mock("@/lib/session-facts", () => ({ getSessionFacts: vi.fn(async () => signedIn.facts) }));
+/** The real account work, watched, so a test can see what the page's actions pass on. */
+vi.mock("@/lib/account", async (original) => {
+  const real = await original<typeof import("@/lib/account")>();
+  return {
+    ...real,
+    changePasswordFor: vi.fn(real.changePasswordFor),
+    setPasswordFor: vi.fn(real.setPasswordFor),
+    deleteAccountFor: vi.fn(real.deleteAccountFor),
+  };
+});
+
 const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
 const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
 
@@ -209,6 +229,103 @@ describe("continuing with Apple or Google", () => {
   });
 });
 
+describe("the account page, for an account without a password", () => {
+  const ME = { id: OTHER, email: "someone@example.com" };
+  const auth = { refreshSession: vi.fn(), signOut: vi.fn() };
+
+  beforeEach(async () => {
+    session.user = ME;
+    signedIn.facts = { signInMethods: ["apple"], hasPassword: false, freshSignIn: false };
+    auth.refreshSession.mockReset().mockResolvedValue({ data: {}, error: null });
+    auth.signOut.mockReset().mockResolvedValue({ error: null });
+    const account = await import("@/lib/account");
+    vi.mocked(account.setPasswordFor).mockClear();
+    vi.mocked(account.deleteAccountFor).mockClear();
+    vi.mocked(account.changePasswordFor).mockClear();
+    const server = await import("@/lib/supabase/server");
+    vi.mocked(server.createClient).mockImplementation((async () => ({
+      ...emptyClient(),
+      auth,
+    })) as never);
+    vi.mocked((await import("next/cache")).revalidatePath).mockClear();
+  });
+
+  it("passes on how they signed in, so a stale sign-in can't set a password", async () => {
+    const { setPassword } = await import("@/app/profile/account/actions");
+    const { setPasswordFor } = await import("@/lib/account");
+    expect(await setPassword({}, form({ next: "longenough" }))).toEqual({
+      error: "Please confirm it's you again.",
+    });
+    expect(setPasswordFor).toHaveBeenCalledWith(ME, { next: "longenough" }, signedIn.facts);
+    expect(auth.refreshSession).not.toHaveBeenCalled();
+  });
+
+  it("once set, refreshes the session so the page knows, and says so", async () => {
+    const { setPassword } = await import("@/app/profile/account/actions");
+    const { setPasswordFor } = await import("@/lib/account");
+    vi.mocked(setPasswordFor).mockResolvedValueOnce({ ok: true, message: "Password set." });
+    expect(await setPassword({}, form({ next: "longenough" }))).toEqual({
+      message: "Password set.",
+    });
+    expect(auth.refreshSession).toHaveBeenCalled();
+    expect((await import("next/cache")).revalidatePath).toHaveBeenCalledWith("/profile/account");
+  });
+
+  it("changing a password passes the facts on too, and is refused without one", async () => {
+    const { changePassword } = await import("@/app/profile/account/actions");
+    const { changePasswordFor } = await import("@/lib/account");
+    expect(await changePassword({}, form({ current: "x", next: "longenough" }))).toEqual({
+      error: "You don't have a password yet. Set one instead.",
+    });
+    expect(changePasswordFor).toHaveBeenCalledWith(
+      ME,
+      { current: "x", next: "longenough" },
+      signedIn.facts,
+    );
+  });
+
+  it("deletes with no password sent, and says goodbye with how to remove Apple's link", async () => {
+    const { deleteAccount } = await import("@/app/profile/account/actions");
+    const { deleteAccountFor } = await import("@/lib/account");
+    vi.mocked(deleteAccountFor).mockResolvedValueOnce({
+      ok: true,
+      message: "Your account is gone.",
+      appleLinkLeft: true,
+    });
+    await expect(deleteAccount({}, form({ confirm: "DELETE" }))).rejects.toThrow(
+      "redirect:/?goodbye=apple",
+    );
+    expect(deleteAccountFor).toHaveBeenCalledWith(ME, { confirm: "DELETE" }, signedIn.facts);
+    expect(auth.signOut).toHaveBeenCalled();
+  });
+
+  it("says a plain goodbye otherwise, and still sends a typed password", async () => {
+    signedIn.facts = { signInMethods: ["email"], hasPassword: true, freshSignIn: false };
+    const { deleteAccount } = await import("@/app/profile/account/actions");
+    const { deleteAccountFor } = await import("@/lib/account");
+    vi.mocked(deleteAccountFor).mockResolvedValueOnce({
+      ok: true,
+      message: "Your account is gone.",
+    });
+    await expect(
+      deleteAccount({}, form({ current: "longenough", confirm: "DELETE" })),
+    ).rejects.toThrow("redirect:/?goodbye=1");
+    expect(deleteAccountFor).toHaveBeenCalledWith(
+      ME,
+      { current: "longenough", confirm: "DELETE" },
+      signedIn.facts,
+    );
+  });
+
+  it("asks a stale sign-in without a password to confirm, deleting nothing", async () => {
+    const { deleteAccount } = await import("@/app/profile/account/actions");
+    expect(await deleteAccount({}, form({ confirm: "DELETE" }))).toEqual({
+      error: "Please confirm it's you again.",
+    });
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
 describe("signed out, every action refuses before touching the database", () => {
   const cases: [string, () => Promise<unknown>][] = [
     ["rate", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 8)],
@@ -310,6 +427,14 @@ describe("signed out, every action refuses before touching the database", () => 
         (await import("@/app/profile/account/actions")).deleteAccount(
           {},
           form({ current: "longenough", confirm: "DELETE" }),
+        ),
+    ],
+    [
+      "setPassword",
+      async () =>
+        (await import("@/app/profile/account/actions")).setPassword(
+          {},
+          form({ next: "longenough" }),
         ),
     ],
   ];

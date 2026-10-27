@@ -1,9 +1,11 @@
 import "server-only";
 import { createClient as createFreshClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { forgetAppleLink } from "@/lib/apple-tokens";
 import { authCallbackUrl } from "@/lib/auth";
 import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import type { SessionFacts } from "@/lib/session-facts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient, type CurrentUser } from "@/lib/supabase/server";
@@ -13,19 +15,33 @@ import { emailSchema, firstError, newPasswordSchema, passwordSchema } from "@/li
  * Changing how somebody logs in, or deleting them, for the website's account
  * page and the app alike.
  *
- * Each has to survive a borrowed laptop or phone with a session left open,
- * so each checks the password first, by signing in again on a client of its
- * own. The caller's session (a cookie, or the app's token) is never touched,
- * and the session the check makes is ended as soon as it's done its job.
+ * Each has to survive a borrowed laptop or phone with a session left open.
+ * An account with a password proves it's them with that password, checked by
+ * signing in again on a client of its own: the caller's session (a cookie, or
+ * the app's token) is never touched, and the session the check makes is ended
+ * as soon as it's done its job. An account made with Apple or Google has no
+ * password, so it proves it's them by having signed in within the last few
+ * minutes, which the caller's `SessionFacts` say (read from the verified
+ * token on the server, never from anything the client sends).
  */
 
-export type AccountOutcome = { ok: true; message: string } | { ok: false; error: string };
+export type AccountOutcome =
+  | {
+      ok: true;
+      message: string;
+      /** Deleting only: Apple couldn't be told, so the Sign in with Apple link is still there. */
+      appleLinkLeft?: true;
+    }
+  | { ok: false; error: string };
 
 const NO_EMAIL = "This account has no email address to check against.";
+const NOT_FRESH = "Please confirm it's you again.";
 
 const passwordInput = z.object({ current: passwordSchema, next: newPasswordSchema });
 const emailInput = z.object({ email: emailSchema, current: passwordSchema });
-const deleteInput = z.object({ current: passwordSchema, confirm: z.string().trim() });
+const setPasswordInput = z.object({ next: newPasswordSchema });
+/** `current` is checked only for an account with a password; one without has none to send. */
+const deleteInput = z.object({ current: z.string().optional(), confirm: z.string().trim() });
 
 type Fresh = ReturnType<typeof createFreshClient<Database>>;
 
@@ -55,7 +71,14 @@ async function done(fresh: Fresh): Promise<void> {
   await fresh.auth.signOut({ scope: "local" }).catch(() => undefined);
 }
 
-export async function changePasswordFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
+export async function changePasswordFor(
+  user: CurrentUser,
+  raw: unknown,
+  facts: SessionFacts,
+): Promise<AccountOutcome> {
+  if (!facts.hasPassword) {
+    return { ok: false, error: "You don't have a password yet. Set one instead." };
+  }
   const input = passwordInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
   if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
@@ -77,7 +100,54 @@ export async function changePasswordFor(user: CurrentUser, raw: unknown): Promis
   return { ok: true, message: "Password changed. You're still logged in here." };
 }
 
-export async function changeEmailFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
+/**
+ * A first password, for an account made with Apple or Google, so it can log
+ * in with its email too. With no password to check, the caller must have
+ * signed in just now. Set through the service role, which alone can mark the
+ * account as having one (`app_metadata.has_password`, which `SessionFacts`
+ * reads); everything else the account's metadata says is kept.
+ */
+export async function setPasswordFor(
+  user: CurrentUser,
+  raw: unknown,
+  facts: SessionFacts,
+): Promise<AccountOutcome> {
+  if (facts.hasPassword) {
+    return { ok: false, error: "You already have a password. Change it instead." };
+  }
+  const input = setPasswordInput.safeParse(raw);
+  if (!input.success) return { ok: false, error: firstError(input.error) };
+  if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
+  if (!facts.freshSignIn) return { ok: false, error: NOT_FRESH };
+
+  const failed = { ok: false, error: "Couldn't set your password. Please try again." } as const;
+  const admin = createAdminClient();
+  const { data, error: readError } = await admin.auth.admin.getUserById(user.id);
+  if (readError || !data.user) {
+    console.error("[account] couldn't read the account to set a password:", readError?.message);
+    return failed;
+  }
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
+    password: input.data.next,
+    app_metadata: { ...data.user.app_metadata, has_password: true },
+  });
+  if (error) {
+    console.error("[account] setting a password failed:", error.message);
+    return failed;
+  }
+  return { ok: true, message: "Password set. You can now log in with your email too." };
+}
+
+export async function changeEmailFor(
+  user: CurrentUser,
+  raw: unknown,
+  facts: SessionFacts,
+): Promise<AccountOutcome> {
+  // The address came from Apple or Google, and there's no password to prove
+  // it's them; setting one first opens this up.
+  if (!facts.hasPassword) {
+    return { ok: false, error: "Set a password first, then you can change your email." };
+  }
   const input = emailInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
   if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
@@ -119,14 +189,40 @@ export async function changeEmailFor(user: CurrentUser, raw: unknown): Promise<A
 }
 
 /**
+ * Whether it's really them: the password for an account with one, a sign-in
+ * in the last few minutes for one without. Null when it is, else what to say.
+ */
+async function provenFor(
+  user: CurrentUser,
+  current: string | undefined,
+  facts: SessionFacts,
+): Promise<string | null> {
+  if (!facts.hasPassword) return facts.freshSignIn ? null : NOT_FRESH;
+
+  const password = passwordSchema.safeParse(current ?? "");
+  if (!password.success) return firstError(password.error);
+  if (!user.email) return NO_EMAIL;
+  const fresh = await checkPassword(user.email, password.data);
+  if (!fresh) return "That isn't your password.";
+  await done(fresh);
+  return null;
+}
+
+/**
  * Deletes the account and everything attached to it.
  *
  * Every table hangs off the person's row with `on delete cascade`, so removing
  * the account removes their ratings, reviews, lists, follows and picks with
  * it. Their avatar is a file rather than a row, so it goes separately. The
- * caller signs their own session out afterwards.
+ * Sign in with Apple link is cancelled first, as Apple asks, while the token
+ * that does it is still stored (it goes with the account). The caller signs
+ * their own session out afterwards.
  */
-export async function deleteAccountFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
+export async function deleteAccountFor(
+  user: CurrentUser,
+  raw: unknown,
+  facts: SessionFacts,
+): Promise<AccountOutcome> {
   const input = deleteInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
   if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
@@ -134,10 +230,12 @@ export async function deleteAccountFor(user: CurrentUser, raw: unknown): Promise
   if (input.data.confirm.toUpperCase() !== "DELETE") {
     return { ok: false, error: "Type DELETE in the box to confirm." };
   }
-  if (!user.email) return { ok: false, error: NO_EMAIL };
-  const fresh = await checkPassword(user.email, input.data.current);
-  if (!fresh) return { ok: false, error: "That isn't your password." };
-  await done(fresh);
+  const refused = await provenFor(user, input.data.current, facts);
+  if (refused) return { ok: false, error: refused };
+
+  // Never throws. A link Apple couldn't be told about doesn't stop the delete;
+  // the person is told how to remove it themselves.
+  const appleGone = await forgetAppleLink(user.id);
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(user.id);
@@ -155,5 +253,13 @@ export async function deleteAccountFor(user: CurrentUser, raw: unknown): Promise
       .remove([`${user.id}/avatar.${extension}`])
       .catch(() => undefined);
   }
-  return { ok: true, message: "Your account is gone." };
+  // Only an account that signs in with Apple can have a link left. Checked
+  // here because forgetAppleLink also answers false before the token table
+  // exists, which mustn't alarm everybody else.
+  const appleLinkLeft = !appleGone && facts.signInMethods.includes("apple");
+  return {
+    ok: true,
+    message: "Your account is gone.",
+    ...(appleLinkLeft ? { appleLinkLeft: true as const } : {}),
+  };
 }

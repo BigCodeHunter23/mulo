@@ -517,6 +517,16 @@ export type OwnProfile = {
 /** `PUT me/profile`, and any other write that has nothing more to say. */
 export type SaveResult = { ok: true } | AppError;
 
+/**
+ * `DELETE me`. Body: `{ confirm: "DELETE", current? }`, where `current` is the
+ * password, needed only when `Me.hasPassword`; an account without one must
+ * have signed in within the last five minutes instead (refused with "Please
+ * confirm it's you again." otherwise). `appleLinkLeft` means Apple couldn't be
+ * told: ask the person to remove MULO under Settings › Apple Account › Sign in
+ * with Apple.
+ */
+export type DeleteResult = { ok: true; appleLinkLeft?: true } | AppError;
+
 /** `GET me` */
 export type Me = {
   id: string;
@@ -1131,5 +1141,11 @@ export type EditableProfile = {
 /** `POST me/avatar` */
 export type AvatarResult = { ok: true; avatarUrl: string } | AppError;
 
-/** Password and email changes answer with the website's own words. */
+/**
+ * Password and email changes answer with the website's own words.
+ * `PUT me/password` `{ current, next }` changes a password; `POST me/password`
+ * `{ next }` sets a first one for an account without (`Me.hasPassword` false),
+ * which must have signed in within the last five minutes. `PUT me/email` needs
+ * a password. `Me.hasPassword` catches up once the app refreshes its token.
+ */
 export type AccountResult = { ok: true; message: string } | AppError;
