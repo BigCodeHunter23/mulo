@@ -22,6 +22,8 @@ describe("appApiProxy", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("access-control-allow-headers")).toMatch(/Authorization/);
     expect(response.headers.get("access-control-allow-methods")).toMatch(/DELETE/);
+    // Lists are edited with PATCH.
+    expect(response.headers.get("access-control-allow-methods")).toMatch(/PATCH/);
   });
 
   it("lets any origin read the answer", () => {
