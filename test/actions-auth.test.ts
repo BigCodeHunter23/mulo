@@ -264,6 +264,15 @@ describe("the account page, for an account without a password", () => {
     });
     expect(setPasswordFor).toHaveBeenCalledWith(ME, { next: "longenough" }, signedIn.facts);
     expect(auth.refreshSession).not.toHaveBeenCalled();
+    // The page draws itself again, offering "Continue with Apple" in place of the form.
+    expect((await import("next/cache")).revalidatePath).toHaveBeenCalledWith("/profile/account");
+  });
+
+  it("leaves the page alone for any other refusal", async () => {
+    const { setPassword } = await import("@/app/profile/account/actions");
+    signedIn.facts = { signInMethods: ["apple"], hasPassword: false, freshSignIn: true };
+    expect((await setPassword({}, form({ next: "abc" }))).error).toMatch(/at least 6/);
+    expect((await import("next/cache")).revalidatePath).not.toHaveBeenCalled();
   });
 
   it("once set, refreshes the session so the page knows, and says so", async () => {
@@ -329,6 +338,7 @@ describe("the account page, for an account without a password", () => {
       error: "Please confirm it's you again.",
     });
     expect(auth.signOut).not.toHaveBeenCalled();
+    expect((await import("next/cache")).revalidatePath).toHaveBeenCalledWith("/profile/account");
   });
 });
 

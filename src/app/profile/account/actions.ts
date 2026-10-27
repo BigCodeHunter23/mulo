@@ -6,6 +6,7 @@ import {
   changeEmailFor,
   changePasswordFor,
   deleteAccountFor,
+  NOT_FRESH,
   setPasswordFor,
   type AccountOutcome,
 } from "@/lib/account";
@@ -20,6 +21,14 @@ const LOGGED_OUT = "You've been logged out. Log in again to change your account.
 /** The shared outcome, in the shape the account page's forms read. */
 function toState(outcome: AccountOutcome): AccountState {
   return outcome.ok ? { message: outcome.message } : { error: outcome.error };
+}
+
+/**
+ * The few minutes after signing in have run out while the page was open: draw
+ * it again, so it offers "Continue with Apple" (or Google) in place of the form.
+ */
+function whenStale(outcome: AccountOutcome): void {
+  if (!outcome.ok && outcome.error === NOT_FRESH) revalidatePath("/profile/account");
 }
 
 /**
@@ -56,6 +65,7 @@ export async function setPassword(_prev: AccountState, formData: FormData): Prom
     { next: field(formData, "next") },
     await getSessionFacts(),
   );
+  whenStale(outcome);
   if (outcome.ok) {
     // Best effort: until the token is refreshed the page still offers to set one.
     const supabase = await createClient();
@@ -95,7 +105,10 @@ export async function deleteAccount(
     { ...(current ? { current } : {}), confirm: field(formData, "confirm") },
     await getSessionFacts(),
   );
-  if (!outcome.ok) return { error: outcome.error };
+  if (!outcome.ok) {
+    whenStale(outcome);
+    return { error: outcome.error };
+  }
 
   const supabase = await createClient();
   await supabase.auth.signOut();

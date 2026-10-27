@@ -35,7 +35,8 @@ export type AccountOutcome =
   | { ok: false; error: string };
 
 const NO_EMAIL = "This account has no email address to check against.";
-const NOT_FRESH = "Please confirm it's you again.";
+/** The answer when an account without a password last signed in too long ago. */
+export const NOT_FRESH = "Please confirm it's you again.";
 const HAS_PASSWORD = "You already have a password. Change it instead.";
 
 const passwordInput = z.object({ current: passwordSchema, next: newPasswordSchema });
