@@ -83,6 +83,10 @@ Dashboard → **SQL Editor**. Paste each file's contents and run it.
 6. `supabase/migrations/0020_blocks.sql`: blocking. Safe to run twice. Until
    it runs, the Block button says it couldn't and nobody is hidden; everything
    else carries on as before.
+7. `supabase/migrations/0021_apple_tokens.sql`: keeps Apple's token for each
+   account that signs in with Apple, so deleting the account can cancel the
+   link. Safe to run twice. Until it runs, Apple sign-in still works and
+   nothing is kept.
 
 Check: in the Table Editor, `profiles` now shows the new constraints, and
 `rate_limits` and `blocks` tables exist (`rate_limits` fills as people log in

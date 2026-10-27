@@ -29,6 +29,14 @@ in plain language, and give them links and exact steps when they need to act.
   Supabase SQL editor, so hand over the SQL with the link, and make every
   migration safe to run twice.
 - Feeds are queries, never stored fan-out tables.
+- What people write goes through the word filter (`src/lib/content-filter.ts`)
+  in the action that saves it: `isClean` for names, usernames, bios and list
+  titles (no swearing or slurs), `isRespectful` for reviews, Versus takes,
+  list descriptions and notes (slurs and hate only). A new free-text field
+  must call one of them, so the app API is covered too.
+- Supabase's Redirect URLs must list exactly `mulo://auth/callback` for the
+  phone app, never `exp://`. That list is the real boundary for the app's
+  social sign-in.
 - Secrets live in `.env.local` and Vercel, never in the repo or the chat.
 - Voice: `docs/voice.md`. Features and badges can carry music culture; section
   headings, buttons, navigation and errors stay plain.
@@ -82,7 +90,11 @@ in plain language, and give them links and exact steps when they need to act.
   `reviews.ts`, `reactions.ts`, `badges.ts` + `badge-catalog.ts`, `taste.ts`,
   `top-picks.ts` (GOAT),
   `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`,
-  `charts.ts` (The Charts).
+  `charts.ts` (The Charts), `content-filter.ts` (the word filter),
+  `session-facts.ts` (how somebody signed in: methods, password, fresh
+  sign-in), `apple.ts` + `apple-tokens.ts` (Sign in with Apple's secret and
+  tokens; `apple_tokens` table, migration 0021), `oauth.ts` (the app's
+  Google and Apple-off-iPhone sign-in through the browser).
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),
   `goat`, `ratings`, `discover`, `charts`, `search`, `welcome` (onboarding, with intro
   cards after signup), `profile` (settings), `notifications`, and

@@ -51,7 +51,9 @@ Apple sheet, checked by Supabase) are in `test/app-api-auth-social.test.ts`.
 Google, and Apple off the iPhone, go through the browser: `auth/oauth/start` answers
 the page to open and `state`, Supabase's PKCE storage (`src/lib/oauth.ts`), which
 the app hands back with the code to `auth/oauth/exchange`, so nothing is kept here and
-a caught `mulo://` link is useless without it. Every
+a caught `mulo://` link is useless without it. Only `mulo://auth/callback` is
+ever asked for as the return address, and Supabase's Redirect URLs list is the
+real boundary. Every
 `users/[username]/*` endpoint finds its person through `visibleProfile`
 (`src/lib/app-profile.ts`), so blocked people are a 404 everywhere; a list by
 somebody blocked is a 404 too, and `lists.ts`, `notifications.ts` and
@@ -61,6 +63,27 @@ app alike. Changing the password or email, and deleting an account, live in
 checks the password by signing in on a client of its own, so the caller's
 session is never touched. The data export is `src/lib/export.ts`, served at
 `/profile/account/export` and `me/export`.
+
+`getSessionFacts()` (`src/lib/session-facts.ts`) says how somebody signed in:
+their sign-in methods, whether they have a password (the providers include
+email, or `app_metadata.has_password`), and whether the sign-in is fresh (the
+session's `amr` within five minutes). An account made with Apple or Google has
+no password, so the account page and the app's `me/password` let it set one,
+and ask for a fresh sign-in instead of a password before changing or deleting
+anything. Apple requires deleting an account to cancel its Sign in with Apple
+link: `src/lib/apple.ts` builds the client secret, swaps codes and revokes, and
+`src/lib/apple-tokens.ts` keeps Apple's refresh token sealed in `apple_tokens`
+(migration 0021, service role only; `rememberAppleToken` when a sign-in came
+from Apple, `forgetAppleLink` revokes it before the account goes). The
+`APPLE_*` settings are in `.env.example`.
+
+**The word filter** (`src/lib/content-filter.ts`) holds what people write to
+two standards. `isClean` (names, usernames, bios, list titles) refuses
+swearing and slurs; `isRespectful` (reviews, Versus takes, list descriptions
+and notes) refuses slurs and hate only. The server actions call them
+(`saveProfile`, the list actions, `saveReview`, `postTake`), so the app API,
+which calls the same actions, is covered with no extra work. A new free-text
+field calls one of them in its action.
 
 Nothing talks to Supabase from the browser. The session cookies are
 `httpOnly`, so page scripts can't read them, and every query runs on the
@@ -136,7 +159,9 @@ records so most pages never wait.
 
 ## Signing in
 
-Supabase Auth with email and password. Sign-up confirmation and password
+Supabase Auth with email and password, plus Continue with Apple and Google
+(the `continueWith` action on `/login`; the phone app's routes are above).
+Sign-up confirmation and password
 reset emails link to `/auth/confirm`, which accepts both of the shapes
 Supabase sends. Where to go next is checked by `safeRedirectPath()`
 (`src/lib/redirects.ts`), so a link can't bounce someone to another site.
