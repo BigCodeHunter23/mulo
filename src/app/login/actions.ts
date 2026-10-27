@@ -1,11 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { authCallbackUrl } from "@/lib/auth";
 import { consumeInviteCookie } from "@/lib/invites";
 import { safeRedirectPath } from "@/lib/redirects";
 import { allowAddress } from "@/lib/rate-limit";
+import { OAUTH_PROVIDERS, PROVIDER_OFF } from "@/lib/oauth";
 import { field, firstError } from "@/lib/validation";
 import {
   AFTER_SIGNUP,
@@ -63,6 +65,31 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   return {
     message: "Account created. Check your email for a confirmation link.",
   };
+}
+
+const providerInput = z.enum(OAUTH_PROVIDERS);
+
+/**
+ * "Continue with Apple" or "Continue with Google": sends the browser to the
+ * provider, which returns through /auth/confirm to finish signing in. The
+ * button's own `provider` value says which; `next` is where to land after.
+ */
+export async function continueWith(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const provider = providerInput.safeParse(field(formData, "provider"));
+  if (!provider.success) return { error: PROVIDER_OFF };
+  if (!(await allowAddress("login"))) return { error: TOO_MANY_ATTEMPTS };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: provider.data,
+    options: {
+      redirectTo: authCallbackUrl(safeRedirectPath(field(formData, "next")) ?? "/"),
+      ...(provider.data === "apple" ? { scopes: "name email" } : {}),
+    },
+  });
+  if (error || !data.url) return { error: "Couldn't start signing in. Try again." };
+
+  redirect(data.url);
 }
 
 export async function logout() {

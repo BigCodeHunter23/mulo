@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { rememberAppleToken } from "@/lib/apple-tokens";
 import { consumeInviteCookie } from "@/lib/invites";
 import { loginPath, safeRedirectPath } from "@/lib/redirects";
 
@@ -45,6 +46,21 @@ export async function GET(request: NextRequest) {
     if (user) {
       // A confirmed sign-up that arrived through somebody's invite link.
       await consumeInviteCookie(user.id);
+
+      // Signed in with Apple in the browser: keep Apple's token, so deleting
+      // the account can cancel the link (Apple requires it).
+      const session = code && result ? result.data.session : null;
+      if (
+        session?.user.app_metadata?.provider === "apple" &&
+        session.provider_refresh_token &&
+        process.env.APPLE_SERVICES_ID
+      ) {
+        await rememberAppleToken(
+          session.user.id,
+          session.provider_refresh_token,
+          process.env.APPLE_SERVICES_ID,
+        );
+      }
       redirect(next);
     }
   }

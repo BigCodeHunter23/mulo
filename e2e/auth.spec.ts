@@ -22,6 +22,14 @@ const env = {
   album: process.env.E2E_ALBUM_MBID,
 };
 
+test("the log-in page offers Apple and Google", async ({ page }) => {
+  for (const mode of ["", "?mode=signup"]) {
+    await page.goto(`/login${mode}`);
+    await expect(page.getByRole("button", { name: "Continue with Apple" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  }
+});
+
 test.describe("signed-in flows", () => {
   test.skip(
     !env.email || !env.password || !env.username || !env.album,

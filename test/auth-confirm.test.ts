@@ -1,0 +1,72 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+const state = vi.hoisted(() => ({
+  exchange: null as unknown,
+  remember: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      exchangeCodeForSession: async () => state.exchange,
+      verifyOtp: async () => state.exchange,
+    },
+  })),
+}));
+vi.mock("@/lib/invites", () => ({ consumeInviteCookie: vi.fn(async () => undefined) }));
+vi.mock("@/lib/apple-tokens", () => ({ rememberAppleToken: state.remember }));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((to: string) => {
+    throw new Error(`redirect:${to}`);
+  }),
+}));
+
+function session(provider: string | undefined, refresh: string | null) {
+  const user = { id: "user-1", app_metadata: provider ? { provider } : {} };
+  return { data: { user, session: { user, provider_refresh_token: refresh } }, error: null };
+}
+
+async function visit(search: string) {
+  const { GET } = await import("@/app/auth/confirm/route");
+  return GET(new NextRequest(`http://localhost/auth/confirm${search}`)).catch((e: Error) => e);
+}
+
+beforeEach(() => {
+  state.remember.mockClear();
+  process.env.APPLE_SERVICES_ID = "com.example.web";
+});
+
+describe("/auth/confirm", () => {
+  it("keeps Apple's token after signing in with Apple", async () => {
+    state.exchange = session("apple", "r-token");
+    expect(await visit("?code=abc&next=%2Fratings")).toEqual(new Error("redirect:/ratings"));
+    expect(state.remember).toHaveBeenCalledWith("user-1", "r-token", "com.example.web");
+  });
+
+  it("keeps nothing for Google, or when Apple gave no token, or with no client id", async () => {
+    state.exchange = session("google", "r-token");
+    await visit("?code=abc");
+    state.exchange = session("apple", null);
+    await visit("?code=abc");
+    state.exchange = session("apple", "r-token");
+    delete process.env.APPLE_SERVICES_ID;
+    await visit("?code=abc");
+    expect(state.remember).not.toHaveBeenCalled();
+  });
+
+  it("copes with a user that has no app_metadata", async () => {
+    state.exchange = {
+      data: { user: { id: "u" }, session: { user: { id: "u" }, provider_refresh_token: "x" } },
+      error: null,
+    };
+    expect(await visit("?code=abc")).toEqual(new Error("redirect:/"));
+    expect(state.remember).not.toHaveBeenCalled();
+  });
+
+  it("leaves the token_hash branch alone", async () => {
+    state.exchange = session("apple", "r-token");
+    await visit("?token_hash=h&type=recovery");
+    expect(state.remember).not.toHaveBeenCalled();
+  });
+});

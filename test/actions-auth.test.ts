@@ -130,6 +130,79 @@ describe("over the rate limit", () => {
   });
 });
 
+describe("continuing with Apple or Google", () => {
+  const oauth = {
+    calls: [] as unknown[],
+    result: { data: { url: "https://accounts.example/auth" }, error: null } as {
+      data: { url: string | null };
+      error: { message: string } | null;
+    },
+  };
+
+  beforeEach(async () => {
+    oauth.calls = [];
+    oauth.result = { data: { url: "https://accounts.example/auth" }, error: null };
+    const server = await import("@/lib/supabase/server");
+    vi.mocked(server.createClient).mockImplementation((async () => ({
+      ...emptyClient(),
+      auth: {
+        signInWithOAuth: async (args: unknown) => {
+          oauth.calls.push(args);
+          return oauth.result;
+        },
+      },
+    })) as never);
+  });
+
+  it("an unknown provider is turned away", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    const result = await continueWith({}, form({ provider: "myspace", next: "/" }));
+    expect(result.error).toMatch(/isn't available yet/);
+    expect(oauth.calls).toHaveLength(0);
+  });
+
+  it("says so over the rate limit", async () => {
+    session.limited = true;
+    const { continueWith } = await import("@/app/login/actions");
+    expect((await continueWith({}, form({ provider: "google" }))).error).toMatch(
+      /Too many attempts/,
+    );
+    expect(oauth.calls).toHaveLength(0);
+  });
+
+  it("sends the browser to the provider, back through /auth/confirm to a safe page", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    await expect(continueWith({}, form({ provider: "google", next: "/ratings" }))).rejects.toThrow(
+      "redirect:https://accounts.example/auth",
+    );
+    const call = oauth.calls[0] as { provider: string; options: Record<string, string> };
+    expect(call.provider).toBe("google");
+    expect(call.options.redirectTo).toContain("/auth/confirm?next=%2Fratings");
+    expect(call.options.scopes).toBeUndefined();
+  });
+
+  it("asks Apple for the name and email, and ignores an outside next", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    await expect(
+      continueWith({}, form({ provider: "apple", next: "https://evil.example" })),
+    ).rejects.toThrow("redirect:");
+    const call = oauth.calls[0] as { options: Record<string, string> };
+    expect(call.options.scopes).toBe("name email");
+    expect(call.options.redirectTo).toContain("next=%2F");
+    expect(call.options.redirectTo).not.toContain("evil");
+  });
+
+  it("answers plainly when Supabase can't start it", async () => {
+    const { continueWith } = await import("@/app/login/actions");
+    oauth.result = { data: { url: null }, error: { message: "boom" } };
+    expect((await continueWith({}, form({ provider: "apple" }))).error).toBe(
+      "Couldn't start signing in. Try again.",
+    );
+    oauth.result = { data: { url: null }, error: null };
+    expect((await continueWith({}, form({ provider: "apple" }))).error).toMatch(/Couldn't start/);
+  });
+});
+
 describe("signed out, every action refuses before touching the database", () => {
   const cases: [string, () => Promise<unknown>][] = [
     ["rate", async () => (await import("@/app/ratings/actions")).rate("album", MBID, 8)],
