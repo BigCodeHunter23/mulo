@@ -9,7 +9,12 @@ import { NextRequest } from "next/server";
 const caller = vi.hoisted(() => ({ limited: false }));
 
 const auth = vi.hoisted(() => ({ signInWithIdToken: vi.fn() }));
-const apple = vi.hoisted(() => ({ exchangeAppleCode: vi.fn(), rememberAppleToken: vi.fn() }));
+const apple = vi.hoisted(() => ({
+  exchangeAppleCode: vi.fn(),
+  rememberAppleToken: vi.fn(),
+  /** What the browser sign-in kept in `apple_tokens`. */
+  upsert: vi.fn(async () => ({ error: null })),
+}));
 
 /** Browser sign-ins build their own client over storage the route hands it. */
 type OAuthStorage = {
@@ -46,6 +51,10 @@ vi.mock("@/lib/rate-limit", async (original) => ({
 vi.mock("@/lib/apple", async (original) => ({
   ...(await original<typeof import("@/lib/apple")>()),
   exchangeAppleCode: apple.exchangeAppleCode,
+  sealToken: (token: string) => `sealed:${token}`,
+}));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({ from: () => ({ upsert: apple.upsert }) }),
 }));
 vi.mock("@/lib/apple-tokens", async (original) => ({
   ...(await original<typeof import("@/lib/apple-tokens")>()),
@@ -86,6 +95,7 @@ beforeEach(() => {
   auth.signInWithIdToken.mockReset();
   apple.exchangeAppleCode.mockReset();
   apple.rememberAppleToken.mockReset();
+  apple.upsert.mockClear();
   oauth.storages = [];
   oauth.signInWithOAuth.mockReset();
   oauth.exchangeCodeForSession.mockReset();
@@ -341,6 +351,12 @@ describe("POST auth/oauth/exchange", () => {
     [`${KEY}-code-verifier`]: JSON.stringify("the-verifier"),
   });
   const ok = { code: "the-code", flowId: FLOW, state };
+  /** Each token kept, as [user, token, client]. */
+  const kept = () =>
+    apple.upsert.mock.calls.map((call: unknown[]) => {
+      const row = call[0] as { user_id: string; refresh_token: string; client_id: string };
+      return [row.user_id, row.refresh_token.replace("sealed:", ""), row.client_id];
+    });
 
   it("swaps the code over the restored state and answers the session", async () => {
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session: SESSION }, error: null });
@@ -385,7 +401,7 @@ describe("POST auth/oauth/exchange", () => {
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
     const response = await exchange(ok);
     expect(await response.json()).toEqual({ ok: true, session: SESSION });
-    expect(apple.rememberAppleToken).toHaveBeenCalledWith(OTHER, "apple-refresh", "com.mulo.web");
+    expect(kept()).toEqual([[OTHER, "apple-refresh", "com.mulo.web"]]);
   });
 
   it("keeps Apple's token for an account first made with email, now signing in with Apple", async () => {
@@ -393,7 +409,7 @@ describe("POST auth/oauth/exchange", () => {
     const session = signedIn("email", "apple-refresh", ["email", EARLIER], ["apple", NOW]);
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
     await exchange(ok);
-    expect(apple.rememberAppleToken).toHaveBeenCalledWith(OTHER, "apple-refresh", "com.mulo.web");
+    expect(kept()).toEqual([[OTHER, "apple-refresh", "com.mulo.web"]]);
   });
 
   it("never keeps Google's token as Apple's, for an Apple account signing in with Google", async () => {
@@ -402,7 +418,7 @@ describe("POST auth/oauth/exchange", () => {
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
     const response = await exchange(ok);
     expect(response.status).toBe(200);
-    expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("keeps no token for Google, or without the services id", async () => {
@@ -419,7 +435,7 @@ describe("POST auth/oauth/exchange", () => {
     });
     await exchange(ok);
 
-    expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("refuses a state that isn't what start handed out", async () => {

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { appleTokenFrom, rememberAppleToken } from "@/lib/apple-tokens";
+import { keepAppleTokenFrom } from "@/lib/apple-tokens";
 import type { AuthResponse } from "@/lib/app-api";
 import { appError, appJson, appRoute, BAD_REQUEST, readBody, toAppSession } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
@@ -34,9 +34,6 @@ export const POST = appRoute(async (request: NextRequest) => {
   );
   if (error || !data.session) return appError(401, "Couldn't finish signing in. Try again.");
 
-  const { session } = data;
-  const servicesId = process.env.APPLE_SERVICES_ID;
-  const appleToken = appleTokenFrom(session);
-  if (appleToken && servicesId) await rememberAppleToken(session.user.id, appleToken, servicesId);
-  return appJson<AuthResponse>({ ok: true, session: toAppSession(session) });
+  await keepAppleTokenFrom(data.session);
+  return appJson<AuthResponse>({ ok: true, session: toAppSession(data.session) });
 });

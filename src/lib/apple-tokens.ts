@@ -22,13 +22,16 @@ type SignIn = {
 };
 
 /**
- * The way of signing in this account used last: the identity with the newest
- * `last_sign_in_at`, which Supabase stamps on the identity a sign-in used.
- * Null when that can't be told for sure: no identities, any without a
- * readable date, or two at the very same moment.
+ * The way of signing in this account used last: its only identity, or else
+ * the one with the newest `last_sign_in_at`, which Supabase stamps on the
+ * identity a sign-in used (a brand-new account's only one may not be dated
+ * yet). Null when that can't be told for sure: no identities, any without a
+ * readable date beside another, or two at the very same moment.
  */
 function lastSignInProvider(identities: readonly UserIdentity[] | undefined): string | null {
   if (!Array.isArray(identities) || identities.length === 0) return null;
+  const [only, ...others] = identities;
+  if (only && others.length === 0) return only.provider;
   let newest: { provider: string; at: number } | null = null;
   let tied = false;
   for (const identity of identities) {
@@ -55,6 +58,20 @@ export function appleTokenFrom(session: SignIn): string | null {
   const token = session.provider_refresh_token;
   if (!token) return null;
   return lastSignInProvider(session.user.identities) === "apple" ? token : null;
+}
+
+/**
+ * After signing in through the browser (the website's `/auth/confirm`, or the
+ * app's `auth/oauth/exchange`): when it was with Apple, keeps Apple's token
+ * for the website's Services ID, which that sign-in was issued to. Never
+ * throws.
+ */
+export async function keepAppleTokenFrom(
+  session: SignIn & { user: { id: string } },
+): Promise<void> {
+  const token = appleTokenFrom(session);
+  const servicesId = process.env.APPLE_SERVICES_ID;
+  if (token && servicesId) await rememberAppleToken(session.user.id, token, servicesId);
 }
 
 /**

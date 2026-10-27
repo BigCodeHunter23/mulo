@@ -3,7 +3,8 @@ import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({
   exchange: null as unknown,
-  remember: vi.fn(async () => undefined),
+  /** What was kept in `apple_tokens`. */
+  upsert: vi.fn(async () => ({ error: null })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -15,10 +16,17 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 vi.mock("@/lib/invites", () => ({ consumeInviteCookie: vi.fn(async () => undefined) }));
-vi.mock("@/lib/apple-tokens", async (original) => ({
-  ...(await original<typeof import("@/lib/apple-tokens")>()),
-  rememberAppleToken: state.remember,
+vi.mock("@/lib/apple", () => ({ sealToken: (token: string) => `sealed:${token}` }));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({ from: () => ({ upsert: state.upsert }) }),
 }));
+
+/** Each token kept, as [user, token, client]. */
+const kept = () =>
+  state.upsert.mock.calls.map((call: unknown[]) => {
+    const row = call[0] as { user_id: string; refresh_token: string; client_id: string };
+    return [row.user_id, row.refresh_token.replace("sealed:", ""), row.client_id];
+  });
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`redirect:${to}`);
@@ -57,7 +65,7 @@ async function visit(search: string) {
 }
 
 beforeEach(() => {
-  state.remember.mockClear();
+  state.upsert.mockClear();
   process.env.APPLE_SERVICES_ID = "com.example.web";
 });
 
@@ -65,19 +73,19 @@ describe("/auth/confirm", () => {
   it("keeps Apple's token after signing in with Apple", async () => {
     state.exchange = session("apple", "r-token");
     expect(await visit("?code=abc&next=%2Fratings")).toEqual(new Error("redirect:/ratings"));
-    expect(state.remember).toHaveBeenCalledWith("user-1", "r-token", "com.example.web");
+    expect(kept()).toEqual([["user-1", "r-token", "com.example.web"]]);
   });
 
   it("keeps Apple's token for an account first made with email, now signing in with Apple", async () => {
     state.exchange = session("apple", "r-token", { first: "email", before: "email" });
     await visit("?code=abc");
-    expect(state.remember).toHaveBeenCalledWith("user-1", "r-token", "com.example.web");
+    expect(kept()).toEqual([["user-1", "r-token", "com.example.web"]]);
   });
 
   it("never keeps Google's token as Apple's, for an Apple account signing in with Google", async () => {
     state.exchange = session("google", "g-token", { first: "apple", before: "apple" });
     expect(await visit("?code=abc")).toEqual(new Error("redirect:/"));
-    expect(state.remember).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("keeps nothing for Google, or when Apple gave no token, or with no client id", async () => {
@@ -88,7 +96,7 @@ describe("/auth/confirm", () => {
     state.exchange = session("apple", "r-token");
     delete process.env.APPLE_SERVICES_ID;
     await visit("?code=abc");
-    expect(state.remember).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("copes with a user that has no app_metadata or identities", async () => {
@@ -97,7 +105,7 @@ describe("/auth/confirm", () => {
       error: null,
     };
     expect(await visit("?code=abc")).toEqual(new Error("redirect:/"));
-    expect(state.remember).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("sends a cancelled sign-in back to log in, saying so plainly", async () => {
@@ -107,7 +115,7 @@ describe("/auth/confirm", () => {
     expect(await visit("?error=server_error")).toEqual(
       new Error("redirect:/login?notice=sign-in-cancelled"),
     );
-    expect(state.remember).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 
   it("still calls an expired email link expired, even when Supabase sends it back with an error", async () => {
@@ -125,6 +133,6 @@ describe("/auth/confirm", () => {
   it("leaves the token_hash branch alone", async () => {
     state.exchange = session("apple", "r-token");
     await visit("?token_hash=h&type=recovery");
-    expect(state.remember).not.toHaveBeenCalled();
+    expect(kept()).toEqual([]);
   });
 });

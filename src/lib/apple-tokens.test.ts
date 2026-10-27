@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const apple = vi.hoisted(() => ({
   sealToken: vi.fn(),
@@ -18,7 +18,12 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({ from: db.from }),
 }));
 
-import { appleTokenFrom, forgetAppleLink, rememberAppleToken } from "./apple-tokens";
+import {
+  appleTokenFrom,
+  forgetAppleLink,
+  keepAppleTokenFrom,
+  rememberAppleToken,
+} from "./apple-tokens";
 
 const USER = "00000000-0000-4000-8000-000000000001";
 
@@ -114,21 +119,60 @@ describe("appleTokenFrom", () => {
     // No identities at all.
     expect(appleTokenFrom(signIn(undefined, "x", "apple"))).toBeNull();
     expect(appleTokenFrom(signIn([], "x", "apple"))).toBeNull();
-    // An identity with no date, or a date that won't read.
-    expect(appleTokenFrom(signIn([identity("apple")], "x", "apple"))).toBeNull();
+    // An identity with no date beside another, or a date that won't read.
     expect(
       appleTokenFrom(signIn([identity("apple", NOW), identity("google")], "x", "apple")),
     ).toBeNull();
-    expect(appleTokenFrom(signIn([identity("apple", "not a date")], "x", "apple"))).toBeNull();
+    expect(
+      appleTokenFrom(
+        signIn([identity("apple", "not a date"), identity("google", EARLIER)], "x", "apple"),
+      ),
+    ).toBeNull();
     // Two ways of signing in at the very same moment.
     expect(
       appleTokenFrom(signIn([identity("apple", NOW), identity("google", NOW)], "x", "apple")),
     ).toBeNull();
   });
 
+  it("gives it for an account whose only way in is Apple, even before Supabase dates it", () => {
+    expect(appleTokenFrom(signIn([identity("apple")], "apple-refresh", "apple"))).toBe(
+      "apple-refresh",
+    );
+    expect(appleTokenFrom(signIn([identity("google")], "google-refresh", "google"))).toBeNull();
+  });
+
   it("copes with a user missing the fields altogether", () => {
     expect(appleTokenFrom({ provider_refresh_token: "x", user: {} })).toBeNull();
     expect(appleTokenFrom({ user: { identities: [identity("apple", NOW)] } })).toBeNull();
+  });
+});
+
+describe("keepAppleTokenFrom", () => {
+  const session = (provider: string, token: string | null) => ({
+    provider_refresh_token: token,
+    user: { id: USER, identities: [identity(provider, NOW)] },
+  });
+
+  beforeEach(() => {
+    apple.sealToken.mockImplementation((token: string) => `sealed:${token}`);
+    vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("keeps Apple's token from a sign-in with Apple, for the website's client", async () => {
+    await keepAppleTokenFrom(session("apple", "apple-refresh"));
+    expect(db.upsert).toHaveBeenCalledWith(
+      { user_id: USER, client_id: "com.mulo.web", refresh_token: "sealed:apple-refresh" },
+      { onConflict: "user_id" },
+    );
+  });
+
+  it("keeps nothing for Google, without a token, or without the client id", async () => {
+    await keepAppleTokenFrom(session("google", "google-refresh"));
+    await keepAppleTokenFrom(session("apple", null));
+    vi.stubEnv("APPLE_SERVICES_ID", "");
+    await keepAppleTokenFrom(session("apple", "apple-refresh"));
+    expect(db.upsert).not.toHaveBeenCalled();
   });
 });
 
