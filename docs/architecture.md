@@ -47,7 +47,11 @@ test says how). New endpoints go in `test/app-api.test.ts`; Collection's
 `test/app-api-collection.test.ts`, and Social and account's (lists,
 notifications, reactions, reports, blocks, follows, invites, profile
 editing, Raised On, the account) in `test/app-api-social.test.ts`. Social log-ins (`auth/apple`: the iPhone's own
-Apple sheet, checked by Supabase) are in `test/app-api-auth-social.test.ts`. Every
+Apple sheet, checked by Supabase) are in `test/app-api-auth-social.test.ts`.
+Google, and Apple off the iPhone, go through the browser: `auth/oauth/start` answers
+the page to open and `state`, Supabase's PKCE storage (`src/lib/oauth.ts`), which
+the app hands back with the code to `auth/oauth/exchange`, so nothing is kept here and
+a caught `mulo://` link is useless without it. Every
 `users/[username]/*` endpoint finds its person through `visibleProfile`
 (`src/lib/app-profile.ts`), so blocked people are a 404 everywhere; a list by
 somebody blocked is a 404 too, and `lists.ts`, `notifications.ts` and

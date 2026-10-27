@@ -483,6 +483,29 @@ export type AppleSignInInput = {
   authorizationCode?: string;
 };
 
+/** The sign-ins that go through the browser. Facebook is refused until Meta approves it. */
+export type OAuthProvider = "apple" | "google" | "facebook";
+
+/**
+ * `POST auth/oauth/start` body. `redirectTo` is where the browser comes back to:
+ * `mulo://auth/callback`, or Expo's development address outside production.
+ */
+export type OAuthStartInput = { provider: OAuthProvider; redirectTo: string };
+
+/**
+ * `POST auth/oauth/start`: the page to open in the browser, and `state` to hand
+ * back to `auth/oauth/exchange` unchanged. Keep `state` on the phone only for
+ * the one sign-in; it's what proves the code that comes back is ours.
+ */
+export type OAuthStartResult = { ok: true; url: string; state: string } | AppError;
+
+/**
+ * `POST auth/oauth/exchange` body: the `code` (and `sb_flow_id`, as `flowId`,
+ * when the return address carries one) from the address the browser came back
+ * to, with `state` from `auth/oauth/start`. Answers `AuthResponse`.
+ */
+export type OAuthExchangeInput = { code: string; flowId?: string; state: string };
+
 /** The signed-in person's own profile. Null until they've picked a username. */
 export type OwnProfile = {
   username: string;
