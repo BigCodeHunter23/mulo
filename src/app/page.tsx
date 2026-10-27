@@ -17,6 +17,7 @@ import CoverWall from "@/components/CoverWall";
 import TasteTwin from "@/components/TasteTwin";
 import ReceiptCard from "@/components/ReceiptCard";
 import { getReceipt, howLongAgo } from "@/lib/receipts";
+import { goodbyeKind } from "@/lib/goodbye";
 import { ButtonLink, EmptyState, Notice, SectionHeading } from "@/components/ui";
 
 /** How much of the feed to show before the first break, and between breaks. */
@@ -41,9 +42,10 @@ function Goodbye({ apple }: { apple: boolean }) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ goodbye?: string }>;
+  searchParams: Promise<{ goodbye?: string | string[] }>;
 }) {
-  const [user, { goodbye }] = await Promise.all([getCurrentUser(), searchParams]);
+  const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
+  const goodbye = goodbyeKind(params.goodbye);
 
   if (!user) {
     return (
