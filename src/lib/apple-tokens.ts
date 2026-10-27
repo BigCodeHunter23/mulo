@@ -1,4 +1,5 @@
 import "server-only";
+import type { Session, UserIdentity } from "@supabase/supabase-js";
 import { hasTokenKey, openToken, revokeAppleToken, sealToken } from "@/lib/apple";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logQueryError } from "@/lib/supabase/errors";
@@ -13,6 +14,48 @@ import { logQueryError } from "@/lib/supabase/errors";
 const MIGRATION = "0021_apple_tokens.sql";
 
 const reason = (error: unknown) => (error instanceof Error ? error.name : "unknown error");
+
+/** The parts of a fresh session that say how it was signed in. Every field may be missing. */
+type SignIn = {
+  provider_refresh_token?: Session["provider_refresh_token"];
+  user: { identities?: readonly UserIdentity[] };
+};
+
+/**
+ * The way of signing in this account used last: the identity with the newest
+ * `last_sign_in_at`, which Supabase stamps on the identity a sign-in used.
+ * Null when that can't be told for sure: no identities, any without a
+ * readable date, or two at the very same moment.
+ */
+function lastSignInProvider(identities: readonly UserIdentity[] | undefined): string | null {
+  if (!Array.isArray(identities) || identities.length === 0) return null;
+  let newest: { provider: string; at: number } | null = null;
+  let tied = false;
+  for (const identity of identities) {
+    const at = Date.parse(identity.last_sign_in_at ?? "");
+    if (Number.isNaN(at)) return null;
+    if (!newest || at > newest.at) {
+      newest = { provider: identity.provider, at };
+      tied = false;
+    } else if (at === newest.at) {
+      tied = true;
+    }
+  }
+  return newest && !tied ? newest.provider : null;
+}
+
+/**
+ * Apple's refresh token from a session just made, or null when this sign-in
+ * wasn't with Apple. `app_metadata.provider` won't do: it names the way the
+ * account was first made, so it would miss an email account signing in with
+ * Apple, and would take Google's token for Apple's when an Apple account
+ * signs in with Google. Never throws, so a missing field can't cost a session.
+ */
+export function appleTokenFrom(session: SignIn): string | null {
+  const token = session.provider_refresh_token;
+  if (!token) return null;
+  return lastSignInProvider(session.user.identities) === "apple" ? token : null;
+}
 
 /**
  * Keeps Apple's refresh token for this account, sealed, with the client it

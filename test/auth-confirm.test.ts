@@ -15,15 +15,39 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 vi.mock("@/lib/invites", () => ({ consumeInviteCookie: vi.fn(async () => undefined) }));
-vi.mock("@/lib/apple-tokens", () => ({ rememberAppleToken: state.remember }));
+vi.mock("@/lib/apple-tokens", async (original) => ({
+  ...(await original<typeof import("@/lib/apple-tokens")>()),
+  rememberAppleToken: state.remember,
+}));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`redirect:${to}`);
   }),
 }));
 
-function session(provider: string | undefined, refresh: string | null) {
-  const user = { id: "user-1", app_metadata: provider ? { provider } : {} };
+const EARLIER = "2026-10-01T09:00:00.000Z";
+const NOW = "2026-10-27T09:00:00.000Z";
+
+/**
+ * A sign-in by `provider` with this provider token. `first` is what the
+ * account was first made with (`app_metadata.provider`); `before` is a way of
+ * signing in it used earlier.
+ */
+function session(
+  provider: string,
+  refresh: string | null,
+  { first = provider, before }: { first?: string; before?: string } = {},
+) {
+  const identities = [
+    ...(before ? [{ provider: before, last_sign_in_at: EARLIER }] : []),
+    { provider, last_sign_in_at: NOW },
+  ].map((identity) => ({
+    ...identity,
+    id: `${identity.provider}-id`,
+    identity_id: `${identity.provider}-identity`,
+    user_id: "user-1",
+  }));
+  const user = { id: "user-1", app_metadata: { provider: first }, identities };
   return { data: { user, session: { user, provider_refresh_token: refresh } }, error: null };
 }
 
@@ -44,6 +68,18 @@ describe("/auth/confirm", () => {
     expect(state.remember).toHaveBeenCalledWith("user-1", "r-token", "com.example.web");
   });
 
+  it("keeps Apple's token for an account first made with email, now signing in with Apple", async () => {
+    state.exchange = session("apple", "r-token", { first: "email", before: "email" });
+    await visit("?code=abc");
+    expect(state.remember).toHaveBeenCalledWith("user-1", "r-token", "com.example.web");
+  });
+
+  it("never keeps Google's token as Apple's, for an Apple account signing in with Google", async () => {
+    state.exchange = session("google", "g-token", { first: "apple", before: "apple" });
+    expect(await visit("?code=abc")).toEqual(new Error("redirect:/"));
+    expect(state.remember).not.toHaveBeenCalled();
+  });
+
   it("keeps nothing for Google, or when Apple gave no token, or with no client id", async () => {
     state.exchange = session("google", "r-token");
     await visit("?code=abc");
@@ -55,7 +91,7 @@ describe("/auth/confirm", () => {
     expect(state.remember).not.toHaveBeenCalled();
   });
 
-  it("copes with a user that has no app_metadata", async () => {
+  it("copes with a user that has no app_metadata or identities", async () => {
     state.exchange = {
       data: { user: { id: "u" }, session: { user: { id: "u" }, provider_refresh_token: "x" } },
       error: null,

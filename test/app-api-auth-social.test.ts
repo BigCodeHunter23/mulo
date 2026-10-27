@@ -44,7 +44,10 @@ vi.mock("@/lib/rate-limit", async (original) => ({
   allowAddress: vi.fn(async () => !caller.limited),
 }));
 vi.mock("@/lib/apple", () => ({ exchangeAppleCode: apple.exchangeAppleCode }));
-vi.mock("@/lib/apple-tokens", () => ({ rememberAppleToken: apple.rememberAppleToken }));
+vi.mock("@/lib/apple-tokens", async (original) => ({
+  ...(await original<typeof import("@/lib/apple-tokens")>()),
+  rememberAppleToken: apple.rememberAppleToken,
+}));
 
 import { BAD_REQUEST } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
@@ -287,34 +290,61 @@ describe("POST auth/oauth/exchange", () => {
     expect(oauth.exchangeCodeForSession).toHaveBeenCalledWith("the-code", { flowId: FLOW });
   });
 
+  /** A session whose user first signed up with `first` and has these identities. */
+  function signedIn(first: string, token: string | null, ...identities: [string, string][]) {
+    return {
+      ...SESSION,
+      provider_refresh_token: token,
+      user: {
+        ...SESSION.user,
+        app_metadata: { provider: first },
+        identities: identities.map(([provider, at]) => ({
+          id: `${provider}-id`,
+          identity_id: `${provider}-identity`,
+          user_id: OTHER,
+          provider,
+          last_sign_in_at: at,
+        })),
+      },
+    };
+  }
+  const EARLIER = "2026-10-01T09:00:00.000Z";
+  const NOW = "2026-10-27T09:00:00.000Z";
+
   it("keeps Apple's refresh token, and never hands it to the app", async () => {
     vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web");
-    const session = {
-      ...SESSION,
-      provider_refresh_token: "apple-refresh",
-      user: { ...SESSION.user, app_metadata: { provider: "apple" } },
-    };
+    const session = signedIn("apple", "apple-refresh", ["apple", NOW]);
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
     const response = await exchange(ok);
     expect(await response.json()).toEqual({ ok: true, session: SESSION });
     expect(apple.rememberAppleToken).toHaveBeenCalledWith(OTHER, "apple-refresh", "com.mulo.web");
   });
 
-  it("keeps no token for Google, or without the services id", async () => {
-    const google = {
-      ...SESSION,
-      provider_refresh_token: "google-refresh",
-      user: { ...SESSION.user, app_metadata: { provider: "google" } },
-    };
+  it("keeps Apple's token for an account first made with email, now signing in with Apple", async () => {
     vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web");
+    const session = signedIn("email", "apple-refresh", ["email", EARLIER], ["apple", NOW]);
+    oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+    await exchange(ok);
+    expect(apple.rememberAppleToken).toHaveBeenCalledWith(OTHER, "apple-refresh", "com.mulo.web");
+  });
+
+  it("never keeps Google's token as Apple's, for an Apple account signing in with Google", async () => {
+    vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web");
+    const session = signedIn("apple", "google-refresh", ["apple", EARLIER], ["google", NOW]);
+    oauth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+    const response = await exchange(ok);
+    expect(response.status).toBe(200);
+    expect(apple.rememberAppleToken).not.toHaveBeenCalled();
+  });
+
+  it("keeps no token for Google, or without the services id", async () => {
+    vi.stubEnv("APPLE_SERVICES_ID", "com.mulo.web");
+    const google = signedIn("google", "google-refresh", ["google", NOW]);
     oauth.exchangeCodeForSession.mockResolvedValue({ data: { session: google }, error: null });
     await exchange(ok);
 
     vi.stubEnv("APPLE_SERVICES_ID", "");
-    const appleSession = {
-      ...google,
-      user: { ...google.user, app_metadata: { provider: "apple" } },
-    };
+    const appleSession = signedIn("apple", "apple-refresh", ["apple", NOW]);
     oauth.exchangeCodeForSession.mockResolvedValue({
       data: { session: appleSession },
       error: null,

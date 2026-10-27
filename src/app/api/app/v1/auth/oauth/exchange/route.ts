@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { rememberAppleToken } from "@/lib/apple-tokens";
+import { appleTokenFrom, rememberAppleToken } from "@/lib/apple-tokens";
 import type { AuthResponse } from "@/lib/app-api";
 import { appError, appJson, appRoute, BAD_REQUEST, readBody, toAppSession } from "@/lib/app-route";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth-input";
@@ -36,13 +36,7 @@ export const POST = appRoute(async (request: NextRequest) => {
 
   const { session } = data;
   const servicesId = process.env.APPLE_SERVICES_ID;
-  // Optional chaining on purpose: a missing field must never cost a session whose code is spent.
-  if (
-    session.user.app_metadata?.provider === "apple" &&
-    session.provider_refresh_token &&
-    servicesId
-  ) {
-    await rememberAppleToken(session.user.id, session.provider_refresh_token, servicesId);
-  }
+  const appleToken = appleTokenFrom(session);
+  if (appleToken && servicesId) await rememberAppleToken(session.user.id, appleToken, servicesId);
   return appJson<AuthResponse>({ ok: true, session: toAppSession(session) });
 });
