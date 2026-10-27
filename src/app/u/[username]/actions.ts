@@ -5,8 +5,9 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { userIdSchema, usernameSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { logQueryError } from "@/lib/supabase/errors";
+import type { FollowResult } from "@/lib/app-api";
 
-export type FollowResult = { ok: true } | { ok: false; error: string; needsLogin?: boolean };
+export type { FollowResult };
 
 /** Follows or unfollows; called directly when the button is tapped. */
 export async function setFollowing(

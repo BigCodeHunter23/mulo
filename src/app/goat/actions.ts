@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
-import type { PickKind } from "@/lib/top-picks";
+import type { PickKind, SaveResult } from "@/lib/app-api";
 import { mbidSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
-export type SaveResult = { ok: true } | { ok: false; error: string };
+export type { SaveResult };
 
 const input = z.object({
   kind: z.enum(["artist", "album"]),

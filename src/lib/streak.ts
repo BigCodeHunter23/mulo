@@ -2,6 +2,9 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
 import type { Database } from "@/lib/supabase/database.types";
+import type { Streak } from "@/lib/app-api";
+
+export type { Streak };
 
 /**
  * Days in a row somebody has done something on MULO.
@@ -15,15 +18,6 @@ import type { Database } from "@/lib/supabase/database.types";
  * already on every one of those rows, so it can't drift from what happened.
  * Days run on Sydney time, the same clock as Daily Versus.
  */
-
-export type Streak = {
-  /** Consecutive days, ending today or yesterday. */
-  days: number;
-  /** Whether today already counts. If not, the streak ends at midnight. */
-  today: boolean;
-  /** The longest run in the window looked at. */
-  best: number;
-};
 
 /** Far enough back to find any streak worth showing. */
 const WINDOW_DAYS = 120;

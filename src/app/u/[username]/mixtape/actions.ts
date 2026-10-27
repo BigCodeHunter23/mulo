@@ -5,8 +5,9 @@ import { getMixtape, type RankOffKind } from "@/lib/mixtape";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { mbidSchema, monthSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import type { SaveResult } from "@/lib/app-api";
 
-export type RankOffResult = { ok: true } | { ok: false; error: string };
+export type RankOffResult = SaveResult;
 
 /** Crowns the winner of a rank-off as somebody's album or track of the month. */
 export async function saveRankOff(

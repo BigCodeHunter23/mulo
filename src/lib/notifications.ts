@@ -1,4 +1,5 @@
 import "server-only";
+import { hiddenPeople } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import {
@@ -10,51 +11,13 @@ import {
   sydneyMidnight,
   toMatchup,
 } from "@/lib/versus";
-import { sideKey, type VersusMatchup, type VersusResult } from "@/lib/versus-shared";
+import type { Notification, Person } from "@/lib/app-api";
+import { sideKey } from "@/lib/versus-shared";
 
 /** When somebody last opened their notifications, kept per browser. */
 export const SEEN_COOKIE = "mulo_notifications_seen";
 
-export type Person = {
-  id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-};
-
-export type Notification =
-  | { kind: "follow"; key: string; at: string; person: Person }
-  | {
-      kind: "reaction";
-      key: string;
-      at: string;
-      person: Person;
-      /** 1 for a love, -1 for a nah. */
-      value: 1 | -1;
-      /** What was reacted to: a rating, a Versus pick, or a take. */
-      on: "rating" | "pick" | "take";
-      subject: { title: string; href: string };
-      /** For a pick, the artist they picked. */
-      picked?: string;
-    }
-  /**
-   * Somebody they follow rated a record they have rated too. Both scores ride
-   * along so the line can put the two numbers side by side, which is the whole
-   * reason to tap it.
-   */
-  | {
-      kind: "also-rated";
-      key: string;
-      at: string;
-      person: Person;
-      subject: { title: string; href: string };
-      yours: number;
-      theirs: number;
-    }
-  /** Today's Daily Versus is up and they haven't picked yet. */
-  | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
-  /** A Versus they picked in has closed. */
-  | { kind: "versus-result"; key: string; at: string; result: VersusResult };
+export type { Notification, Person };
 
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
 
@@ -307,50 +270,61 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     })),
   ];
 
-  return notifications.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit);
+  // Somebody blocked, either way round, has nothing to say here.
+  const hidden = await hiddenPeople();
+  return notifications
+    .filter((notification) => !("person" in notification && hidden.has(notification.person.id)))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, limit);
 }
 
-/** The time of somebody's newest notification, for the dot on the bell. */
+/** How many of each kind to look through, in case the newest are from somebody blocked. */
+const LATEST_LOOK = 5;
+
+/**
+ * The time of somebody's newest notification, for the dot on the bell.
+ * Somebody blocked, either way round, doesn't light it.
+ */
 export async function getLatestNotificationAt(userId: string): Promise<string | null> {
-  const supabase = await createClient();
+  const [supabase, hidden] = await Promise.all([createClient(), hiddenPeople()]);
   const newest = { ascending: false } as const;
 
   const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus] =
     await Promise.all([
       supabase
         .from("follows")
-        .select("created_at")
+        .select("follower_id, created_at")
         .eq("following_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, ratings!inner ( user_id )")
+        .select("user_id, created_at, ratings!inner ( user_id )")
         .eq("ratings.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, artist_ratings!inner ( user_id )")
+        .select("user_id, created_at, artist_ratings!inner ( user_id )")
         .eq("artist_ratings.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, versus_votes!inner ( user_id )")
+        .select("user_id, created_at, versus_votes!inner ( user_id )")
         .eq("versus_votes.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, versus_takes!inner ( user_id )")
+        .select("user_id, created_at, versus_takes!inner ( user_id )")
         .eq("versus_takes.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       getLatestVersusAt(userId),
     ]);
 
@@ -361,7 +335,10 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     pickReaction.data,
     takeReaction.data,
   ]
-    .flatMap((rows) => (rows ?? []) as { created_at: string }[])
+    .flatMap(
+      (rows) => (rows ?? []) as { created_at: string; user_id?: string; follower_id?: string }[],
+    )
+    .filter((row) => !hidden.has(row.user_id ?? row.follower_id ?? ""))
     .map((row) => row.created_at)
     .concat(versus ? [versus] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));

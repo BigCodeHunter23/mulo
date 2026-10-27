@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getScoresForReleases } from "@/lib/ratings";
+import type { GuessAlbum } from "@/lib/app-api";
+
+export type { GuessAlbum };
 
 /**
  * Guess the score: a record, a slider, and how close you got to what everyone
@@ -12,15 +15,6 @@ import { getScoresForReleases } from "@/lib/ratings";
  * starting score included, so nothing here can disagree with the rest of the
  * site.
  */
-
-export type GuessAlbum = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover: string | null;
-  year: string | null;
-  score: number;
-};
 
 /** Albums people are likely to recognise, to draw a game from. */
 const POOL = 400;

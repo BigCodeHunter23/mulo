@@ -2,16 +2,9 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createPublicClient } from "@/lib/supabase/public";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
+import type { PickKind, TopPick, PickSuggestions } from "@/lib/app-api";
 
-export type PickKind = "artist" | "album";
-
-/** One entry in somebody's ranked top ten, ready to render. */
-export type TopPick = {
-  mbid: string;
-  title: string;
-  subtitle: string | null;
-  image: string | null;
-};
+export type { PickKind, TopPick, PickSuggestions };
 
 type ArtistRow = {
   position: number;
@@ -96,12 +89,6 @@ export async function getPublicTopPicks(userId: string, kind: PickKind): Promise
 
   return (data ?? []).map(toAlbumPick);
 }
-
-export type PickSuggestions = {
-  /** "rated": their own ratings, best first. "popular": a start for new accounts. */
-  source: "rated" | "popular";
-  picks: (TopPick & { score: number | null })[];
-};
 
 const RATED_LIMIT = 100;
 const POPULAR_LIMIT = 12;

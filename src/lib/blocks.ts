@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import type { BlockedPerson } from "@/lib/app-api";
 import { logQueryError } from "@/lib/supabase/errors";
 
 /**
@@ -50,12 +51,7 @@ export async function isHidden(userId: string): Promise<boolean> {
   return (await hiddenPeople()).has(userId);
 }
 
-export type BlockedPerson = {
-  id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-};
+export type { BlockedPerson };
 
 /** Who the signed-in person has blocked, for the account page. */
 export async function listBlocked(): Promise<BlockedPerson[]> {

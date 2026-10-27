@@ -71,12 +71,15 @@ function sameSong(theirs: string, ours: string) {
   if (mine.length !== yours.length || mine.length === 0) return false;
 
   let exact = 0;
-  for (let i = 0; i < mine.length; i++) {
-    if (mine[i] === yours[i]) {
+  // Word by word, without indexing, so the app's stricter type check (it
+  // copies this file) can see every word is there.
+  for (const [i, word] of mine.entries()) {
+    const theirWord = yours[i] ?? "";
+    if (word === theirWord) {
       exact++;
       continue;
     }
-    if (!censoredPair(mine[i], yours[i])) return false;
+    if (!censoredPair(word, theirWord)) return false;
   }
   // At least half has to line up exactly, so two short near-misses can't pass.
   return exact * 2 >= mine.length;

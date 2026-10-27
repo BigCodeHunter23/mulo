@@ -88,6 +88,8 @@ in plain language, and give them links and exact steps when they need to act.
   cards after signup), `profile` (settings), `notifications`, and
   `admin/reports` (the moderation inbox, open only to emails in the
   `ADMIN_EMAILS` environment variable).
+- `src/app/api/app/v1/`: the phone app's API (bearer tokens, CORS, shapes in
+  `src/lib/app-api.ts`). See `docs/architecture.md`.
 - Notifications, like feeds, are read from existing tables (follows,
   reactions, Versus picks) rather than stored; when someone last looked lives
   in a cookie.

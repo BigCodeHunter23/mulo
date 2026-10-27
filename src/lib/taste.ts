@@ -1,21 +1,9 @@
 import "server-only";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
+import type { TasteMatch } from "@/lib/app-api";
 
-export type TasteMatch = {
-  /** Out of 100: how closely two people score the same records. */
-  percent: number;
-  /** How many things they have both rated. */
-  shared: number;
-  /** Where they disagree most, which is the fun part. */
-  clash: {
-    title: string;
-    subtitle: string | null;
-    href: string;
-    yours: number;
-    theirs: number;
-  } | null;
-};
+export type { TasteMatch };
 
 type Pair = {
   kind: "album" | "artist" | "song";

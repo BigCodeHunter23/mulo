@@ -1,34 +1,8 @@
 import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
+import type { SearchAlbum, SearchArtist, SearchResults, SearchSong } from "@/lib/app-api";
 
-export type SearchArtist = {
-  mbid: string;
-  name: string;
-  image_url: string | null;
-};
-
-export type SearchAlbum = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover_art_url: string | null;
-  year: string | null;
-};
-
-export type SearchSong = {
-  mbid: string;
-  title: string;
-  album: string;
-  albumMbid: string;
-  artist: string | null;
-  cover_art_url: string | null;
-};
-
-export type SearchResults = {
-  artists: SearchArtist[];
-  albums: SearchAlbum[];
-  songs: SearchSong[];
-};
+export type { SearchArtist, SearchAlbum, SearchSong, SearchResults };
 
 type SongRow = {
   title: string;

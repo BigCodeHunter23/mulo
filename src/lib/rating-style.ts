@@ -4,6 +4,9 @@ import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { mainFamily } from "@/lib/main-genre";
 import { startingScore } from "@/lib/ratings";
+import type { Standout, RatingStyle } from "@/lib/app-api";
+
+export type { Standout, RatingStyle };
 
 /**
  * How one person rates, next to everybody else.
@@ -16,32 +19,6 @@ import { startingScore } from "@/lib/ratings";
 
 /** Below this there isn't enough to say anything honest about somebody. */
 export const ENOUGH_TO_JUDGE = 8;
-
-export type Standout = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover_art_url: string | null;
-  yours: number;
-  theirs: number;
-  gap: number;
-};
-
-export type RatingStyle = {
-  /** Albums they've rated that anybody else has rated too. */
-  compared: number;
-  /** Their average on those, and everyone else's. */
-  yours: number;
-  everyone: number;
-  /** Positive: kinder than the crowd. Negative: harsher. */
-  gap: number;
-  /** The record they're furthest above the crowd on, and furthest below. */
-  champion: Standout | null;
-  sceptic: Standout | null;
-  /** Decades and genres they're kindest and hardest on, with enough rated to mean it. */
-  decades: { label: string; gap: number; count: number }[];
-  genres: { label: string; gap: number; count: number }[];
-};
 
 type Row = {
   release_mbid: string;

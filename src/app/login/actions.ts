@@ -1,56 +1,21 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { authCallbackUrl } from "@/lib/auth";
 import { consumeInviteCookie } from "@/lib/invites";
 import { safeRedirectPath } from "@/lib/redirects";
 import { allowAddress } from "@/lib/rate-limit";
+import { field, firstError } from "@/lib/validation";
 import {
-  emailSchema,
-  field,
-  firstError,
-  newPasswordSchema,
-  passwordSchema,
-} from "@/lib/validation";
+  AFTER_SIGNUP,
+  friendlyError,
+  loginInput,
+  signupInput,
+  TOO_MANY_ATTEMPTS,
+} from "@/lib/auth-input";
 
 export type AuthState = { error?: string; message?: string };
-
-/** Where a new account goes first: it needs a username before anything else works. */
-const AFTER_SIGNUP = "/welcome?intro=1";
-
-const TOO_MANY_ATTEMPTS = "Too many attempts just now. Please wait a few minutes and try again.";
-
-const loginInput = z.object({ email: emailSchema, password: passwordSchema });
-const signupInput = z.object({ email: emailSchema, password: newPasswordSchema });
-
-/** Supabase's raw messages are terse and jargon-y; say something useful. */
-function friendlyError(message: string) {
-  const m = message.toLowerCase();
-
-  if (m.includes("invalid login credentials")) {
-    return "That email and password combination doesn't match an account.";
-  }
-  if (m.includes("email not confirmed")) {
-    return "Please confirm your email address first — check your inbox for the link.";
-  }
-  if (m.includes("already registered") || m.includes("already been registered")) {
-    return "An account with that email already exists. Try logging in instead.";
-  }
-  if (m.includes("rate limit")) {
-    return "Too many attempts just now. Please wait a few minutes and try again.";
-  }
-  if (m.includes("password should be")) {
-    return "Your password needs to be at least 6 characters.";
-  }
-  if (m.includes("invalid") && m.includes("email")) {
-    return "That doesn't look like a valid email address.";
-  }
-  // Anything else is Supabase talking to developers, not to people.
-  console.error("[auth] unexpected Supabase error:", message);
-  return "Something went wrong on our side. Please try again in a minute.";
-}
 
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const input = loginInput.safeParse({

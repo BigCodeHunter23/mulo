@@ -150,14 +150,18 @@ export type GenreFamily = {
   tiers: GenreTier[];
 };
 
-const LADDER = [10, 25, 50, 100];
+const LADDER = [10, 25, 50, 100] as const;
 
+// Spelled out rung by rung rather than looked up by position, so the app's
+// stricter type check (it copies this file) can see every rung has a count.
 function ladder(id: string, names: [string, string, string, string]): GenreTier[] {
-  return names.map((name, i) => ({
-    slug: `${id}-${i + 1}`,
-    name,
-    need: LADDER[i],
-  }));
+  const [first, second, third, fourth] = names;
+  return [
+    { slug: `${id}-1`, name: first, need: LADDER[0] },
+    { slug: `${id}-2`, name: second, need: LADDER[1] },
+    { slug: `${id}-3`, name: third, need: LADDER[2] },
+    { slug: `${id}-4`, name: fourth, need: LADDER[3] },
+  ];
 }
 
 export const GENRE_FAMILIES: GenreFamily[] = [

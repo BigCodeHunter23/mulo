@@ -1,19 +1,9 @@
 import "server-only";
-import type { Era, Scene } from "@/lib/eras";
+import type { RaisedOn } from "@/lib/app-api";
 import { findScene } from "@/lib/raised-on-shared";
 import { createClient } from "@/lib/supabase/server";
 
-export type RaisedOn = {
-  era: Era | null;
-  scene: Scene | null;
-  album: {
-    mbid: string;
-    title: string;
-    artist: string | null;
-    cover: string | null;
-    year: number | null;
-  };
-};
+export type { RaisedOn };
 
 /** The record somebody was raised on, with its decade and scene, if they've picked. */
 export async function getRaisedOn(userId: string): Promise<RaisedOn | null> {

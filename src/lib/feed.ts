@@ -2,65 +2,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { hiddenFilter } from "@/lib/blocks";
-import { getReactions, NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
+import { getReactions, NO_REACTIONS } from "@/lib/reactions";
 import { MATCHUP_SELECT, sydneyDay, toMatchup } from "@/lib/versus";
-import { sideKey, type VersusMatchup, type VersusSideKey } from "@/lib/versus-shared";
+import { sideKey } from "@/lib/versus-shared";
+import type { Author, FeedAlbum, FeedItem } from "@/lib/app-api";
 
-type Author = { username: string; display_name: string | null; avatar_url: string | null };
-
-export type FeedAlbum = {
-  mbid: string;
-  title: string;
-  cover_art_url: string | null;
-  artist: { mbid: string; name: string } | null;
-};
-
-export type FeedItem =
-  | {
-      kind: "album";
-      key: string;
-      /** The rating itself, which is what a love or a nah attaches to. */
-      ratingId: number;
-      reaction: ReactionSummary;
-      created_at: string;
-      author: Author;
-      score: number;
-      review: string | null;
-      release: FeedAlbum;
-    }
-  | {
-      kind: "artist";
-      key: string;
-      ratingId: number;
-      reaction: ReactionSummary;
-      created_at: string;
-      author: Author;
-      score: number;
-      review: string | null;
-      artist: { mbid: string; name: string; image_url: string | null };
-    }
-  | {
-      kind: "songs";
-      key: string;
-      created_at: string;
-      author: Author;
-      release: FeedAlbum;
-      /** Newest first. */
-      songs: { title: string; score: number }[];
-    }
-  | {
-      kind: "pick";
-      key: string;
-      /** The pick itself, which is what a love or a nah attaches to. */
-      ratingId: number;
-      reaction: ReactionSummary;
-      created_at: string;
-      author: Author;
-      matchup: VersusMatchup;
-      pick: VersusSideKey;
-      /** Hidden until the viewer has picked too, or the matchup has closed. */
-      revealed: boolean;
-    };
+export type { FeedAlbum, FeedItem };
 
 type ReleaseRow = {
   mbid: string;

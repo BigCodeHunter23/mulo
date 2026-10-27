@@ -17,30 +17,9 @@ import { mbidSchema } from "@/lib/validation";
 // New albums and artists cost a MusicBrainz request, which bans addresses that
 // ask too often; limit how many one visitor can set off.
 import { allowAddress, RateLimitedError } from "@/lib/rate-limit";
+import type { Artist, Release, Track } from "@/lib/app-api";
 
-export type Artist = {
-  mbid: string;
-  name: string;
-  image_url: string | null;
-  bio: string | null;
-};
-
-export type Release = {
-  mbid: string;
-  title: string;
-  artist_mbid: string | null;
-  release_date: string | null;
-  cover_art_url: string | null;
-  genres: string[];
-};
-
-export type Track = {
-  position: number;
-  title: string;
-  duration_ms: number | null;
-  /** The song, for rating. Null on a tracklist saved before songs existed. */
-  song_mbid: string | null;
-};
+export type { Artist, Release, Track };
 
 const RELEASE_COLUMNS = "mbid, title, artist_mbid, release_date, cover_art_url, genres";
 

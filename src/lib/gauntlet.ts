@@ -2,6 +2,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedArtistAlbums } from "@/lib/catalog";
 import { hitsForAlbums, type StackAlbum } from "@/lib/stack";
+import type { SetProgress } from "@/lib/app-api";
+import type { RankedAlbum } from "@/lib/app-api";
+
+export type { RankedAlbum };
+
+export type { SetProgress };
 
 /**
  * The Gauntlet: an artist's whole discography, rated in one run, and what
@@ -12,21 +18,6 @@ import { hitsForAlbums, type StackAlbum } from "@/lib/stack";
  * album ratings, so a Gauntlet run and rating albums one page at a time end in
  * exactly the same place.
  */
-
-export type RankedAlbum = {
-  mbid: string;
-  title: string;
-  year: string | null;
-  cover: string | null;
-  score: number;
-};
-
-export type SetProgress = {
-  total: number;
-  rated: number;
-  /** The albums still to rate, oldest first, for a run. */
-  remaining: string[];
-};
 
 /** How many of an artist's albums somebody has rated. */
 export async function getSetProgress(userId: string, albumMbids: string[]): Promise<SetProgress> {

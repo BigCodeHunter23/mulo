@@ -11,6 +11,9 @@ import {
   tierFor,
   type Badge,
 } from "@/lib/badge-catalog";
+import type { BoardBadge, BoardGroup, BoardLadder, BadgeBoard } from "@/lib/app-api";
+
+export type { BoardBadge, BoardGroup, BoardLadder, BadgeBoard };
 
 export type { Badge };
 
@@ -321,31 +324,6 @@ export async function getBadges(userId: string): Promise<Badge[]> {
 
   return [...ladders, ...SOLO_BADGES.filter((badge) => earned.has(badge.slug))];
 }
-
-export type BoardBadge = {
-  slug: string;
-  name: string;
-  earned: boolean;
-  /** Only filled in once earned. Locked ones keep their secret. */
-  description: string | null;
-};
-
-export type BoardGroup = { id: string; title: string; badges: BoardBadge[] };
-
-export type BoardLadder = {
-  id: string;
-  name: string;
-  /** Albums rated in this genre so far. */
-  rated: number;
-  tiers: { slug: string; name: string; earned: boolean }[];
-};
-
-export type BadgeBoard = {
-  earned: number;
-  total: number;
-  groups: BoardGroup[];
-  ladders: BoardLadder[];
-};
 
 /** Everything there is to collect, and which of it somebody has. */
 export async function getBadgeBoard(userId: string): Promise<BadgeBoard> {

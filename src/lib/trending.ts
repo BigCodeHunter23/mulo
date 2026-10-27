@@ -4,21 +4,9 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { coverSrc } from "@/lib/cover-url";
 import { logQueryError } from "@/lib/supabase/errors";
 import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
+import type { HeavyRotation, RotationAlbum } from "@/lib/app-api";
 
-export type RotationAlbum = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover: string | null;
-  /** Different people who rated the album or its songs in the window. */
-  people: number;
-  average: number;
-};
-
-export type HeavyRotation = {
-  label: "this week" | "this month";
-  albums: RotationAlbum[];
-};
+export type { HeavyRotation, RotationAlbum };
 
 const WINDOWS = [
   { days: 7, label: "this week" },

@@ -5,6 +5,9 @@ import { getRaisedOn } from "@/lib/raised-on";
 import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
 import { playCounts } from "@/lib/hits";
+import type { StackAlbum, StackHit } from "@/lib/app-api";
+
+export type { StackAlbum, StackHit };
 
 /**
  * The Stack: a run of records to rate quickly, picked for one person.
@@ -31,31 +34,18 @@ import { playCounts } from "@/lib/hits";
  * reflects what somebody has rated up to that moment.
  */
 
-export type StackAlbum = {
-  mbid: string;
-  title: string;
-  artist: string | null;
-  cover: string | null;
-  year: string | null;
-  /** Why it's in the run, shown as a quiet line under the cover. */
-  reason: string | null;
-  /**
-   * The record's tracklist, to jog a memory. A cover and a title often aren't
-   * enough to place an album — the moment somebody reads a song they know,
-   * they can score it honestly instead of guessing or skipping.
-   */
-  hits: StackHit[];
-  /** True when play counts are known, so the bars and "biggest" mean something. */
-  hitsByPlays: boolean;
-};
+/**
+ * Long enough to be worth opening, short enough to finish in a sitting.
+ *
+ * Forty was a slog. A run nobody reaches the end of always feels like
+ * homework, and the end of a run — where the ranking sits and another run is
+ * one tap away — is the part that makes somebody go again. Ten takes a couple
+ * of minutes and ends on that.
+ */
+export const STACK_RUN = 10;
 
-export type StackHit = {
-  title: string;
-  /** Plays relative to the album's biggest song, 0 to 1, for the bar. */
-  share: number;
-  /** The most-played song on the record, worth calling out. */
-  biggest: boolean;
-};
+/** The decades a run can be narrowed to. */
+export const STACK_DECADES = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
 /** Points for each reason a record might be one somebody knows. */
 const WEIGHT = {

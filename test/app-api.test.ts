@@ -1,0 +1,1684 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+/**
+ * The app API's route layer (`src/app/api/app/v1`): who each endpoint lets
+ * in, what it hands the website's own code, and what it answers. The lib
+ * functions and actions are stand-ins here; test/actions-auth.test.ts covers
+ * the actions themselves.
+ */
+
+const caller = vi.hoisted(() => ({
+  token: null as string | null,
+  user: null as { id: string; email: string | null } | null,
+  limited: false,
+}));
+
+/** What Supabase answers a log-in, sign-up, refresh or log-out. */
+const auth = vi.hoisted(() => ({
+  signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
+  refreshSession: vi.fn(),
+  admin: { signOut: vi.fn() },
+}));
+
+/** Stand-ins for the lib functions the endpoints read through. */
+const lib = vi.hoisted(() => ({
+  // catalog
+  getCachedRelease: vi.fn(),
+  getCachedArtist: vi.fn(),
+  getCachedArtistAlbums: vi.fn(),
+  getCachedTracks: vi.fn(),
+  // ratings
+  getScores: vi.fn(),
+  getOwnRating: vi.fn(),
+  getSongScores: vi.fn(),
+  getTopSongs: vi.fn(),
+  getScoresForReleases: vi.fn(),
+  getMyAlbumScores: vi.fn(),
+  getFriendRaters: vi.fn(),
+  friendsForResults: vi.fn(),
+  getOwnRatingCounts: vi.fn(),
+  getOwnAlbumRatings: vi.fn(),
+  getOwnArtistRatings: vi.fn(),
+  getOwnSongRatings: vi.fn(),
+  getHighestRatedAlbums: vi.fn(),
+  // reviews, reactions
+  getReviews: vi.fn(),
+  getReactions: vi.fn(),
+  // gauntlet, discover, search
+  getSetProgress: vi.fn(),
+  similarArtists: vi.fn(),
+  newReleases: vi.fn(),
+  topRatedOnMulo: vi.fn(),
+  mostPlayedAlbums: vi.fn(),
+  artistsToExplore: vi.fn(),
+  searchCatalog: vi.fn(),
+  // trending, charts, stack
+  getHeavyRotation: vi.fn(),
+  getChart: vi.fn(),
+  getChartProgress: vi.fn(),
+  getStack: vi.fn(),
+  // feed
+  getFollowingFeed: vi.fn(),
+  getGlobalFeed: vi.fn(),
+  getUserFeed: vi.fn(),
+  // social, blocks
+  getOwnProfile: vi.fn(),
+  getProfileByUsername: vi.fn(),
+  getProfileStats: vi.fn(),
+  getFollowState: vi.fn(),
+  listProfiles: vi.fn(),
+  getFollowingIds: vi.fn(),
+  isHidden: vi.fn(),
+  // daily habits
+  getStreak: vi.fn(),
+  sydneyDay: vi.fn(),
+  getTodaysMatchup: vi.fn(),
+  getMatchupForDay: vi.fn(),
+  getVersusView: vi.fn(),
+  getTakes: vi.fn(),
+  getNominations: vi.fn(),
+  currentDrop: vi.fn(),
+  getDropResults: vi.fn(),
+  getGuessGame: vi.fn(),
+  // collection
+  getTopPicks: vi.fn(),
+  getTasteMatch: vi.fn(),
+  // social and account
+  getUserLists: vi.fn(),
+  getRecentLists: vi.fn(),
+  getRaisedOn: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  bearerToken: vi.fn(async () => caller.token),
+  getCurrentUser: vi.fn(async () => caller.user),
+  createClient: vi.fn(async () => ({})),
+}));
+vi.mock("@/lib/supabase/public", () => ({ createPublicClient: vi.fn(() => ({ auth })) }));
+vi.mock("@/lib/rate-limit", async (original) => ({
+  ...(await original<typeof import("@/lib/rate-limit")>()),
+  allowAddress: vi.fn(async () => !caller.limited),
+  allowUser: vi.fn(async () => !caller.limited),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn }));
+vi.mock("@/lib/catalog", () => ({
+  getCachedRelease: lib.getCachedRelease,
+  getCachedArtist: lib.getCachedArtist,
+  getCachedArtistAlbums: lib.getCachedArtistAlbums,
+  getCachedTracks: lib.getCachedTracks,
+}));
+vi.mock("@/lib/ratings", () => ({
+  NO_FRIENDS: { artists: {}, albums: {} },
+  getScores: lib.getScores,
+  getOwnRating: lib.getOwnRating,
+  getSongScores: lib.getSongScores,
+  getTopSongs: lib.getTopSongs,
+  getScoresForReleases: lib.getScoresForReleases,
+  getMyAlbumScores: lib.getMyAlbumScores,
+  getFriendRaters: lib.getFriendRaters,
+  friendsForResults: lib.friendsForResults,
+  getOwnRatingCounts: lib.getOwnRatingCounts,
+  getOwnAlbumRatings: lib.getOwnAlbumRatings,
+  getOwnArtistRatings: lib.getOwnArtistRatings,
+  getOwnSongRatings: lib.getOwnSongRatings,
+  getHighestRatedAlbums: lib.getHighestRatedAlbums,
+}));
+vi.mock("@/lib/reviews", () => ({ getReviews: lib.getReviews }));
+vi.mock("@/lib/reactions", () => ({ getReactions: lib.getReactions }));
+vi.mock("@/lib/gauntlet", () => ({ getSetProgress: lib.getSetProgress }));
+vi.mock("@/lib/discover", async (original) => ({
+  // The shelves' sizes and minimums are the real ones.
+  SHELVES: (await original<typeof import("@/lib/discover")>()).SHELVES,
+  similarArtists: lib.similarArtists,
+  newReleases: lib.newReleases,
+  topRatedOnMulo: lib.topRatedOnMulo,
+  mostPlayedAlbums: lib.mostPlayedAlbums,
+  artistsToExplore: lib.artistsToExplore,
+}));
+vi.mock("@/lib/trending", () => ({ getHeavyRotation: lib.getHeavyRotation }));
+vi.mock("@/lib/charts", () => ({
+  CHART_KINDS: [
+    { id: "albums", label: "Albums", noun: "album" },
+    { id: "songs", label: "Songs", noun: "song" },
+  ],
+  CHART_GENRES: [{ id: "hip-hop", name: "Hip hop" }],
+  isChartKind: (value: string) => value === "albums" || value === "songs",
+  getChart: lib.getChart,
+  getChartProgress: lib.getChartProgress,
+}));
+vi.mock("@/lib/stack", () => ({
+  STACK_DECADES: [1980, 1990],
+  STACK_RUN: 10,
+  getStack: lib.getStack,
+}));
+vi.mock("@/lib/search", () => ({ searchCatalog: lib.searchCatalog }));
+vi.mock("@/lib/feed", () => ({
+  getFollowingFeed: lib.getFollowingFeed,
+  getGlobalFeed: lib.getGlobalFeed,
+  getUserFeed: lib.getUserFeed,
+}));
+vi.mock("@/lib/social", () => ({
+  getOwnProfile: lib.getOwnProfile,
+  getProfileByUsername: lib.getProfileByUsername,
+  getProfileStats: lib.getProfileStats,
+  getFollowState: lib.getFollowState,
+  listProfiles: lib.listProfiles,
+  getFollowingIds: lib.getFollowingIds,
+}));
+vi.mock("@/lib/blocks", () => ({ isHidden: lib.isHidden }));
+vi.mock("@/lib/streak", () => ({ getStreak: lib.getStreak }));
+vi.mock("@/lib/versus", async (original) => ({
+  // The day arithmetic is the real one; the clock and the reads are stand-ins.
+  ...(await original<typeof import("@/lib/versus")>()),
+  sydneyDay: lib.sydneyDay,
+  getTodaysMatchup: lib.getTodaysMatchup,
+  getMatchupForDay: lib.getMatchupForDay,
+  getVersusView: lib.getVersusView,
+}));
+vi.mock("@/lib/versus-takes", () => ({ getTakes: lib.getTakes }));
+vi.mock("@/lib/nominations", () => ({ getNominations: lib.getNominations }));
+vi.mock("@/lib/drop", () => ({
+  currentDrop: lib.currentDrop,
+  getDropResults: lib.getDropResults,
+}));
+vi.mock("@/lib/guess", () => ({ getGuessGame: lib.getGuessGame }));
+vi.mock("@/lib/top-picks", () => ({ getTopPicks: lib.getTopPicks }));
+vi.mock("@/lib/taste", () => ({ getTasteMatch: lib.getTasteMatch }));
+vi.mock("@/lib/lists", () => ({
+  getUserLists: lib.getUserLists,
+  getRecentLists: lib.getRecentLists,
+}));
+vi.mock("@/lib/raised-on", () => ({ getRaisedOn: lib.getRaisedOn }));
+
+/** Stand-ins for the website's own actions, which the writes hand straight to. */
+const actions = vi.hoisted(() => ({
+  rate: vi.fn(),
+  removeRating: vi.fn(),
+  saveReview: vi.fn(),
+  setFollowing: vi.fn(),
+  saveProfile: vi.fn(),
+  castVote: vi.fn(),
+  postTake: vi.fn(),
+  deleteTake: vi.fn(),
+  nominateMatchup: vi.fn(),
+  backNomination: vi.fn(),
+}));
+
+vi.mock("@/app/profile/actions", () => ({ saveProfile: actions.saveProfile }));
+
+vi.mock("@/app/ratings/actions", () => ({
+  rate: actions.rate,
+  removeRating: actions.removeRating,
+  saveReview: actions.saveReview,
+}));
+vi.mock("@/app/u/[username]/actions", () => ({ setFollowing: actions.setFollowing }));
+vi.mock("@/app/versus/actions", () => ({
+  castVote: actions.castVote,
+  postTake: actions.postTake,
+  deleteTake: actions.deleteTake,
+  nominateMatchup: actions.nominateMatchup,
+  backNomination: actions.backNomination,
+}));
+
+const { TOO_MANY } = await import("@/lib/rate-limit");
+
+const MBID = "0383dadf-2a4e-4d10-a46a-e9e041da8eb3";
+const OTHER = "1f9df192-a621-4f54-8850-2c5373b7eac9";
+const USER = { id: OTHER, email: "someone@example.com" };
+
+function request(path: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
+  return new NextRequest(`https://mulo.test/api/app/v1/${path}`, init);
+}
+
+function json(path: string, method: string, body: unknown) {
+  return request(path, {
+    method,
+    body: JSON.stringify(body),
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** Route parameters, as Next hands them to a handler. */
+const params = <T>(value: T) => ({ params: Promise.resolve(value) });
+
+function signIn() {
+  caller.token = "good";
+  caller.user = USER;
+}
+
+beforeEach(() => {
+  caller.token = null;
+  caller.user = null;
+  caller.limited = false;
+  auth.signInWithPassword.mockReset();
+  auth.signUp.mockReset();
+  auth.refreshSession.mockReset();
+  auth.admin.signOut.mockReset().mockResolvedValue({ data: null, error: null });
+  for (const fn of Object.values(lib)) fn.mockReset();
+  for (const fn of Object.values(actions)) fn.mockReset().mockResolvedValue({ ok: true });
+});
+
+const SESSION = {
+  access_token: "access",
+  refresh_token: "refresh",
+  expires_at: 1_900_000_000,
+  user: { id: OTHER, email: "someone@example.com" },
+};
+
+describe("POST auth/login", () => {
+  const login = async (body: unknown) =>
+    (await import("@/app/api/app/v1/auth/login/route")).POST(json("auth/login", "POST", body));
+
+  it("hands back the session", async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { session: SESSION }, error: null });
+    const response = await login({ email: "someone@example.com", password: "longenough" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+  });
+
+  it("says a wrong password plainly", async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: { message: "Invalid login credentials" },
+    });
+    const response = await login({ email: "someone@example.com", password: "wrong" });
+    expect(response.status).toBe(401);
+    expect((await response.json()).error).toMatch(/doesn't match an account/);
+  });
+
+  it("says which field is wrong, before asking Supabase", async () => {
+    const response = await login({ email: "", password: "x" });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Enter your email address.");
+    expect(auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("refuses a body it can't read", async () => {
+    const response = (await import("@/app/api/app/v1/auth/login/route")).POST(
+      request("auth/login", { method: "POST", body: "{" }),
+    );
+    expect((await response).status).toBe(400);
+  });
+
+  it("refuses over the limit before asking Supabase", async () => {
+    caller.limited = true;
+    const response = await login({ email: "someone@example.com", password: "longenough" });
+    expect(response.status).toBe(429);
+    expect(auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST auth/signup", () => {
+  const signup = async (body: unknown) =>
+    (await import("@/app/api/app/v1/auth/signup/route")).POST(json("auth/signup", "POST", body));
+
+  it("asks for a confirmation that lands on the welcome steps", async () => {
+    auth.signUp.mockResolvedValue({ data: { session: null, user: { id: OTHER } }, error: null });
+    const response = await signup({ email: "someone@example.com", password: "longenough" });
+    expect(await response.json()).toEqual({
+      ok: true,
+      session: null,
+      message: "Account created. Check your email for a confirmation link, then log in here.",
+    });
+    expect(auth.signUp.mock.calls[0][0].options.emailRedirectTo).toMatch(
+      /\/auth\/confirm\?next=%2Fwelcome%3Fintro%3D1$/,
+    );
+  });
+
+  it("hands back the session when Supabase signs them straight in", async () => {
+    auth.signUp.mockResolvedValue({ data: { session: SESSION, user: { id: OTHER } }, error: null });
+    const response = await signup({ email: "someone@example.com", password: "longenough" });
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+  });
+
+  it("refuses a short password before asking Supabase", async () => {
+    const response = await signup({ email: "someone@example.com", password: "x" });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/at least 6/);
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it("says an existing account plainly", async () => {
+    auth.signUp.mockResolvedValue({
+      data: { session: null, user: null },
+      error: { message: "User already registered" },
+    });
+    const response = await signup({ email: "someone@example.com", password: "longenough" });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/already exists/);
+  });
+
+  it("refuses over the limit before asking Supabase", async () => {
+    caller.limited = true;
+    const response = await signup({ email: "someone@example.com", password: "longenough" });
+    expect(response.status).toBe(429);
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET me", () => {
+  const me = async () => (await import("@/app/api/app/v1/me/route")).GET();
+
+  it("needs a token", async () => {
+    expect((await me()).status).toBe(401);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await me()).status).toBe(401);
+  });
+
+  it("answers who you are and your profile", async () => {
+    signIn();
+    const profile = {
+      username: "alex",
+      display_name: null,
+      avatar_url: null,
+      raised_on_mbid: null,
+    };
+    lib.getOwnProfile.mockResolvedValue(profile);
+    expect(await (await me()).json()).toEqual({ ...USER, profile });
+    expect(lib.getOwnProfile).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("says when there's no username yet", async () => {
+    signIn();
+    lib.getOwnProfile.mockResolvedValue(null);
+    expect((await (await me()).json()).profile).toBeNull();
+  });
+});
+
+const RELEASE = {
+  mbid: MBID,
+  title: "To Pimp a Butterfly",
+  artist_mbid: OTHER,
+  release_date: "2015-03-15",
+  cover_art_url: null,
+  genres: ["hip hop"],
+};
+const ARTIST = { mbid: OTHER, name: "Kendrick Lamar", image_url: null, bio: null };
+const SCORES = {
+  overall: 9.1,
+  overallCount: 12,
+  you: null,
+  friends: null,
+  friendsCount: 0,
+  friendList: [],
+  seeded: false,
+};
+
+describe("GET albums/[mbid]", () => {
+  const album = async (mbid = MBID) =>
+    (await import("@/app/api/app/v1/albums/[mbid]/route")).GET(
+      request(`albums/${mbid}`),
+      params({ mbid }),
+    );
+
+  beforeEach(() => {
+    lib.getCachedRelease.mockResolvedValue(RELEASE);
+    lib.getCachedArtist.mockResolvedValue(ARTIST);
+    lib.getScores.mockResolvedValue(SCORES);
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([{ id: 7 }]);
+    lib.getReactions.mockResolvedValue({ 7: { love: 1, dislike: 0, mine: null } });
+  });
+
+  it("answers signed out with everything the album page shows", async () => {
+    const response = await album();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ release: RELEASE, artist: ARTIST, scores: SCORES, own: null });
+    expect(body.reactions).toEqual({ 7: { love: 1, dislike: 0, mine: null } });
+    expect(typeof body.prompt).toBe("string");
+    expect(lib.getReactions).toHaveBeenCalledWith("album", [7]);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await album()).status).toBe(401);
+  });
+
+  it("is 404 for an album that isn't there", async () => {
+    lib.getCachedRelease.mockResolvedValue(null);
+    expect((await album()).status).toBe(404);
+  });
+
+  it("is 404 for something that isn't an id, without looking", async () => {
+    expect((await album("nope")).status).toBe(404);
+    expect(lib.getCachedRelease).not.toHaveBeenCalled();
+  });
+
+  it("is 429 when the catalogue limit is hit", async () => {
+    const { RateLimitedError } = await import("@/lib/rate-limit");
+    lib.getCachedRelease.mockRejectedValue(new RateLimitedError("catalog"));
+    expect((await album()).status).toBe(429);
+  });
+});
+
+describe("GET albums/[mbid]/tracks", () => {
+  it("answers the tracklist with its song scores", async () => {
+    const tracks = [
+      { position: 1, title: "Wesley's Theory", duration_ms: 287000, song_mbid: OTHER },
+      { position: 2, title: "For Free?", duration_ms: 130000, song_mbid: null },
+    ];
+    const scores = { community: {}, own: {}, friends: {} };
+    lib.getCachedTracks.mockResolvedValue(tracks);
+    lib.getSongScores.mockResolvedValue(scores);
+    const { GET } = await import("@/app/api/app/v1/albums/[mbid]/tracks/route");
+    const body = await (await GET(request(`albums/${MBID}/tracks`), params({ mbid: MBID }))).json();
+    expect(body).toEqual({ tracks, scores });
+    expect(lib.getSongScores).toHaveBeenCalledWith([OTHER]);
+  });
+});
+
+describe("GET artists/[mbid]", () => {
+  const artist = async (mbid = OTHER) =>
+    (await import("@/app/api/app/v1/artists/[mbid]/route")).GET(
+      request(`artists/${mbid}`),
+      params({ mbid }),
+    );
+
+  beforeEach(() => {
+    lib.getCachedArtist.mockResolvedValue(ARTIST);
+    lib.getCachedArtistAlbums.mockResolvedValue([RELEASE]);
+    lib.getScores.mockResolvedValue(SCORES);
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([]);
+    lib.getReactions.mockResolvedValue({});
+    lib.getTopSongs.mockResolvedValue([]);
+    lib.getScoresForReleases.mockResolvedValue(new Map([[MBID, 9.1]]));
+    lib.getMyAlbumScores.mockResolvedValue(new Map());
+    lib.getFriendRaters.mockResolvedValue({});
+    lib.getSetProgress.mockResolvedValue({ total: 1, rated: 0, remaining: [MBID] });
+  });
+
+  it("answers signed out, with album scores as plain objects", async () => {
+    const body = await (await artist()).json();
+    expect(body).toMatchObject({ artist: ARTIST, albums: [RELEASE], setProgress: null });
+    expect(body.albumScores).toEqual({ [MBID]: 9.1 });
+    expect(body.myAlbumScores).toEqual({});
+    expect(lib.getFriendRaters).toHaveBeenCalledWith("album", [MBID]);
+    expect(lib.getSetProgress).not.toHaveBeenCalled();
+  });
+
+  it("adds how much of the discography you've rated when signed in", async () => {
+    signIn();
+    const body = await (await artist()).json();
+    expect(body.setProgress).toEqual({ total: 1, rated: 0, remaining: [MBID] });
+    expect(lib.getSetProgress).toHaveBeenCalledWith(OTHER, [MBID]);
+  });
+
+  it("is 404 for an artist that isn't there", async () => {
+    lib.getCachedArtist.mockResolvedValue(null);
+    expect((await artist()).status).toBe(404);
+  });
+
+  it("is 404 for something that isn't an id, without looking", async () => {
+    expect((await artist("nope")).status).toBe(404);
+    expect(lib.getCachedArtist).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET artists/[mbid]/similar", () => {
+  it("answers Where Next", async () => {
+    lib.similarArtists.mockResolvedValue([ARTIST]);
+    const { GET } = await import("@/app/api/app/v1/artists/[mbid]/similar/route");
+    const response = await GET(request(`artists/${OTHER}/similar`), params({ mbid: OTHER }));
+    expect(await response.json()).toEqual({ artists: [ARTIST] });
+    expect(lib.similarArtists).toHaveBeenCalledWith(OTHER, 6);
+  });
+});
+
+describe("GET search", () => {
+  const RESULTS = { artists: [ARTIST], albums: [], songs: [] };
+  const search = async (q: string) =>
+    (await import("@/app/api/app/v1/search/route")).GET(
+      request(`search?q=${encodeURIComponent(q)}`),
+    );
+
+  beforeEach(() => {
+    lib.searchCatalog.mockResolvedValue(RESULTS);
+    lib.friendsForResults.mockResolvedValue({ artists: { [OTHER]: [] }, albums: {} });
+  });
+
+  it("answers signed out with nobody's friends", async () => {
+    expect(await (await search("kendrick")).json()).toEqual({
+      ...RESULTS,
+      friends: { artists: {}, albums: {} },
+    });
+    expect(lib.searchCatalog).toHaveBeenCalledWith("kendrick", 8);
+    expect(lib.friendsForResults).not.toHaveBeenCalled();
+  });
+
+  it("adds who you follow has rated what when signed in", async () => {
+    signIn();
+    expect((await (await search("kendrick")).json()).friends.artists).toEqual({ [OTHER]: [] });
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await search("kendrick")).status).toBe(401);
+  });
+
+  it("says no politely over the limit", async () => {
+    caller.limited = true;
+    expect((await search("kendrick")).status).toBe(429);
+    expect(lib.searchCatalog).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET search/wider", () => {
+  it("is the website's own MusicBrainz search", async () => {
+    const app = await import("@/app/api/app/v1/search/wider/route");
+    const site = await import("@/app/api/search/wider/route");
+    expect(app.GET).toBe(site.GET);
+  });
+});
+
+describe("signed-in-only reads", () => {
+  it.each([
+    ["feed", async () => (await import("@/app/api/app/v1/feed/route")).GET(request("feed"))],
+    [
+      "ratings",
+      async () => (await import("@/app/api/app/v1/ratings/route")).GET(request("ratings")),
+    ],
+    ["people", async () => (await import("@/app/api/app/v1/people/route")).GET(request("people"))],
+    ["stack", async () => (await import("@/app/api/app/v1/stack/route")).GET(request("stack"))],
+  ])("%s needs a token", async (_name, call) => {
+    const response = await call();
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ ok: false, error: "Log in first." });
+  });
+});
+
+describe("GET feed", () => {
+  const feed = async (query = "") =>
+    (await import("@/app/api/app/v1/feed/route")).GET(request(`feed${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getFollowingFeed.mockResolvedValue([{ key: "a" }]);
+    lib.getGlobalFeed.mockResolvedValue([{ key: "b" }]);
+  });
+
+  it("is the people you follow by default", async () => {
+    expect(await (await feed()).json()).toEqual({ items: [{ key: "a" }] });
+    expect(lib.getFollowingFeed).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("is everyone on MULO when asked", async () => {
+    expect(await (await feed("?scope=everyone")).json()).toEqual({ items: [{ key: "b" }] });
+    expect(lib.getGlobalFeed).toHaveBeenCalledWith(24);
+  });
+
+  it("refuses a scope it doesn't know", async () => {
+    expect((await feed("?scope=mine")).status).toBe(400);
+  });
+});
+
+/** A list, as a card shows it. */
+const LIST = {
+  id: 1,
+  title: "Debuts",
+  description: null,
+  ranked: true,
+  updatedAt: "2026-10-01T00:00:00Z",
+  count: 3,
+  covers: [],
+  ownerId: OTHER,
+  owner: { username: "alex", name: "Alex", avatarUrl: null },
+};
+
+const RAISED = {
+  era: null,
+  scene: null,
+  album: { mbid: MBID, title: "OK Computer", artist: "Radiohead", cover: null, year: 1997 },
+};
+
+describe("GET discover", () => {
+  const discover = async () => (await import("@/app/api/app/v1/discover/route")).GET();
+  const album = (mbid: string) => ({
+    mbid,
+    title: mbid,
+    artist: null,
+    cover_art_url: null,
+    year: null,
+  });
+  const four = ["a", "b", "c", "d"].map(album);
+
+  beforeEach(() => {
+    lib.getHeavyRotation.mockResolvedValue(null);
+    lib.newReleases.mockResolvedValue(four);
+    lib.topRatedOnMulo.mockResolvedValue([]);
+    lib.mostPlayedAlbums.mockResolvedValue([album("e")]);
+    lib.artistsToExplore.mockResolvedValue([ARTIST]);
+    lib.getGlobalFeed.mockResolvedValue([{ key: "f" }]);
+    lib.getMyAlbumScores.mockResolvedValue(new Map([["a", 9]]));
+    lib.getRecentLists.mockResolvedValue([LIST]);
+  });
+
+  it("answers every shelf, and your own scores for the albums on them", async () => {
+    signIn();
+    const body = await (await discover()).json();
+    expect(body).toEqual({
+      rotation: null,
+      newReleases: four,
+      topRated: [],
+      mostPlayed: [album("e")],
+      artistsToExplore: [ARTIST],
+      justRated: [{ key: "f" }],
+      mine: { a: 9 },
+      lists: [LIST],
+    });
+    expect(lib.newReleases).toHaveBeenCalledWith(10);
+    expect(lib.getRecentLists).toHaveBeenCalledWith(4);
+    expect(lib.getMyAlbumScores.mock.calls[0][0]).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("leaves out a shelf below the page's minimum", async () => {
+    lib.newReleases.mockResolvedValue(four.slice(0, 3));
+    expect((await (await discover()).json()).newReleases).toEqual([]);
+  });
+
+  it("leaves out a shelf whose read fails, and keeps the rest", async () => {
+    lib.mostPlayedAlbums.mockRejectedValue(new Error("down"));
+    const response = await discover();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.mostPlayed).toEqual([]);
+    expect(body.newReleases).toEqual(four);
+  });
+
+  it("is open to somebody signed out, with no scores of their own", async () => {
+    const body = await (await discover()).json();
+    expect(body.mine).toEqual({});
+    expect(lib.getMyAlbumScores).not.toHaveBeenCalled();
+  });
+
+  it("keeps who rated what to people with an account, as the page does", async () => {
+    const body = await (await discover()).json();
+    expect(body.justRated).toEqual([]);
+    expect(body.newReleases).toEqual(four);
+    expect(lib.getGlobalFeed).not.toHaveBeenCalled();
+  });
+
+  it("keeps lists to people with an account, as the page does", async () => {
+    expect((await (await discover()).json()).lists).toEqual([]);
+    expect(lib.getRecentLists).not.toHaveBeenCalled();
+  });
+
+  it("leaves lists out, rather than failing, when they can't be read", async () => {
+    signIn();
+    lib.getRecentLists.mockRejectedValue(new Error("down"));
+    const response = await discover();
+    expect(response.status).toBe(200);
+    expect((await response.json()).lists).toEqual([]);
+  });
+});
+
+describe("GET charts", () => {
+  const charts = async (query = "") =>
+    (await import("@/app/api/app/v1/charts/route")).GET(request(`charts${query}`));
+  const CHART = {
+    kind: "songs",
+    genre: "hip-hop",
+    genreName: "Hip hop",
+    entries: [],
+    pool: 0,
+    siteAverage: 6.5,
+  };
+
+  beforeEach(() => {
+    lib.getChart.mockResolvedValue(CHART);
+    lib.getChartProgress.mockResolvedValue({ yours: new Map([["x", 8]]), rated: 1, total: 5 });
+  });
+
+  it("answers the chart asked for, and what you've rated in it as plain data", async () => {
+    const body = await (await charts("?type=songs&genre=hip-hop")).json();
+    expect(lib.getChart).toHaveBeenCalledWith("songs", { genre: "hip-hop", limit: 100 });
+    expect(body).toEqual({
+      chart: CHART,
+      progress: { yours: { x: 8 }, rated: 1, total: 5 },
+      kinds: [
+        { id: "albums", label: "Albums" },
+        { id: "songs", label: "Songs" },
+      ],
+      genres: [{ id: "hip-hop", label: "Hip hop" }],
+    });
+  });
+
+  it("falls back to every album for a type or genre it doesn't know", async () => {
+    await charts("?type=podcasts&genre=nope");
+    expect(lib.getChart).toHaveBeenCalledWith("albums", { genre: null, limit: 100 });
+  });
+});
+
+describe("GET stack", () => {
+  const stack = async (query = "") =>
+    (await import("@/app/api/app/v1/stack/route")).GET(request(`stack${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getStack.mockResolvedValue([{ mbid: "a" }]);
+  });
+
+  it("draws a run for the signed-in person, with the filters on offer", async () => {
+    const body = await (await stack("?decade=1990&genre=hip-hop")).json();
+    expect(lib.getStack).toHaveBeenCalledWith(OTHER, 10, { decade: 1990, genre: "hip-hop" });
+    expect(body.albums).toEqual([{ mbid: "a" }]);
+    expect(body.decade).toBe(1990);
+    expect(body.genre).toBe("hip-hop");
+    expect(body.decades).toEqual([1980, 1990]);
+    expect(body.genres).toContainEqual({ id: "hip-hop", label: "Hip hop" });
+  });
+
+  it("ignores a filter it doesn't know", async () => {
+    await stack("?decade=1875&genre=nope");
+    expect(lib.getStack).toHaveBeenCalledWith(OTHER, 10, { decade: null, genre: null });
+  });
+
+  it("is never kept by a cache: every run is new", async () => {
+    expect((await stack()).headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
+describe("read limit", () => {
+  const discover = async () => (await import("@/app/api/app/v1/discover/route")).GET();
+
+  beforeEach(async () => {
+    const limits = await import("@/lib/rate-limit");
+    vi.mocked(limits.allowAddress).mockClear();
+    vi.mocked(limits.allowUser).mockClear();
+    lib.getHeavyRotation.mockResolvedValue(null);
+    for (const shelf of [
+      lib.newReleases,
+      lib.topRatedOnMulo,
+      lib.mostPlayedAlbums,
+      lib.artistsToExplore,
+      lib.getGlobalFeed,
+    ]) {
+      shelf.mockResolvedValue([]);
+    }
+    lib.getMyAlbumScores.mockResolvedValue(new Map());
+  });
+
+  it("turns a caller away past the limit, before reading anything", async () => {
+    caller.limited = true;
+    const response = await discover();
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({ ok: false, error: TOO_MANY });
+    expect(lib.newReleases).not.toHaveBeenCalled();
+  });
+
+  it("counts somebody signed out by their address", async () => {
+    const { allowAddress, allowUser } = await import("@/lib/rate-limit");
+    await discover();
+    expect(allowAddress).toHaveBeenCalledWith("read");
+    expect(allowUser).not.toHaveBeenCalled();
+  });
+
+  it("counts somebody signed in as themselves", async () => {
+    signIn();
+    const { allowAddress, allowUser } = await import("@/lib/rate-limit");
+    await discover();
+    expect(allowUser).toHaveBeenCalledWith("read", OTHER);
+    expect(allowAddress).not.toHaveBeenCalled();
+  });
+
+  it("covers the Charts and The Stack too", async () => {
+    caller.limited = true;
+    const charts = (await import("@/app/api/app/v1/charts/route")).GET(request("charts"));
+    expect((await charts).status).toBe(429);
+    expect(lib.getChart).not.toHaveBeenCalled();
+
+    signIn();
+    const stack = (await import("@/app/api/app/v1/stack/route")).GET(request("stack"));
+    expect((await stack).status).toBe(429);
+    expect(lib.getStack).not.toHaveBeenCalled();
+  });
+});
+
+const TODAY = "2026-10-26";
+
+function matchup(day: string, id = 7) {
+  const side = (mbid: string, name: string) => ({ mbid, name, image: null });
+  return {
+    id,
+    day,
+    title: "King of New York",
+    tagline: "Two kings, one city",
+    left: side(MBID, "Nas"),
+    right: side(OTHER, "Jay-Z"),
+  };
+}
+
+function view(day: string, over: Record<string, unknown> = {}) {
+  return {
+    matchup: matchup(day),
+    closed: day < TODAY,
+    closesAt: "2026-10-26T13:00:00.000Z",
+    now: 0,
+    signedIn: false,
+    mine: null,
+    tally: null,
+    friendsPicked: 0,
+    ...over,
+  };
+}
+
+const TAKE = (id: number) => ({ id, body: `take ${id}` });
+const SPLIT = { left: 3, right: 1, friends: { left: [], right: [] } };
+
+describe("GET versus", () => {
+  const versus = async () => (await import("@/app/api/app/v1/versus/route")).GET();
+
+  beforeEach(() => {
+    lib.sydneyDay.mockReturnValue(TODAY);
+    lib.getTodaysMatchup.mockResolvedValue(matchup(TODAY));
+    lib.getMatchupForDay.mockResolvedValue(matchup("2026-10-25", 6));
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      m.day === TODAY ? view(TODAY) : view(m.day, { tally: SPLIT }),
+    );
+    lib.getTakes.mockResolvedValue({ available: true, takes: [TAKE(1), TAKE(2)] });
+    lib.getNominations.mockResolvedValue([{ id: 5 }]);
+  });
+
+  it("answers today's matchup, yesterday's result and the nominations", async () => {
+    const body = await (await versus()).json();
+    expect(body.today).toEqual(view(TODAY));
+    expect(body.yesterday).toEqual(view("2026-10-25", { tally: SPLIT }));
+    expect(body.nominations).toEqual([{ id: 5 }]);
+    expect(lib.getMatchupForDay).toHaveBeenCalledWith("2026-10-25");
+    expect(lib.getNominations).toHaveBeenCalledWith(null);
+  });
+
+  it("asks for the nominations as the signed-in person, to mark the ones they back", async () => {
+    signIn();
+    await versus();
+    expect(lib.getNominations).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("holds the takes back until you pick, but says how many there are", async () => {
+    const body = await (await versus()).json();
+    expect(body.takes).toEqual({ available: true, count: 2, takes: [] });
+  });
+
+  it("shows the takes once you've picked", async () => {
+    lib.getVersusView.mockResolvedValue(view(TODAY, { mine: "left", tally: SPLIT }));
+    const body = await (await versus()).json();
+    expect(body.takes).toEqual({ available: true, count: 2, takes: [TAKE(1), TAKE(2)] });
+    expect(lib.getTakes).toHaveBeenCalledWith(7);
+  });
+
+  it("leaves yesterday out when nobody picked in it", async () => {
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      view(m.day, { tally: { left: 0, right: 0, friends: { left: [], right: [] } } }),
+    );
+    expect((await (await versus()).json()).yesterday).toBeNull();
+  });
+
+  it("leaves yesterday out when there was no matchup", async () => {
+    lib.getMatchupForDay.mockResolvedValue(null);
+    expect((await (await versus()).json()).yesterday).toBeNull();
+  });
+
+  it("answers an empty page when today's matchup couldn't be set up", async () => {
+    lib.getTodaysMatchup.mockResolvedValue(null);
+    expect(await (await versus()).json()).toEqual({
+      today: null,
+      takes: { available: false, count: 0, takes: [] },
+      yesterday: null,
+      nominations: [],
+    });
+    expect(lib.getTakes).not.toHaveBeenCalled();
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await versus()).status).toBe(429);
+    expect(lib.getTodaysMatchup).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET versus/[day]", () => {
+  const day = async (value: string) =>
+    (await import("@/app/api/app/v1/versus/[day]/route")).GET(
+      request(`versus/${value}`),
+      params({ day: value }),
+    );
+
+  beforeEach(() => {
+    lib.sydneyDay.mockReturnValue(TODAY);
+    lib.getTodaysMatchup.mockResolvedValue(matchup(TODAY));
+    lib.getMatchupForDay.mockResolvedValue(matchup("2026-10-20"));
+    lib.getVersusView.mockImplementation(async (m: { day: string }) =>
+      view(m.day, { tally: SPLIT }),
+    );
+    lib.getTakes.mockResolvedValue({ available: true, takes: [TAKE(1)] });
+  });
+
+  it("answers a finished day with its result and every take", async () => {
+    const body = await (await day("2026-10-20")).json();
+    expect(lib.getMatchupForDay).toHaveBeenCalledWith("2026-10-20");
+    expect(body).toEqual({
+      view: view("2026-10-20", { tally: SPLIT }),
+      takes: { available: true, count: 1, takes: [TAKE(1)] },
+    });
+  });
+
+  it("answers today from today's matchup", async () => {
+    await day(TODAY);
+    expect(lib.getTodaysMatchup).toHaveBeenCalled();
+    expect(lib.getMatchupForDay).not.toHaveBeenCalled();
+  });
+
+  it.each(["2026-10-27", "yesterday", "2026-1-5"])("is 404 for %s", async (value) => {
+    const response = await day(value);
+    expect(response.status).toBe(404);
+    expect(lib.getMatchupForDay).not.toHaveBeenCalled();
+  });
+
+  it("is 404 for a day with no matchup, without reading takes", async () => {
+    lib.getMatchupForDay.mockResolvedValue(null);
+    expect((await day("2026-10-20")).status).toBe(404);
+    expect(lib.getTakes).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET drop", () => {
+  const drop = async () => (await import("@/app/api/app/v1/drop/route")).GET();
+  const DROP = {
+    week: 3,
+    album: { mbid: MBID, title: "Blonde", artist: "Frank Ocean" },
+    opensAt: "2026-10-25T13:00:00.000Z",
+    closesAt: "2026-11-01T13:00:00.000Z",
+    now: 0,
+  };
+  const SPREAD = [0, 0, 0, 0, 0, 1, 1, 2, 0, 0];
+  const review = (id: number) => ({ id, username: `r${id}`, review: "Good" });
+
+  beforeEach(() => {
+    lib.currentDrop.mockReturnValue(DROP);
+    lib.getCachedRelease.mockResolvedValue({ cover_art_url: "c", release_date: "2016-08-20" });
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: null,
+    });
+    lib.getOwnRating.mockResolvedValue(null);
+    lib.getReviews.mockResolvedValue([review(1), review(2), review(3)]);
+    lib.getReactions.mockResolvedValue({
+      1: { love: 1, dislike: 0, mine: null },
+      2: { love: 0, dislike: 0, mine: null },
+      3: { love: 5, dislike: 0, mine: null },
+    });
+  });
+
+  it("holds the spread, the average and the reviews back until you've rated it", async () => {
+    const body = await (await drop()).json();
+    expect(body).toEqual({
+      drop: DROP,
+      cover: "c",
+      year: "2016",
+      own: null,
+      results: { count: 4, thisWeek: 2, yours: null, average: null, spread: null },
+      reviews: [],
+      reactions: {},
+    });
+    expect(lib.getDropResults).toHaveBeenCalledWith(DROP);
+    expect(lib.getReviews).not.toHaveBeenCalled();
+    expect(lib.getReactions).not.toHaveBeenCalled();
+  });
+
+  it("shows how it's landing, and the most loved reviews, once you have", async () => {
+    signIn();
+    lib.getOwnRating.mockResolvedValue({ score: 8, review: null });
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: 8,
+    });
+    const body = await (await drop()).json();
+    expect(body.own).toEqual({ score: 8, review: null });
+    expect(body.results).toEqual({ count: 4, thisWeek: 2, yours: 8, average: 7.5, spread: SPREAD });
+    expect(body.reviews.map((r: { id: number }) => r.id)).toEqual([3, 1, 2]);
+    expect(Object.keys(body.reactions)).toEqual(["1", "2", "3"]);
+    expect(lib.getOwnRating).toHaveBeenCalledWith("album", MBID);
+    expect(lib.getReviews).toHaveBeenCalledWith("album", MBID);
+    expect(lib.getReactions).toHaveBeenCalledWith("album", [1, 2, 3]);
+  });
+
+  it("keeps the six most loved reviews, and only their reactions", async () => {
+    lib.getDropResults.mockResolvedValue({
+      spread: SPREAD,
+      count: 4,
+      thisWeek: 2,
+      average: 7.5,
+      yours: 8,
+    });
+    const reviews = [1, 2, 3, 4, 5, 6, 7, 8].map(review);
+    lib.getReviews.mockResolvedValue(reviews);
+    lib.getReactions.mockResolvedValue(
+      Object.fromEntries(reviews.map(({ id }) => [id, { love: id, dislike: 0, mine: null }])),
+    );
+    const body = await (await drop()).json();
+    expect(body.reviews.map((r: { id: number }) => r.id)).toEqual([8, 7, 6, 5, 4, 3]);
+    expect(Object.keys(body.reactions).sort()).toEqual(["3", "4", "5", "6", "7", "8"]);
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await drop()).status).toBe(429);
+    expect(lib.getDropResults).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET guess", () => {
+  const guess = async () => (await import("@/app/api/app/v1/guess/route")).GET();
+
+  it("deals a fresh game of ten", async () => {
+    lib.getGuessGame.mockResolvedValue([{ mbid: MBID, score: 7.4 }]);
+    const response = await guess();
+    expect(await response.json()).toEqual({ albums: [{ mbid: MBID, score: 7.4 }] });
+    expect(lib.getGuessGame).toHaveBeenCalledWith(10);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await guess()).status).toBe(429);
+    expect(lib.getGuessGame).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET me/streak", () => {
+  const streak = async () => (await import("@/app/api/app/v1/me/streak/route")).GET();
+
+  it("answers the signed-in person's streak", async () => {
+    signIn();
+    lib.getStreak.mockResolvedValue({ days: 4, today: false, best: 6 });
+    expect(await (await streak()).json()).toEqual({ days: 4, today: false, best: 6 });
+    expect(lib.getStreak).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("needs somebody signed in", async () => {
+    expect((await streak()).status).toBe(401);
+    expect(lib.getStreak).not.toHaveBeenCalled();
+  });
+
+  it("is limited like the other reads", async () => {
+    signIn();
+    caller.limited = true;
+    expect((await streak()).status).toBe(429);
+    expect(lib.getStreak).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET ratings", () => {
+  const ratings = async (query = "") =>
+    (await import("@/app/api/app/v1/ratings/route")).GET(request(`ratings${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getOwnRatingCounts.mockResolvedValue({ album: 2, artist: 1, song: 0 });
+    lib.getOwnAlbumRatings.mockResolvedValue([{ score: 9 }]);
+    lib.getOwnArtistRatings.mockResolvedValue([{ score: 8 }]);
+    lib.getOwnSongRatings.mockResolvedValue([{ score: 7 }]);
+  });
+
+  it("is your albums, newest first, by default", async () => {
+    expect(await (await ratings()).json()).toEqual({
+      counts: { album: 2, artist: 1, song: 0 },
+      kind: "album",
+      sort: "recent",
+      items: [{ score: 9 }],
+    });
+    expect(lib.getOwnAlbumRatings).toHaveBeenCalledWith("recent");
+  });
+
+  it.each([
+    ["artist", "highest", lib.getOwnArtistRatings, 8],
+    ["song", "lowest", lib.getOwnSongRatings, 7],
+  ] as const)("is your %ss in %s order when asked", async (kind, sort, read, score) => {
+    const body = await (await ratings(`?kind=${kind}&sort=${sort}`)).json();
+    expect(body).toMatchObject({ kind, sort, items: [{ score }] });
+    expect(read).toHaveBeenCalledWith(sort);
+    expect(lib.getOwnAlbumRatings).not.toHaveBeenCalled();
+  });
+
+  it("refuses a kind it doesn't know", async () => {
+    expect((await ratings("?kind=podcast")).status).toBe(400);
+  });
+});
+
+describe("GET people", () => {
+  const people = async (query = "") =>
+    (await import("@/app/api/app/v1/people/route")).GET(request(`people${query}`));
+
+  beforeEach(() => {
+    signIn();
+    lib.getFollowingIds.mockResolvedValue(["p1"]);
+  });
+
+  it("pages through everyone, marking who you follow", async () => {
+    lib.listProfiles.mockResolvedValue(Array.from({ length: 51 }, (_, i) => ({ id: `p${i}` })));
+    const body = await (await people("?page=2")).json();
+    expect(lib.listProfiles).toHaveBeenCalledWith({ offset: 50, size: 51 });
+    expect(body.people).toHaveLength(50);
+    expect(body).toMatchObject({ following: ["p1"], hasMore: true });
+  });
+
+  it("says when it's the last page", async () => {
+    lib.listProfiles.mockResolvedValue([{ id: "p0" }]);
+    const body = await (await people()).json();
+    expect(lib.listProfiles).toHaveBeenCalledWith({ offset: 0, size: 51 });
+    expect(body.hasMore).toBe(false);
+  });
+});
+
+describe("GET users/[username]", () => {
+  const PROFILE = {
+    id: OTHER,
+    username: "alex",
+    display_name: null,
+    avatar_url: null,
+    bio: null,
+    created_at: "2026-01-01T00:00:00Z",
+  };
+  const profile = async (username = "alex") =>
+    (await import("@/app/api/app/v1/users/[username]/route")).GET(
+      request(`users/${username}`),
+      params({ username }),
+    );
+
+  beforeEach(() => {
+    lib.getProfileByUsername.mockResolvedValue(PROFILE);
+    lib.isHidden.mockResolvedValue(false);
+    lib.getProfileStats.mockResolvedValue({
+      followers: 1,
+      following: 2,
+      ratings: 3,
+      averageScore: 7,
+    });
+    lib.getFollowState.mockResolvedValue({ signedIn: false, isSelf: false, isFollowing: false });
+    lib.getUserFeed.mockResolvedValue([]);
+    lib.getHighestRatedAlbums.mockResolvedValue([]);
+    lib.getStreak.mockResolvedValue({ days: 3, today: true, best: 9 });
+    lib.getTopPicks.mockResolvedValue([]);
+    lib.getTasteMatch.mockResolvedValue(null);
+    lib.getUserLists.mockResolvedValue([]);
+    lib.getRaisedOn.mockResolvedValue(null);
+  });
+
+  const PICK = { mbid: MBID, title: "Kid A", subtitle: "Radiohead", image: null };
+  const MATCH = { percent: 81, shared: 12, clash: null };
+  const SOMEONE = { id: "a3d0a1c4-0000-4000-8000-000000000001", email: null };
+
+  it("answers their GOAT to anyone, as the page shows it", async () => {
+    lib.getTopPicks.mockImplementation(async (_id: string, kind: string) =>
+      kind === "album" ? [PICK] : [],
+    );
+    const body = await (await profile()).json();
+    expect(body.goat).toEqual({ artists: [], albums: [PICK] });
+    expect(lib.getTopPicks).toHaveBeenCalledWith(OTHER, "artist");
+  });
+
+  it("answers the taste match to somebody signed in looking at someone else", async () => {
+    caller.token = "good";
+    caller.user = SOMEONE;
+    lib.getTasteMatch.mockResolvedValue(MATCH);
+    const body = await (await profile()).json();
+    expect(body.taste).toEqual(MATCH);
+    expect(lib.getTasteMatch).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("leaves the taste match out signed out and on your own profile", async () => {
+    lib.getTasteMatch.mockResolvedValue(MATCH);
+    expect((await (await profile()).json()).taste).toBeNull();
+    signIn(); // USER is OTHER, the profile's own id
+    expect((await (await profile()).json()).taste).toBeNull();
+    expect(lib.getTasteMatch).not.toHaveBeenCalled();
+  });
+
+  it("shows no taste match, rather than no profile, when it can't be worked out", async () => {
+    caller.token = "good";
+    caller.user = SOMEONE;
+    lib.getTasteMatch.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).taste).toBeNull();
+  });
+
+  it("answers the profile's core signed out, without their listening", async () => {
+    lib.getUserFeed.mockResolvedValue([{ key: "r" }]);
+    lib.getHighestRatedAlbums.mockResolvedValue([{ mbid: MBID }]);
+    const body = await (await profile()).json();
+    expect(body).toMatchObject({
+      profile: PROFILE,
+      stats: { ratings: 3 },
+      follow: { isFollowing: false },
+      recent: [],
+      highest: [],
+    });
+    expect(lib.getUserFeed).not.toHaveBeenCalled();
+    expect(lib.getHighestRatedAlbums).not.toHaveBeenCalled();
+  });
+
+  it("answers their latest ratings and top shelf to somebody signed in", async () => {
+    signIn();
+    lib.getUserFeed.mockResolvedValue([{ key: "r" }]);
+    lib.getHighestRatedAlbums.mockResolvedValue([{ mbid: MBID }]);
+    const body = await (await profile()).json();
+    expect(body).toMatchObject({ recent: [{ key: "r" }], highest: [{ mbid: MBID }] });
+    expect(lib.getUserFeed).toHaveBeenCalledWith(OTHER);
+    expect(lib.getHighestRatedAlbums).toHaveBeenCalledWith(OTHER, 12);
+  });
+
+  it("refuses a token that doesn't verify", async () => {
+    caller.token = "expired";
+    expect((await profile()).status).toBe(401);
+  });
+
+  it("answers their streak to anyone, as the flame on the page shows", async () => {
+    const body = await (await profile()).json();
+    expect(body.streak).toEqual({ days: 3, today: true, best: 9 });
+    expect(lib.getStreak).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("shows no flame, rather than no profile, when the streak can't be read", async () => {
+    lib.getStreak.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).streak).toEqual({ days: 0, today: false, best: 0 });
+  });
+
+  it("is limited like the other reads", async () => {
+    caller.limited = true;
+    expect((await profile()).status).toBe(429);
+    expect(lib.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
+  it("is 404 for nobody by that name", async () => {
+    lib.getProfileByUsername.mockResolvedValue(null);
+    expect((await profile()).status).toBe(404);
+  });
+
+  it("is 404 for somebody blocked either way round", async () => {
+    lib.isHidden.mockResolvedValue(true);
+    expect((await profile()).status).toBe(404);
+    expect(lib.getUserFeed).not.toHaveBeenCalled();
+  });
+
+  it("answers their first three non-empty lists and how many there are, signed in", async () => {
+    signIn();
+    const lists = [1, 2, 3, 4, 5].map((id) => ({ ...LIST, id, count: id === 2 ? 0 : 3 }));
+    lib.getUserLists.mockResolvedValue(lists);
+    const body = await (await profile()).json();
+    expect(body.lists.top.map((l: { id: number }) => l.id)).toEqual([1, 3, 4]);
+    expect(body.lists.count).toBe(4);
+    expect(lib.getUserLists).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("keeps lists to people with an account, as the page does", async () => {
+    lib.getUserLists.mockResolvedValue([LIST]);
+    expect((await (await profile()).json()).lists).toEqual({ top: [], count: 0 });
+    expect(lib.getUserLists).not.toHaveBeenCalled();
+  });
+
+  it("shows no lists, rather than no profile, when they can't be read", async () => {
+    signIn();
+    lib.getUserLists.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).lists).toEqual({ top: [], count: 0 });
+  });
+
+  it("answers the record they were raised on to anyone, as the page shows it", async () => {
+    lib.getRaisedOn.mockResolvedValue(RAISED);
+    expect((await (await profile()).json()).raisedOn).toEqual(RAISED);
+    expect(lib.getRaisedOn).toHaveBeenCalledWith(OTHER);
+    lib.getRaisedOn.mockRejectedValue(new Error("down"));
+    expect((await (await profile()).json()).raisedOn).toBeNull();
+  });
+
+  it("is 404 for a username that can't exist, without looking", async () => {
+    expect((await profile("no!")).status).toBe(404);
+    expect(lib.getProfileByUsername).not.toHaveBeenCalled();
+  });
+});
+
+describe("writes", () => {
+  const writes: [string, () => Promise<Response>][] = [
+    [
+      "POST ratings",
+      async () =>
+        (await import("@/app/api/app/v1/ratings/route")).POST(
+          json("ratings", "POST", { kind: "album", mbid: MBID, score: 8 }),
+        ),
+    ],
+    [
+      "DELETE ratings",
+      async () =>
+        (await import("@/app/api/app/v1/ratings/route")).DELETE(
+          request(`ratings?kind=album&mbid=${MBID}`, { method: "DELETE" }),
+        ),
+    ],
+    [
+      "PUT reviews",
+      async () =>
+        (await import("@/app/api/app/v1/reviews/route")).PUT(
+          json("reviews", "PUT", { kind: "album", mbid: MBID, review: "Great" }),
+        ),
+    ],
+    [
+      "PUT follows",
+      async () =>
+        (await import("@/app/api/app/v1/follows/[userId]/route")).PUT(
+          json(`follows/${OTHER}`, "PUT", { following: true, username: "alex" }),
+          params({ userId: OTHER }),
+        ),
+    ],
+    [
+      "POST versus/picks",
+      async () =>
+        (await import("@/app/api/app/v1/versus/picks/route")).POST(
+          json("versus/picks", "POST", { matchupId: 7, pick: "left" }),
+        ),
+    ],
+    [
+      "POST versus/takes",
+      async () =>
+        (await import("@/app/api/app/v1/versus/takes/route")).POST(
+          json("versus/takes", "POST", { matchupId: 7, body: "Easy." }),
+        ),
+    ],
+    [
+      "DELETE versus/takes/[id]",
+      async () =>
+        (await import("@/app/api/app/v1/versus/takes/[id]/route")).DELETE(
+          request("versus/takes/3", { method: "DELETE" }),
+          params({ id: "3" }),
+        ),
+    ],
+    [
+      "POST versus/nominations",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/route")).POST(
+          json("versus/nominations", "POST", { left: MBID, right: OTHER }),
+        ),
+    ],
+    [
+      "PUT versus/nominations/[id]/back",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/[id]/back/route")).PUT(
+          request("versus/nominations/5/back", { method: "PUT" }),
+          params({ id: "5" }),
+        ),
+    ],
+    [
+      "DELETE versus/nominations/[id]/back",
+      async () =>
+        (await import("@/app/api/app/v1/versus/nominations/[id]/back/route")).DELETE(
+          request("versus/nominations/5/back", { method: "DELETE" }),
+          params({ id: "5" }),
+        ),
+    ],
+  ];
+
+  it.each(writes)("%s needs a token, and touches nothing without one", async (_name, call) => {
+    expect((await call()).status).toBe(401);
+    for (const action of Object.values(actions)) expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each(writes)("%s refuses a token that doesn't verify", async (_name, call) => {
+    caller.token = "forged";
+    expect((await call()).status).toBe(401);
+    for (const action of Object.values(actions)) expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each(writes)("%s answers with the action's own result", async (_name, call) => {
+    signIn();
+    const response = await call();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("hands a score straight to rate", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    await POST(json("ratings", "POST", { kind: "song", mbid: OTHER, score: 7, releaseMbid: MBID }));
+    expect(actions.rate).toHaveBeenCalledWith("song", OTHER, 7, MBID);
+  });
+
+  it("hands a removal straight to removeRating", async () => {
+    signIn();
+    const { DELETE } = await import("@/app/api/app/v1/ratings/route");
+    await DELETE(
+      request(`ratings?kind=song&mbid=${OTHER}&releaseMbid=${MBID}`, { method: "DELETE" }),
+    );
+    expect(actions.removeRating).toHaveBeenCalledWith("song", OTHER, MBID);
+  });
+
+  it("hands a review straight to saveReview", async () => {
+    signIn();
+    const { PUT } = await import("@/app/api/app/v1/reviews/route");
+    await PUT(json("reviews", "PUT", { kind: "artist", mbid: OTHER, review: "" }));
+    expect(actions.saveReview).toHaveBeenCalledWith("artist", OTHER, "");
+  });
+
+  it("hands a follow straight to setFollowing", async () => {
+    signIn();
+    const { PUT } = await import("@/app/api/app/v1/follows/[userId]/route");
+    await PUT(
+      json(`follows/${MBID}`, "PUT", { following: false, username: "sam" }),
+      params({ userId: MBID }),
+    );
+    expect(actions.setFollowing).toHaveBeenCalledWith(MBID, "sam", false);
+  });
+
+  it("hands a pick straight to castVote", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    await POST(json("versus/picks", "POST", { matchupId: 7, pick: "right" }));
+    expect(actions.castVote).toHaveBeenCalledWith(7, "right");
+  });
+
+  it("refuses a pick of neither side, without asking castVote", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 7, pick: "middle" }));
+    expect(response.status).toBe(400);
+    expect(actions.castVote).not.toHaveBeenCalled();
+  });
+
+  it("passes on an earlier pick and the split with the refusal", async () => {
+    signIn();
+    const refusal = {
+      ok: false,
+      error: "You already picked in this one.",
+      mine: "left",
+      tally: { left: 2, right: 1, friends: { left: [], right: [] } },
+    };
+    actions.castVote.mockResolvedValueOnce(refusal);
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 7, pick: "right" }));
+    expect(await response.json()).toEqual(refusal);
+  });
+
+  it("hands a take straight to postTake, and its removal to deleteTake", async () => {
+    signIn();
+    const takes = await import("@/app/api/app/v1/versus/takes/route");
+    await takes.POST(json("versus/takes", "POST", { matchupId: 7, body: "Easy." }));
+    expect(actions.postTake).toHaveBeenCalledWith(7, "Easy.");
+
+    const take = await import("@/app/api/app/v1/versus/takes/[id]/route");
+    await take.DELETE(request("versus/takes/3", { method: "DELETE" }), params({ id: "3" }));
+    expect(actions.deleteTake).toHaveBeenCalledWith(3);
+  });
+
+  it("hands a nomination straight to nominateMatchup", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/nominations/route");
+    await POST(json("versus/nominations", "POST", { left: MBID, right: OTHER }));
+    expect(actions.nominateMatchup).toHaveBeenCalledWith(MBID, OTHER);
+  });
+
+  it("backs a nomination, and takes the backing back", async () => {
+    signIn();
+    const back = await import("@/app/api/app/v1/versus/nominations/[id]/back/route");
+    await back.PUT(request("versus/nominations/5/back", { method: "PUT" }), params({ id: "5" }));
+    await back.DELETE(
+      request("versus/nominations/5/back", { method: "DELETE" }),
+      params({ id: "5" }),
+    );
+    expect(actions.backNomination.mock.calls).toEqual([
+      [5, true],
+      [5, false],
+    ]);
+  });
+
+  it.each(["abc", "1e2", "0", ""])("refuses a take or nomination id of %j", async (id) => {
+    signIn();
+    const take = await import("@/app/api/app/v1/versus/takes/[id]/route");
+    const back = await import("@/app/api/app/v1/versus/nominations/[id]/back/route");
+    const removed = await take.DELETE(
+      request("versus/takes/x", { method: "DELETE" }),
+      params({ id }),
+    );
+    const backed = await back.PUT(
+      request("versus/nominations/x/back", { method: "PUT" }),
+      params({ id }),
+    );
+    expect([removed.status, backed.status]).toEqual([400, 400]);
+    expect(actions.deleteTake).not.toHaveBeenCalled();
+    expect(actions.backNomination).not.toHaveBeenCalled();
+  });
+
+  it("refuses a matchup that can't be one", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/versus/picks/route");
+    const response = await POST(json("versus/picks", "POST", { matchupId: 1.5, pick: "left" }));
+    expect(response.status).toBe(400);
+    expect(actions.castVote).not.toHaveBeenCalled();
+  });
+
+  it("passes on the action's own refusal, in its words", async () => {
+    signIn();
+    actions.rate.mockResolvedValueOnce({ ok: false, error: "Scores run from 1 to 10." });
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    const response = await POST(json("ratings", "POST", { kind: "album", mbid: MBID, score: 11 }));
+    expect(await response.json()).toEqual({ ok: false, error: "Scores run from 1 to 10." });
+  });
+
+  it("refuses a body it can't read", async () => {
+    signIn();
+    const { POST } = await import("@/app/api/app/v1/ratings/route");
+    const response = await POST(request("ratings", { method: "POST", body: "{" }));
+    expect(response.status).toBe(400);
+    expect(actions.rate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a removal that doesn't say what", async () => {
+    signIn();
+    const { DELETE } = await import("@/app/api/app/v1/ratings/route");
+    const response = await DELETE(request("ratings?kind=album", { method: "DELETE" }));
+    expect(response.status).toBe(400);
+    expect(actions.removeRating).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST auth/refresh", () => {
+  const refresh = async (body: unknown) =>
+    (await import("@/app/api/app/v1/auth/refresh/route")).POST(json("auth/refresh", "POST", body));
+
+  it("trades a refresh token for a fresh session", async () => {
+    auth.refreshSession.mockResolvedValue({ data: { session: SESSION }, error: null });
+    const response = await refresh({ refresh_token: "old" });
+    expect(await response.json()).toEqual({ ok: true, session: SESSION });
+    expect(auth.refreshSession).toHaveBeenCalledWith({ refresh_token: "old" });
+  });
+
+  it("is 401 when Supabase won't refresh it", async () => {
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: "Invalid Refresh Token: Already Used" },
+    });
+    const response = await refresh({ refresh_token: "used" });
+    expect(response.status).toBe(401);
+    expect((await response.json()).error).toMatch(/log in again/);
+  });
+
+  it("refuses a body without a refresh token, without asking", async () => {
+    expect((await refresh({})).status).toBe(400);
+    expect(auth.refreshSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST auth/logout", () => {
+  const logout = async () => (await import("@/app/api/app/v1/auth/logout/route")).POST();
+
+  it("needs a token", async () => {
+    expect((await logout()).status).toBe(401);
+    expect(auth.admin.signOut).not.toHaveBeenCalled();
+  });
+
+  it("ends this device's session only", async () => {
+    signIn();
+    expect(await (await logout()).json()).toEqual({ ok: true });
+    expect(auth.admin.signOut).toHaveBeenCalledWith("good", "local");
+  });
+
+  it("still says ok when Supabase can't be reached: the app forgets the session anyway", async () => {
+    signIn();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    auth.admin.signOut.mockRejectedValue(new Error("fetch failed"));
+    expect(await (await logout()).json()).toEqual({ ok: true });
+  });
+});
+
+describe("PUT me/profile", () => {
+  const save = async (body: unknown) =>
+    (await import("@/app/api/app/v1/me/profile/route")).PUT(json("me/profile", "PUT", body));
+
+  it("needs a token", async () => {
+    expect((await save({ username: "alex" })).status).toBe(401);
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+  });
+
+  it("hands the username and display name to the website's own action, and nothing else", async () => {
+    signIn();
+    actions.saveProfile.mockResolvedValue({ message: "Profile saved." });
+    const response = await save({ username: "alex", display_name: "Alex" });
+    expect(await response.json()).toEqual({ ok: true });
+    const form = actions.saveProfile.mock.calls[0][1] as FormData;
+    expect(form.get("username")).toBe("alex");
+    expect(form.get("display_name")).toBe("Alex");
+    // Leaving these out keeps the bio as it was and stops the action redirecting.
+    expect(form.has("bio")).toBe(false);
+    expect(form.has("next")).toBe(false);
+  });
+
+  it("passes on the action's own refusal, in its words", async () => {
+    signIn();
+    actions.saveProfile.mockResolvedValue({
+      error: "That username is already taken. Try another.",
+    });
+    expect(await (await save({ username: "alex" })).json()).toEqual({
+      ok: false,
+      error: "That username is already taken. Try another.",
+    });
+  });
+
+  it("refuses a body it can't read", async () => {
+    signIn();
+    expect((await save({ username: 7 })).status).toBe(400);
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+  });
+});
