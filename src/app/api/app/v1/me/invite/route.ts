@@ -1,6 +1,6 @@
 import { getInviteLink } from "@/app/invite/actions";
 import type { InviteResult } from "@/lib/app-api";
-import { appJson, appRoute, signedInCaller } from "@/lib/app-route";
+import { appJson, appRoute, limitReads, signedInCaller } from "@/lib/app-route";
 import { siteUrl } from "@/lib/site";
 
 /**
@@ -10,6 +10,7 @@ import { siteUrl } from "@/lib/site";
 export const POST = appRoute(async () => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  await limitReads(user);
 
   const link = await getInviteLink();
   return appJson<InviteResult>(link.ok ? { ok: true, url: `${siteUrl()}${link.path}` } : link);

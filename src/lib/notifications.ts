@@ -278,47 +278,53 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     .slice(0, limit);
 }
 
-/** The time of somebody's newest notification, for the dot on the bell. */
+/** How many of each kind to look through, in case the newest are from somebody blocked. */
+const LATEST_LOOK = 5;
+
+/**
+ * The time of somebody's newest notification, for the dot on the bell.
+ * Somebody blocked, either way round, doesn't light it.
+ */
 export async function getLatestNotificationAt(userId: string): Promise<string | null> {
-  const supabase = await createClient();
+  const [supabase, hidden] = await Promise.all([createClient(), hiddenPeople()]);
   const newest = { ascending: false } as const;
 
   const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus] =
     await Promise.all([
       supabase
         .from("follows")
-        .select("created_at")
+        .select("follower_id, created_at")
         .eq("following_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, ratings!inner ( user_id )")
+        .select("user_id, created_at, ratings!inner ( user_id )")
         .eq("ratings.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, artist_ratings!inner ( user_id )")
+        .select("user_id, created_at, artist_ratings!inner ( user_id )")
         .eq("artist_ratings.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, versus_votes!inner ( user_id )")
+        .select("user_id, created_at, versus_votes!inner ( user_id )")
         .eq("versus_votes.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       supabase
         .from("reactions")
-        .select("created_at, versus_takes!inner ( user_id )")
+        .select("user_id, created_at, versus_takes!inner ( user_id )")
         .eq("versus_takes.user_id", userId)
         .neq("user_id", userId)
         .order("created_at", newest)
-        .limit(1),
+        .limit(LATEST_LOOK),
       getLatestVersusAt(userId),
     ]);
 
@@ -329,7 +335,10 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     pickReaction.data,
     takeReaction.data,
   ]
-    .flatMap((rows) => (rows ?? []) as { created_at: string }[])
+    .flatMap(
+      (rows) => (rows ?? []) as { created_at: string; user_id?: string; follower_id?: string }[],
+    )
+    .filter((row) => !hidden.has(row.user_id ?? row.follower_id ?? ""))
     .map((row) => row.created_at)
     .concat(versus ? [versus] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));

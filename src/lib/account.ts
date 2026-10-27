@@ -6,7 +6,7 @@ import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
-import type { CurrentUser } from "@/lib/supabase/server";
+import { createClient, type CurrentUser } from "@/lib/supabase/server";
 import { emailSchema, firstError, newPasswordSchema, passwordSchema } from "@/lib/validation";
 
 /**
@@ -29,13 +29,25 @@ const deleteInput = z.object({ current: passwordSchema, confirm: z.string().trim
 
 type Fresh = ReturnType<typeof createFreshClient<Database>>;
 
-/** A client signed in with this password, or null when it's wrong. */
+/**
+ * A client signed in with this password, or null when it's wrong. Each try
+ * counts against the tight `password` limit as well as the usual one.
+ */
 async function checkPassword(email: string, password: string): Promise<Fresh | null> {
   const fresh = createFreshClient<Database>(supabaseUrl(), supabaseAnonKey(), {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
   const { error } = await fresh.auth.signInWithPassword({ email, password });
   return error ? null : fresh;
+}
+
+/** Both limits: the usual one for changes, and the tight one for password checks. */
+async function allowed(user: CurrentUser): Promise<boolean> {
+  const [write, password] = await Promise.all([
+    allowUser("write", user.id),
+    allowUser("password", user.id),
+  ]);
+  return write && password;
 }
 
 /** Ends the session a check made. Losing it is untidy, not a failure. */
@@ -46,7 +58,7 @@ async function done(fresh: Fresh): Promise<void> {
 export async function changePasswordFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
   const input = passwordInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
-  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
+  if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
   if (!user.email) return { ok: false, error: NO_EMAIL };
 
   const fresh = await checkPassword(user.email, input.data.current);
@@ -68,7 +80,7 @@ export async function changePasswordFor(user: CurrentUser, raw: unknown): Promis
 export async function changeEmailFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
   const input = emailInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
-  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
+  if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
 
   if (!user.email) return { ok: false, error: "This account has no email address to change." };
   if (input.data.email.toLowerCase() === user.email.toLowerCase()) {
@@ -77,7 +89,14 @@ export async function changeEmailFor(user: CurrentUser, raw: unknown): Promise<A
   const fresh = await checkPassword(user.email, input.data.current);
   if (!fresh) return { ok: false, error: "That isn't your current password." };
 
-  const { error } = await fresh.auth.updateUser(
+  // The website asks from its own session, which keeps the link's sign-in
+  // code in this browser, so following it logs straight in as before. The app
+  // has no such session (its token client holds none), so it asks from the
+  // checked one; the change is confirmed either way when the link is followed.
+  const own = await createClient();
+  const { data } = await own.auth.getSession();
+  const asker = data.session ? own : fresh;
+  const { error } = await asker.auth.updateUser(
     { email: input.data.email },
     { emailRedirectTo: authCallbackUrl("/profile/account") },
   );
@@ -110,7 +129,7 @@ export async function changeEmailFor(user: CurrentUser, raw: unknown): Promise<A
 export async function deleteAccountFor(user: CurrentUser, raw: unknown): Promise<AccountOutcome> {
   const input = deleteInput.safeParse(raw);
   if (!input.success) return { ok: false, error: firstError(input.error) };
-  if (!(await allowUser("write", user.id))) return { ok: false, error: TOO_MANY };
+  if (!(await allowed(user))) return { ok: false, error: TOO_MANY };
 
   if (input.data.confirm.toUpperCase() !== "DELETE") {
     return { ok: false, error: "Type DELETE in the box to confirm." };
@@ -121,16 +140,20 @@ export async function deleteAccountFor(user: CurrentUser, raw: unknown): Promise
   await done(fresh);
 
   const admin = createAdminClient();
-
-  // Best effort: a left-behind picture is untidy, not a reason to stop.
-  for (const extension of ["jpg", "png", "webp"]) {
-    await admin.storage.from("avatars").remove([`${user.id}/avatar.${extension}`]);
-  }
-
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     console.error("[account] delete failed:", error.message);
     return { ok: false, error: "Couldn't delete your account. Please try again, or get in touch." };
+  }
+
+  // The picture goes after the account, so a failed delete never leaves a
+  // live account without its picture. Best effort: a left-behind file is
+  // untidy, not a reason to say the account wasn't deleted.
+  for (const extension of ["jpg", "png", "webp"]) {
+    await admin.storage
+      .from("avatars")
+      .remove([`${user.id}/avatar.${extension}`])
+      .catch(() => undefined);
   }
   return { ok: true, message: "Your account is gone." };
 }

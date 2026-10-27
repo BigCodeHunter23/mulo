@@ -673,6 +673,25 @@ describe("POST me/avatar", () => {
     });
   });
 
+  it("refuses a body too big to be a 2MB photo before reading it", async () => {
+    signIn();
+    const response = await (
+      await import("@/app/api/app/v1/me/avatar/route")
+    ).POST(
+      request("me/avatar", {
+        method: "POST",
+        body: photo(),
+        headers: { "content-length": String(3 * 1024 * 1024) },
+      }),
+    );
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: "That image is over 2MB. Please pick a smaller one.",
+    });
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+  });
+
   it("refuses a body with no photo, or no form at all", async () => {
     signIn();
     expect((await upload(new FormData())).status).toBe(400);

@@ -21,6 +21,11 @@ export const LIMITS = {
   /** Per person: new lists, takes and nominations, which other people read. */
   post: { limit: 30, windowSeconds: 60 * 60 },
   report: { limit: 20, windowSeconds: 60 * 60 },
+  /**
+   * Per person: checking a password before changing how they log in, or
+   * deleting them. Tight, since a stolen session could otherwise guess at it.
+   */
+  password: { limit: 10, windowSeconds: 15 * 60 },
   /** Per person, or per address signed out: the app's heavier reads. */
   read: { limit: 120, windowSeconds: 60 },
 } as const;

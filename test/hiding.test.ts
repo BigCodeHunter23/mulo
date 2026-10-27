@@ -30,7 +30,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/blocks", () => ({ hiddenPeople: vi.fn(async () => new Set([HIDDEN])) }));
 vi.mock("@/lib/social", () => ({ getFollowingIds: vi.fn(async () => []) }));
 vi.mock("@/lib/versus", () => ({
-  getLatestVersusAt: vi.fn(),
+  getLatestVersusAt: vi.fn(async () => null),
   getRecentResults: vi.fn(async () => []),
   getTodaysMatchup: vi.fn(async () => null),
   hasPickedToday: vi.fn(async () => true),
@@ -41,7 +41,7 @@ vi.mock("@/lib/versus", () => ({
 
 const { getListsWithAlbum, getRecentLists } = await import("@/lib/lists");
 const { getReactions } = await import("@/lib/reactions");
-const { getNotifications } = await import("@/lib/notifications");
+const { getLatestNotificationAt, getNotifications } = await import("@/lib/notifications");
 
 function listRow(id: number, owner: string) {
   return {
@@ -102,5 +102,14 @@ describe("notifications", () => {
     tables.rows.profiles = [person(HIDDEN), person(OTHER)];
     const found = await getNotifications(ME);
     expect(found.map((n) => (n.kind === "follow" ? n.person.id : n.kind))).toEqual([OTHER]);
+  });
+
+  it("doesn't light the bell for a hidden person", async () => {
+    tables.rows.follows = [
+      { follower_id: HIDDEN, created_at: "2026-10-02T00:00:00Z" },
+      { follower_id: OTHER, created_at: "2026-10-01T00:00:00Z" },
+    ];
+    tables.rows.reactions = [{ user_id: HIDDEN, created_at: "2026-10-03T00:00:00Z" }];
+    expect(await getLatestNotificationAt(ME)).toBe("2026-10-01T00:00:00Z");
   });
 });

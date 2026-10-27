@@ -15,6 +15,8 @@ const fresh = vi.hoisted(() => ({
 }));
 
 const admin = vi.hoisted(() => ({ remove: vi.fn(), deleteUser: vi.fn() }));
+/** The caller's own client: a browser's has a session, the app's token client none. */
+const own = vi.hoisted(() => ({ session: null as object | null, updateUser: vi.fn() }));
 const limits = vi.hoisted(() => ({ limited: false }));
 
 vi.mock("@supabase/supabase-js", () => ({
@@ -32,6 +34,14 @@ vi.mock("@/lib/supabase/admin", () => ({
     auth: { admin: { deleteUser: admin.deleteUser } },
   })),
 }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getSession: async () => ({ data: { session: own.session } }),
+      updateUser: own.updateUser,
+    },
+  })),
+}));
 vi.mock("@/lib/env", () => ({
   supabaseUrl: () => "https://x.supabase.co",
   supabaseAnonKey: () => "k",
@@ -46,6 +56,7 @@ vi.mock("@/lib/rate-limit", async (original) => ({
 
 const { changeEmailFor, changePasswordFor, deleteAccountFor } = await import("@/lib/account");
 const { createClient } = await import("@supabase/supabase-js");
+const { allowUser } = await import("@/lib/rate-limit");
 
 const ME = { id: "1f9df192-a621-4f54-8850-2c5373b7eac9", email: "me@example.com" };
 
@@ -61,6 +72,9 @@ beforeEach(() => {
   fresh.signOut.mockReset().mockResolvedValue({ error: null });
   admin.remove.mockReset().mockResolvedValue({ error: null });
   admin.deleteUser.mockReset().mockResolvedValue({ error: null });
+  own.session = null;
+  own.updateUser.mockReset().mockResolvedValue({ error: null });
+  vi.mocked(allowUser).mockClear();
 });
 
 describe("changePasswordFor", () => {
@@ -106,6 +120,12 @@ describe("changePasswordFor", () => {
     expect(fresh.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it("counts against the tight password limit as well as the usual one", async () => {
+    await changePasswordFor(ME, { current: "right-password", next: "brand-new" });
+    expect(allowUser).toHaveBeenCalledWith("password", ME.id);
+    expect(allowUser).toHaveBeenCalledWith("write", ME.id);
+  });
+
   it("is limited like every other change", async () => {
     limits.limited = true;
     expect(await changePasswordFor(ME, { current: "right-password", next: "brand-new" })).toEqual({
@@ -130,6 +150,17 @@ describe("changeEmailFor", () => {
       { email: "new@example.com" },
       { emailRedirectTo: "https://mulo.test/cb?next=/profile/account" },
     );
+    expect(fresh.signOut).toHaveBeenCalled();
+  });
+
+  it("asks from the browser's own session, so the link logs straight in there", async () => {
+    own.session = { access_token: "cookie" };
+    await changeEmailFor(ME, { email: "new@example.com", current: "right-password" });
+    expect(own.updateUser).toHaveBeenCalledWith(
+      { email: "new@example.com" },
+      { emailRedirectTo: "https://mulo.test/cb?next=/profile/account" },
+    );
+    expect(fresh.updateUser).not.toHaveBeenCalled();
     expect(fresh.signOut).toHaveBeenCalled();
   });
 
@@ -161,6 +192,10 @@ describe("deleteAccountFor", () => {
       message: "Your account is gone.",
     });
     expect(admin.remove).toHaveBeenCalledTimes(3);
+    // The account first, so a failed delete never leaves it without its picture.
+    expect(admin.deleteUser.mock.invocationCallOrder[0]).toBeLessThan(
+      admin.remove.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(admin.remove).toHaveBeenCalledWith([`${ME.id}/avatar.jpg`]);
     expect(admin.deleteUser).toHaveBeenCalledWith(ME.id);
     expect(fresh.signOut).toHaveBeenCalled();
@@ -183,12 +218,20 @@ describe("deleteAccountFor", () => {
     expect(admin.deleteUser).not.toHaveBeenCalled();
   });
 
-  it("says when the delete itself fails", async () => {
+  it("still says it's gone when a picture won't go", async () => {
+    admin.remove.mockRejectedValue(new Error("storage down"));
+    expect((await deleteAccountFor(ME, { current: "right-password", confirm: "DELETE" })).ok).toBe(
+      true,
+    );
+  });
+
+  it("says when the delete itself fails, leaving the picture", async () => {
     admin.deleteUser.mockResolvedValue({ error: { message: "down" } });
     expect(await deleteAccountFor(ME, { current: "right-password", confirm: "DELETE" })).toEqual({
       ok: false,
       error: "Couldn't delete your account. Please try again, or get in touch.",
     });
+    expect(admin.remove).not.toHaveBeenCalled();
   });
 
   it("can't check an account with no email", async () => {

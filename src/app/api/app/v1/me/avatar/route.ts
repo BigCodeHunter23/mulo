@@ -6,6 +6,13 @@ import { PICK_A_USERNAME } from "@/lib/app-profile";
 import { getEditableProfile } from "@/lib/social";
 
 /**
+ * Comfortably over the website's 2MB limit, to leave room for the form's own
+ * framing: anything bigger is refused before it's read into memory.
+ */
+const MAX_BODY_BYTES = 2.5 * 1024 * 1024;
+const TOO_BIG = "That image is over 2MB. Please pick a smaller one.";
+
+/**
  * A new photo, sent as a form with one `avatar` file. The website's own save
  * does the checking (2MB, JPEG, PNG or WebP judged by its bytes) and the
  * upload; the username and display name go along as they are, and with no
@@ -14,6 +21,9 @@ import { getEditableProfile } from "@/lib/social";
 export const POST = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {
+    return appError(413, TOO_BIG);
+  }
 
   let avatar: FormDataEntryValue | null;
   try {
