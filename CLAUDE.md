@@ -92,7 +92,7 @@ in plain language, and give them links and exact steps when they need to act.
   `mixtape.ts` (monthly recap), `trending.ts` (Heavy Rotation), `search.ts`,
   `charts.ts` (The Charts), `content-filter.ts` (the word filter),
   `session-facts.ts` (how somebody signed in: methods, password, fresh
-  sign-in), `apple.ts` + `apple-tokens.ts` (Sign in with Apple's secret and
+  sign-in, a reset link's session), `apple.ts` + `apple-tokens.ts` (Sign in with Apple's secret and
   tokens; `apple_tokens` table, migration 0021), `oauth.ts` (the app's
   Google and Apple-off-iPhone sign-in through the browser).
 - `src/app/`: `album/[mbid]`, `artist/[mbid]`, `u/[username]` (plus `mixtape`),

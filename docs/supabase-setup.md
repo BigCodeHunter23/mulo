@@ -148,6 +148,22 @@ Dashboard → **Authentication → Sign In / Providers**:
 - **Facebook**: leave it **off** until Meta has approved the app. MULO says
   "That sign-in isn't available yet" until then.
 
+Then, still under **Authentication** (the names move around between
+dashboard versions; look under **Sign In / Providers**, **Multi-Factor** and
+**Settings**):
+
+- **Multi-factor (TOTP and phone)**: turn enrolment **off**. MULO doesn't use
+  a second factor, so nobody should be able to add one to their account.
+- **Secure password change**: turn it **on**, and **require the current
+  password** (or "reauthentication") if it's offered. Then a session left open
+  on somebody else's laptop can't quietly change the password through
+  Supabase directly.
+- **Secure email change**: turn it **on**. A new address then has to be
+  confirmed from the old one as well, so a borrowed session can't move the
+  account to an address somebody else controls.
+- **Manual linking**: keep it **off**. MULO never links accounts by hand; left
+  on, anyone signed in could attach another Google or Apple account to theirs.
+
 The `APPLE_…` settings in Vercel (which let MULO cancel an Apple link when an
 account is deleted, as Apple requires) are explained in `.env.example`.
 

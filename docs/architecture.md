@@ -66,15 +66,18 @@ session is never touched. The data export is `src/lib/export.ts`, served at
 
 `getSessionFacts()` (`src/lib/session-facts.ts`) says how somebody signed in:
 their sign-in methods, whether they have a password (the providers include
-email, or `app_metadata.has_password`), and whether the sign-in is fresh (the
-session's `amr` within five minutes). An account made with Apple or Google has
+email, or `app_metadata.has_password`), and whether the sign-in is fresh (an
+`amr` entry for a real sign-in, such as `password` or `oauth`, within five
+minutes; a second factor or a refresh never counts). `cameFromResetLink()`
+reads the same claims for `/auth/update-password`, which only a reset link's
+own session (within fifteen minutes) may use. An account made with Apple or Google has
 no password, so the account page and the app's `me/password` let it set one,
 and ask for a fresh sign-in instead of a password before changing or deleting
 anything. Apple requires deleting an account to cancel its Sign in with Apple
 link: `src/lib/apple.ts` builds the client secret, swaps codes and revokes, and
 `src/lib/apple-tokens.ts` keeps Apple's refresh token sealed in `apple_tokens`
-(migration 0021, service role only; `rememberAppleToken` when a sign-in came
-from Apple, `forgetAppleLink` revokes it before the account goes). The
+(migration 0021, service role only; `keepAppleTokenFrom` after a browser
+sign-in with Apple, `forgetAppleLink` revokes it before the account goes). The
 `APPLE_*` settings are in `.env.example`.
 
 **The word filter** (`src/lib/content-filter.ts`) holds what people write to
