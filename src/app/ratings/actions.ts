@@ -6,6 +6,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kinds";
 import { mbidSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import { isRespectful, NOT_RESPECTFUL } from "@/lib/content-filter";
 import { getBadges } from "@/lib/badges";
 import { getCrowd } from "@/lib/ratings";
 import { isMilestone, milestonePath } from "@/lib/milestones";
@@ -179,6 +180,7 @@ export async function saveReview(
   ) {
     return TRY_AGAIN;
   }
+  if (!isRespectful(review)) return { ok: false, error: NOT_RESPECTFUL };
 
   const user = await getCurrentUser();
   if (!user) {

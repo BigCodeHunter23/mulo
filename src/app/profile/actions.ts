@@ -9,6 +9,7 @@ import { safeRedirectPath } from "@/lib/redirects";
 import { field, firstError, textSchema, usernameSchema } from "@/lib/validation";
 import { imageTypeOf } from "@/lib/image-type";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import { isClean, NOT_CLEAN } from "@/lib/content-filter";
 
 export type ProfileState = { error?: string; message?: string };
 
@@ -67,8 +68,9 @@ export async function saveProfile(_prev: ProfileState, formData: FormData): Prom
     bio: field(formData, "bio"),
   });
   if (!input.success) return { error: firstError(input.error) };
-  if (!(await allowUser("write", user.id))) return { error: TOO_MANY };
   const { username, display_name, bio } = input.data;
+  if (![username, display_name, bio].every(isClean)) return { error: NOT_CLEAN };
+  if (!(await allowUser("write", user.id))) return { error: TOO_MANY };
 
   let avatarUrl: string | undefined;
   const avatar = formData.get("avatar");

@@ -27,6 +27,12 @@ describe("isRespectful (reviews, takes, list notes)", () => {
     expect(isRespectful("chingchong")).toBe(false);
     expect(isRespectful("Negro Swan is a masterpiece")).toBe(true);
   });
+  it.each(["retard", "chink", "kike", "tranny", "abo", "nigger", "fag"])("blocks %s", (word) => {
+    expect(isRespectful(word)).toBe(false);
+  });
+  it.each(["about", "Abbott", "dyke", "shit"])("allows %s", (word) => {
+    expect(isRespectful(word)).toBe(true);
+  });
   it("has plain messages", () => {
     expect(NOT_CLEAN).toBe("Please choose something else.");
     expect(NOT_RESPECTFUL).toBe("Please keep it respectful.");

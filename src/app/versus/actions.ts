@@ -7,6 +7,7 @@ import { TAKE_LIMIT, type VersusSideKey } from "@/lib/versus-shared";
 import type { PickResult } from "@/lib/app-api";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import { isRespectful, NOT_RESPECTFUL } from "@/lib/content-filter";
 
 const isRowId = (value: unknown) => rowIdSchema.safeParse(value).success;
 const isMbid = (value: unknown): value is string => mbidSchema.safeParse(value).success;
@@ -67,6 +68,8 @@ export async function postTake(matchupId: number, body: string): Promise<TakeRes
   if (text.length > TAKE_LIMIT) {
     return { ok: false, error: `Keep it to ${TAKE_LIMIT} characters.` };
   }
+
+  if (!isRespectful(text)) return { ok: false, error: NOT_RESPECTFUL };
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Log in to post a take." };

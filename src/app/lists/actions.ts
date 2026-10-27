@@ -7,6 +7,7 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { LIST_LIMIT } from "@/lib/lists";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import { isClean, isRespectful, NOT_CLEAN, NOT_RESPECTFUL } from "@/lib/content-filter";
 
 /**
  * Everything that changes a list. Each change checks first that the list is
@@ -110,6 +111,8 @@ export async function createList(input: {
   const title = clean(parsed.data.title, TITLE_MAX);
   if (!title) return { ok: false, error: "Give your list a name." };
   const description = clean(parsed.data.description, DESCRIPTION_MAX) || null;
+  if (!isClean(title)) return { ok: false, error: NOT_CLEAN };
+  if (description && !isRespectful(description)) return { ok: false, error: NOT_RESPECTFUL };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -141,6 +144,9 @@ export async function updateList(
   if (!rowIdSchema.safeParse(id).success || !parsed.success) return TRY_AGAIN;
   const title = clean(parsed.data.title, TITLE_MAX);
   if (!title) return { ok: false, error: "Give your list a name." };
+  const description = clean(parsed.data.description, DESCRIPTION_MAX) || null;
+  if (!isClean(title)) return { ok: false, error: NOT_CLEAN };
+  if (description && !isRespectful(description)) return { ok: false, error: NOT_RESPECTFUL };
 
   const refused = await refuseUnlessOwner(id);
   if (refused) return refused;
@@ -150,7 +156,7 @@ export async function updateList(
     .from("lists")
     .update({
       title,
-      description: clean(parsed.data.description, DESCRIPTION_MAX) || null,
+      description,
       ranked: Boolean(parsed.data.ranked),
       updated_at: new Date().toISOString(),
     })
@@ -248,13 +254,15 @@ export async function setListNote(
   if (!itemInput.safeParse({ id, releaseMbid }).success || typeof note !== "string") {
     return TRY_AGAIN;
   }
+  const text = clean(note, NOTE_MAX) || null;
+  if (text && !isRespectful(text)) return { ok: false, error: NOT_RESPECTFUL };
   const refused = await refuseUnlessOwner(id);
   if (refused) return refused;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("list_items")
-    .update({ note: clean(note, NOTE_MAX) || null })
+    .update({ note: text })
     .eq("list_id", id)
     .eq("release_mbid", releaseMbid)
     .select("list_id");
