@@ -86,12 +86,19 @@ export async function rememberAppleToken(
 }
 
 /**
- * Cancels this account's Sign in with Apple link by revoking the stored
- * token, then forgets it. True when there's nothing left linked (revoked, or
- * nothing was stored); false when Apple couldn't be told. The row is left on
- * a failed revoke; deleting the account removes it anyway.
+ * What became of the Apple link: `revoked` (Apple was told), `nothing-stored`
+ * (no token was ever kept, so Apple can't be told), `failed` (a token was
+ * kept but Apple couldn't be told with it), or `unknown` (the stored token
+ * couldn't be looked up, as before migration 0021 is run).
  */
-export async function forgetAppleLink(userId: string): Promise<boolean> {
+export type AppleLinkResult = "revoked" | "nothing-stored" | "failed" | "unknown";
+
+/**
+ * Cancels this account's Sign in with Apple link by revoking the stored
+ * token, then forgets it. Never throws. The row is left on a failed revoke;
+ * deleting the account removes it anyway.
+ */
+export async function forgetAppleLink(userId: string): Promise<AppleLinkResult> {
   try {
     const db = createAdminClient();
     const { data, error } = await db
@@ -101,9 +108,9 @@ export async function forgetAppleLink(userId: string): Promise<boolean> {
       .maybeSingle();
     if (error) {
       logQueryError("apple", error, MIGRATION);
-      return false;
+      return "unknown";
     }
-    if (!data) return true;
+    if (!data) return "nothing-stored";
 
     const forget = async () => {
       const { error: deleteError } = await db.from("apple_tokens").delete().eq("user_id", userId);
@@ -114,7 +121,7 @@ export async function forgetAppleLink(userId: string): Promise<boolean> {
       // Without the key the token can't be opened now, but it may once the
       // key is set again, so keep it.
       console.error("[apple] no key to open the stored token; keeping it.");
-      return false;
+      return "failed";
     }
     const token = openToken(data.refresh_token);
     if (!token) {
@@ -122,16 +129,16 @@ export async function forgetAppleLink(userId: string): Promise<boolean> {
       // older key or changed, and can never be used again.
       console.error("[apple] stored token couldn't be opened; forgetting it.");
       await forget();
-      return false;
+      return "failed";
     }
     if (!(await revokeAppleToken(token, data.client_id))) {
       console.error("[apple] revoke failed");
-      return false;
+      return "failed";
     }
     await forget();
-    return true;
+    return "revoked";
   } catch (error) {
     console.error("[apple] couldn't cancel the Apple link:", reason(error));
-    return false;
+    return "unknown";
   }
 }

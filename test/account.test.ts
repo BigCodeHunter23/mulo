@@ -105,7 +105,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ data: { user: { id: ME.id, app_metadata: APPLE_META } }, error: null });
   admin.updateUserById.mockReset().mockResolvedValue({ data: { user: null }, error: null });
-  apple.forgetAppleLink.mockReset().mockResolvedValue(true);
+  apple.forgetAppleLink.mockReset().mockResolvedValue("revoked");
   own.session = null;
   own.updateUser.mockReset().mockResolvedValue({ error: null });
   vi.mocked(allowUser).mockClear();
@@ -379,7 +379,7 @@ describe("deleteAccountFor, cancelling the Apple link", () => {
   });
 
   it("deletes anyway when Apple can't be told, and says the link is left", async () => {
-    apple.forgetAppleLink.mockResolvedValue(false);
+    apple.forgetAppleLink.mockResolvedValue("failed");
     expect(await deleteAccountFor(ME, { confirm: "DELETE" }, APPLE_FRESH)).toEqual({
       ok: true,
       message: "Your account is gone.",
@@ -388,14 +388,39 @@ describe("deleteAccountFor, cancelling the Apple link", () => {
     expect(admin.deleteUser).toHaveBeenCalledWith(ME.id);
   });
 
-  it("raises no alarm for an account that never signed in with Apple", async () => {
-    apple.forgetAppleLink.mockResolvedValue(false);
+  it("says a stored link that wouldn't revoke is left, even if the token doesn't say Apple", async () => {
+    apple.forgetAppleLink.mockResolvedValue("failed");
     const google = facts({ signInMethods: ["google"], hasPassword: false, freshSignIn: true });
     expect(await deleteAccountFor(ME, { confirm: "DELETE" }, google)).toEqual({
       ok: true,
       message: "Your account is gone.",
+      appleLinkLeft: true,
     });
   });
+
+  it.each(["nothing-stored", "unknown"])(
+    "says the link is left for an Apple account when %s, as Apple was never told",
+    async (result) => {
+      apple.forgetAppleLink.mockResolvedValue(result);
+      expect(await deleteAccountFor(ME, { confirm: "DELETE" }, APPLE_FRESH)).toEqual({
+        ok: true,
+        message: "Your account is gone.",
+        appleLinkLeft: true,
+      });
+    },
+  );
+
+  it.each(["nothing-stored", "unknown"])(
+    "raises no alarm for an account that never signed in with Apple (%s)",
+    async (result) => {
+      apple.forgetAppleLink.mockResolvedValue(result);
+      const google = facts({ signInMethods: ["google"], hasPassword: false, freshSignIn: true });
+      expect(await deleteAccountFor(ME, { confirm: "DELETE" }, google)).toEqual({
+        ok: true,
+        message: "Your account is gone.",
+      });
+    },
+  );
 
   it("is limited like every other change", async () => {
     limits.limited = true;

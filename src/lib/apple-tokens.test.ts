@@ -140,57 +140,57 @@ describe("forgetAppleLink", () => {
     });
     apple.openToken.mockReturnValue("r-token");
     apple.revokeAppleToken.mockResolvedValue(true);
-    expect(await forgetAppleLink(USER)).toBe(true);
+    expect(await forgetAppleLink(USER)).toBe("revoked");
     expect(apple.openToken).toHaveBeenCalledWith("sealed-value");
     expect(apple.revokeAppleToken).toHaveBeenCalledWith("r-token", "com.mulo.web");
     expect(db.deleted).toHaveBeenCalledWith("user_id", USER);
   });
 
-  it("answers true without revoking when there's nothing stored", async () => {
+  it("says there's nothing stored, revoking nothing", async () => {
     db.maybeSingle.mockResolvedValue({ data: null, error: null });
-    expect(await forgetAppleLink(USER)).toBe(true);
+    expect(await forgetAppleLink(USER)).toBe("nothing-stored");
     expect(apple.revokeAppleToken).not.toHaveBeenCalled();
     expect(db.deleted).not.toHaveBeenCalled();
   });
 
-  it("answers false and keeps the row when Apple won't revoke", async () => {
+  it("fails, and keeps the row when Apple won't revoke", async () => {
     db.maybeSingle.mockResolvedValue({
       data: { client_id: "com.mulo.app", refresh_token: "sealed-value" },
       error: null,
     });
     apple.openToken.mockReturnValue("r-token");
     apple.revokeAppleToken.mockResolvedValue(false);
-    expect(await forgetAppleLink(USER)).toBe(false);
+    expect(await forgetAppleLink(USER)).toBe("failed");
     expect(db.deleted).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith("[apple] revoke failed");
   });
 
-  it("answers false and drops the row when the stored token can't be opened", async () => {
+  it("fails, and drops the row when the stored token can't be opened", async () => {
     db.maybeSingle.mockResolvedValue({
       data: { client_id: "com.mulo.app", refresh_token: "sealed-value" },
       error: null,
     });
     apple.openToken.mockReturnValue(null);
-    expect(await forgetAppleLink(USER)).toBe(false);
+    expect(await forgetAppleLink(USER)).toBe("failed");
     expect(apple.revokeAppleToken).not.toHaveBeenCalled();
     expect(db.deleted).toHaveBeenCalledWith("user_id", USER);
   });
 
-  it("answers false and keeps the row while there's no key to open it with", async () => {
+  it("fails, and keeps the row while there's no key to open it with", async () => {
     db.maybeSingle.mockResolvedValue({
       data: { client_id: "com.mulo.app", refresh_token: "sealed-value" },
       error: null,
     });
     apple.hasTokenKey.mockReturnValue(false);
     apple.openToken.mockReturnValue(null);
-    expect(await forgetAppleLink(USER)).toBe(false);
+    expect(await forgetAppleLink(USER)).toBe("failed");
     expect(apple.revokeAppleToken).not.toHaveBeenCalled();
     expect(db.deleted).not.toHaveBeenCalled();
   });
 
-  it("answers false when the row can't be read", async () => {
+  it("says when it can't tell, because the row can't be read", async () => {
     db.maybeSingle.mockResolvedValue({ data: null, error: { message: "down" } });
-    expect(await forgetAppleLink(USER)).toBe(false);
+    expect(await forgetAppleLink(USER)).toBe("unknown");
     expect(apple.revokeAppleToken).not.toHaveBeenCalled();
   });
 

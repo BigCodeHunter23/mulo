@@ -261,7 +261,7 @@ export async function deleteAccountFor(
 
   // Never throws. A link Apple couldn't be told about doesn't stop the delete;
   // the person is told how to remove it themselves.
-  const appleGone = await forgetAppleLink(user.id);
+  const apple = await forgetAppleLink(user.id);
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(user.id);
@@ -279,10 +279,12 @@ export async function deleteAccountFor(
       .remove([`${user.id}/avatar.${extension}`])
       .catch(() => undefined);
   }
-  // Only an account that signs in with Apple can have a link left. Checked
-  // here because forgetAppleLink also answers false before the token table
-  // exists, which mustn't alarm everybody else.
-  const appleLinkLeft = !appleGone && facts.signInMethods.includes("apple");
+  // A kept token Apple wouldn't take means a link is left. With no token to
+  // revoke (never kept, as before the key was set, or not readable) Apple
+  // was never told either, but only an account that signs in with Apple has
+  // a link to leave; that check keeps everybody else from being alarmed.
+  const appleLinkLeft =
+    apple === "failed" || (apple !== "revoked" && facts.signInMethods.includes("apple"));
   return {
     ok: true,
     message: "Your account is gone.",
