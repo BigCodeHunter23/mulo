@@ -176,3 +176,19 @@ export async function getOwnProfile(userId: string): Promise<OwnProfile | null> 
     .maybeSingle();
   return data ?? null;
 }
+
+/** What the app's edit screen starts from: the signed-in person's own row, bio included. */
+export async function getEditableProfile(userId: string): Promise<{
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+} | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("username, display_name, bio, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+  return data ?? null;
+}

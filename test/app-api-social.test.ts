@@ -574,3 +574,132 @@ describe("POST me/invite", () => {
     expect((await invite()).status).toBe(401);
   });
 });
+
+// ── Profile, photo and Raised On ───────────────────────────────────────
+
+const OWN = { username: "me", display_name: "Me", bio: "Hi", avatar_url: null };
+const RAISED = {
+  era: null,
+  scene: null,
+  album: { mbid: MBID, title: "OK Computer", artist: "Radiohead", cover: null, year: 1997 },
+};
+
+describe("GET me/profile", () => {
+  const read = async () => (await import("@/app/api/app/v1/me/profile/route")).GET();
+
+  it("answers what the edit screen starts from", async () => {
+    signIn();
+    lib.getEditableProfile.mockResolvedValue(OWN);
+    lib.getRaisedOn.mockResolvedValue(RAISED);
+    expect(await (await read()).json()).toEqual({ ...OWN, raisedOn: RAISED });
+    expect(lib.getEditableProfile).toHaveBeenCalledWith(ME.id);
+    expect(lib.getRaisedOn).toHaveBeenCalledWith(ME.id);
+  });
+
+  it("is 404 before there's a username", async () => {
+    signIn();
+    lib.getEditableProfile.mockResolvedValue(null);
+    expect(await (await read()).json()).toEqual({ ok: false, error: "Pick a username first." });
+  });
+
+  it("needs a token", async () => {
+    expect((await read()).status).toBe(401);
+  });
+});
+
+describe("PUT me/profile", () => {
+  it("sends the bio along when it's given", async () => {
+    signIn();
+    actions.saveProfile.mockResolvedValue({ message: "Profile saved." });
+    const response = await (
+      await import("@/app/api/app/v1/me/profile/route")
+    ).PUT(json("me/profile", "PUT", { username: "me", display_name: "Me", bio: "" }));
+    expect(await response.json()).toEqual({ ok: true });
+    const form = actions.saveProfile.mock.calls[0]?.[1] as FormData;
+    expect(form.has("bio")).toBe(true);
+    expect(form.get("bio")).toBe("");
+  });
+});
+
+describe("POST me/avatar", () => {
+  const upload = async (body: BodyInit | null, type?: string) =>
+    (await import("@/app/api/app/v1/me/avatar/route")).POST(
+      request("me/avatar", {
+        method: "POST",
+        body,
+        ...(type ? { headers: { "content-type": type } } : {}),
+      }),
+    );
+  const photo = () => {
+    const form = new FormData();
+    form.set(
+      "avatar",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "me.jpg", { type: "image/jpeg" }),
+    );
+    return form;
+  };
+
+  it("saves the photo through the website's own save, leaving the rest as it was", async () => {
+    signIn();
+    lib.getEditableProfile
+      .mockResolvedValueOnce(OWN)
+      .mockResolvedValueOnce({ ...OWN, avatar_url: "https://x/avatars/me/avatar.jpg?v=1" });
+    actions.saveProfile.mockResolvedValue({ message: "Profile saved." });
+
+    expect(await (await upload(photo())).json()).toEqual({
+      ok: true,
+      avatarUrl: "https://x/avatars/me/avatar.jpg?v=1",
+    });
+    const form = actions.saveProfile.mock.calls[0]?.[1] as FormData;
+    expect(form.get("username")).toBe("me");
+    expect(form.get("display_name")).toBe("Me");
+    expect(form.has("bio")).toBe(false);
+    expect(form.get("avatar")).toBeInstanceOf(File);
+  });
+
+  it("passes on the save's refusal, in its words", async () => {
+    signIn();
+    lib.getEditableProfile.mockResolvedValue(OWN);
+    actions.saveProfile.mockResolvedValue({
+      error: "That image is over 2MB. Please pick a smaller one.",
+    });
+    expect(await (await upload(photo())).json()).toEqual({
+      ok: false,
+      error: "That image is over 2MB. Please pick a smaller one.",
+    });
+  });
+
+  it("refuses a body with no photo, or no form at all", async () => {
+    signIn();
+    expect((await upload(new FormData())).status).toBe(400);
+    expect((await upload("{}", "application/json")).status).toBe(400);
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+  });
+
+  it("needs a username first, and a token", async () => {
+    expect((await upload(photo())).status).toBe(401);
+    signIn();
+    lib.getEditableProfile.mockResolvedValue(null);
+    expect((await upload(photo())).status).toBe(404);
+  });
+});
+
+describe("PUT me/raised-on", () => {
+  const save = async (body: unknown) =>
+    (await import("@/app/api/app/v1/me/raised-on/route")).PUT(json("me/raised-on", "PUT", body));
+
+  it("saves through the website's own action", async () => {
+    signIn();
+    const body = { mbid: MBID, era: "90s", scene: "britpop", useAsPicture: true };
+    expect(await (await save(body)).json()).toEqual({ ok: true });
+    expect(actions.saveRaisedOn).toHaveBeenCalledWith(body);
+  });
+
+  it("refuses a body it can't read, and needs a token", async () => {
+    expect((await save({ mbid: MBID, era: null, scene: null, useAsPicture: false })).status).toBe(
+      401,
+    );
+    signIn();
+    expect((await save({ mbid: MBID })).status).toBe(400);
+  });
+});
