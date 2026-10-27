@@ -97,6 +97,13 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({})),
 }));
 vi.mock("@/lib/supabase/public", () => ({ createPublicClient: vi.fn(() => ({ auth })) }));
+vi.mock("@/lib/session-facts", () => ({
+  getSessionFacts: vi.fn(async () => ({
+    signInMethods: ["email", "google"],
+    hasPassword: true,
+    freshSignIn: false,
+  })),
+}));
 vi.mock("@/lib/rate-limit", async (original) => ({
   ...(await original<typeof import("@/lib/rate-limit")>()),
   allowAddress: vi.fn(async () => !caller.limited),
@@ -379,7 +386,12 @@ describe("GET me", () => {
       raised_on_mbid: null,
     };
     lib.getOwnProfile.mockResolvedValue(profile);
-    expect(await (await me()).json()).toEqual({ ...USER, profile });
+    expect(await (await me()).json()).toEqual({
+      ...USER,
+      profile,
+      signInMethods: ["email", "google"],
+      hasPassword: true,
+    });
     expect(lib.getOwnProfile).toHaveBeenCalledWith(OTHER);
   });
 

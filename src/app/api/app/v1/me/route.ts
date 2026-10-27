@@ -3,6 +3,7 @@ import { z } from "zod";
 import { deleteAccountFor } from "@/lib/account";
 import type { Me, SaveResult } from "@/lib/app-api";
 import { appJson, appRoute, readBody, signedInCaller } from "@/lib/app-route";
+import { getSessionFacts } from "@/lib/session-facts";
 import { getOwnProfile } from "@/lib/social";
 
 /** The shape only; `deleteAccountFor` checks the password and the word. */
@@ -12,7 +13,13 @@ const deleteBody = z.object({ current: z.string().max(200), confirm: z.string().
 export const GET = appRoute(async () => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
-  return appJson<Me>({ ...user, profile: await getOwnProfile(user.id) });
+  const [profile, facts] = await Promise.all([getOwnProfile(user.id), getSessionFacts()]);
+  return appJson<Me>({
+    ...user,
+    profile,
+    signInMethods: facts.signInMethods,
+    hasPassword: facts.hasPassword,
+  });
 });
 
 /**

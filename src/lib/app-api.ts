@@ -457,6 +457,9 @@ export type PickResult =
 /** What every endpoint answers when something goes wrong. */
 export type AppError = { ok: false; error: string };
 
+/** The ways somebody can sign in. */
+export type SignInMethod = "email" | "apple" | "google" | "facebook";
+
 /** A Supabase session, as the app stores it. */
 export type AppSession = {
   access_token: string;
@@ -481,7 +484,15 @@ export type OwnProfile = {
 export type SaveResult = { ok: true } | AppError;
 
 /** `GET me` */
-export type Me = { id: string; email: string | null; profile: OwnProfile | null };
+export type Me = {
+  id: string;
+  email: string | null;
+  profile: OwnProfile | null;
+  /** How this account can sign in. */
+  signInMethods: SignInMethod[];
+  /** Whether it has a password: email accounts do, social ones only once they set one. */
+  hasPassword: boolean;
+};
 
 /** `GET albums/[mbid]` */
 export type AlbumPage = {
