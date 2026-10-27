@@ -193,6 +193,11 @@ function tokenKey(): Buffer | null {
   return key;
 }
 
+/** Whether APPLE_TOKEN_KEY is set and usable, so tokens can be sealed and opened. */
+export function hasTokenKey(): boolean {
+  return tokenKey() !== null;
+}
+
 /**
  * Seals a token for storage with AES-256-GCM under APPLE_TOKEN_KEY, as
  * `iv.tag.ciphertext` in base64url. Null without a usable key.

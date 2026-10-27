@@ -12,5 +12,6 @@ create table if not exists public.apple_tokens (
 );
 
 alter table public.apple_tokens enable row level security;
+revoke all on public.apple_tokens from anon, authenticated;
 
 -- No policies: nobody but the service role reads or writes it.

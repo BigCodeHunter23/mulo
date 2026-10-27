@@ -1,6 +1,13 @@
 import { generateKeyPairSync, randomBytes, verify, type KeyObject } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clientSecret, exchangeAppleCode, openToken, revokeAppleToken, sealToken } from "./apple";
+import {
+  clientSecret,
+  exchangeAppleCode,
+  hasTokenKey,
+  openToken,
+  revokeAppleToken,
+  sealToken,
+} from "./apple";
 
 const TEAM = "TEAM123456";
 const KID = "KEY1234567";
@@ -220,9 +227,13 @@ describe("sealToken and openToken", () => {
 
   it("answer null without a key, or with a key that isn't 32 bytes", () => {
     setSettings({ APPLE_TOKEN_KEY: "" });
+    expect(hasTokenKey()).toBe(false);
     expect(sealToken("r-token")).toBeNull();
     expect(openToken("a.b.c")).toBeNull();
     vi.stubEnv("APPLE_TOKEN_KEY", randomBytes(16).toString("base64"));
+    expect(hasTokenKey()).toBe(false);
     expect(sealToken("r-token")).toBeNull();
+    vi.stubEnv("APPLE_TOKEN_KEY", randomBytes(32).toString("base64"));
+    expect(hasTokenKey()).toBe(true);
   });
 });

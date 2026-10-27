@@ -1,5 +1,5 @@
 import "server-only";
-import { openToken, revokeAppleToken, sealToken } from "@/lib/apple";
+import { hasTokenKey, openToken, revokeAppleToken, sealToken } from "@/lib/apple";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logQueryError } from "@/lib/supabase/errors";
 
@@ -67,9 +67,16 @@ export async function forgetAppleLink(userId: string): Promise<boolean> {
       if (deleteError) logQueryError("apple", deleteError, MIGRATION);
     };
 
+    if (!hasTokenKey()) {
+      // Without the key the token can't be opened now, but it may once the
+      // key is set again, so keep it.
+      console.error("[apple] no key to open the stored token; keeping it.");
+      return false;
+    }
     const token = openToken(data.refresh_token);
     if (!token) {
-      // Sealed under a key that's since changed: it can never be used again.
+      // The key is there but the value won't open: it was sealed under an
+      // older key or changed, and can never be used again.
       console.error("[apple] stored token couldn't be opened; forgetting it.");
       await forget();
       return false;

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const apple = vi.hoisted(() => ({
   sealToken: vi.fn(),
   openToken: vi.fn(),
+  hasTokenKey: vi.fn(),
   revokeAppleToken: vi.fn(),
 }));
 vi.mock("@/lib/apple", () => apple);
@@ -23,6 +24,7 @@ const USER = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
   for (const mock of [...Object.values(apple), ...Object.values(db)]) mock.mockReset();
+  apple.hasTokenKey.mockReturnValue(true);
   db.upsert.mockResolvedValue({ error: null });
   db.deleted.mockResolvedValue({ error: null });
   db.from.mockImplementation(() => ({
@@ -105,6 +107,18 @@ describe("forgetAppleLink", () => {
     expect(await forgetAppleLink(USER)).toBe(false);
     expect(apple.revokeAppleToken).not.toHaveBeenCalled();
     expect(db.deleted).toHaveBeenCalledWith("user_id", USER);
+  });
+
+  it("answers false and keeps the row while there's no key to open it with", async () => {
+    db.maybeSingle.mockResolvedValue({
+      data: { client_id: "com.mulo.app", refresh_token: "sealed-value" },
+      error: null,
+    });
+    apple.hasTokenKey.mockReturnValue(false);
+    apple.openToken.mockReturnValue(null);
+    expect(await forgetAppleLink(USER)).toBe(false);
+    expect(apple.revokeAppleToken).not.toHaveBeenCalled();
+    expect(db.deleted).not.toHaveBeenCalled();
   });
 
   it("answers false when the row can't be read", async () => {
