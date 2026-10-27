@@ -472,6 +472,17 @@ export type AppSession = {
 /** `POST auth/login` and `POST auth/signup`. No session means "check your email". */
 export type AuthResponse = { ok: true; session: AppSession | null; message?: string } | AppError;
 
+/**
+ * `POST auth/apple` body: what the iPhone's own Apple sheet hands back. The nonce
+ * is the raw one whose SHA-256 hash the sheet was opened with. The one-time
+ * code, when sent, is swapped for Apple's refresh token. Answers `AuthResponse`.
+ */
+export type AppleSignInInput = {
+  identityToken: string;
+  nonce: string;
+  authorizationCode?: string;
+};
+
 /** The signed-in person's own profile. Null until they've picked a username. */
 export type OwnProfile = {
   username: string;

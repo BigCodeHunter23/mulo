@@ -46,7 +46,8 @@ test says how). New endpoints go in `test/app-api.test.ts`; Collection's
 (badges, GOAT, Mixtape, the Gauntlet, taste) are in
 `test/app-api-collection.test.ts`, and Social and account's (lists,
 notifications, reactions, reports, blocks, follows, invites, profile
-editing, Raised On, the account) in `test/app-api-social.test.ts`. Every
+editing, Raised On, the account) in `test/app-api-social.test.ts`. Social log-ins (`auth/apple`: the iPhone's own
+Apple sheet, checked by Supabase) are in `test/app-api-auth-social.test.ts`. Every
 `users/[username]/*` endpoint finds its person through `visibleProfile`
 (`src/lib/app-profile.ts`), so blocked people are a 404 everywhere; a list by
 somebody blocked is a 404 too, and `lists.ts`, `notifications.ts` and
