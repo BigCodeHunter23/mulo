@@ -59,6 +59,8 @@ export type ReactionSummary = {
 
 export type Review = {
   id: number;
+  /** Whose it is, to block them by. */
+  user_id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -146,7 +148,13 @@ export type SongRating = {
 
 // --- Feed (feed.ts) ---
 
-export type Author = { username: string; display_name: string | null; avatar_url: string | null };
+export type Author = {
+  /** Their account, to block them by. */
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
 export type FeedAlbum = {
   mbid: string;

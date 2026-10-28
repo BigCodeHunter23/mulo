@@ -55,6 +55,11 @@ export default function ReviewList({
             />
             <ReportButton
               {...(kind === "album" ? { ratingId: review.id } : { artistRatingId: review.id })}
+              author={{
+                id: review.user_id,
+                username: review.username,
+                name: review.display_name || review.username,
+              }}
               signedIn={signedIn}
               label="Report"
             />

@@ -126,7 +126,15 @@ export default async function Takes({
                       {take.mine ? (
                         <DeleteTake takeId={take.id} />
                       ) : (
-                        <ReportButton takeId={take.id} signedIn={signedIn} />
+                        <ReportButton
+                          takeId={take.id}
+                          author={{
+                            id: take.author.id,
+                            username: take.author.username,
+                            name: take.author.display_name || take.author.username,
+                          }}
+                          signedIn={signedIn}
+                        />
                       )}
                     </div>
                   </div>

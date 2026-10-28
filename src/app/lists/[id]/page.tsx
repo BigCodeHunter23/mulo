@@ -65,7 +65,13 @@ export default async function ListPage({ params }: { params: Params }) {
               filename="mulo-list"
             />
           )}
-          {!own && <ReportButton listId={list.id} signedIn={Boolean(user)} />}
+          {!own && (
+            <ReportButton
+              listId={list.id}
+              author={{ id: list.ownerId, username: list.owner.username, name: list.owner.name }}
+              signedIn={Boolean(user)}
+            />
+          )}
         </div>
       </header>
 

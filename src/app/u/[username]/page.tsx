@@ -236,6 +236,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                 <ShareButton url={`/u/${profile.username}`} title={`${name} on MULO`} />
                 <ReportButton
                   profileId={profile.id}
+                  author={{ id: profile.id, username: profile.username, name }}
                   signedIn={followState.signedIn}
                   label="Report"
                 />

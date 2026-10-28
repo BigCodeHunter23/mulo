@@ -25,7 +25,7 @@ type SongRow = {
   releases: ReleaseRow;
 };
 
-const AUTHOR = "profiles!inner ( username, display_name, avatar_url )";
+const AUTHOR = "profiles!inner ( id, username, display_name, avatar_url )";
 const RELEASE = "releases!inner ( mbid, title, cover_art_url, artists ( mbid, name ) )";
 
 function toAlbum(row: ReleaseRow): FeedAlbum {

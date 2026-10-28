@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import LoginLink from "@/components/LoginLink";
 import { useFormStatus } from "react-dom";
 import { submitReport, type ReportState } from "@/app/report/actions";
+import { setBlocked } from "@/app/u/[username]/actions";
 import { REPORT_REASONS } from "@/lib/report-reasons";
 import { buttonClass, fieldClass } from "@/components/ui";
 
@@ -20,10 +21,46 @@ function SubmitButton() {
   );
 }
 
+type ReportedPerson = { id: string; username: string; name: string };
+
 /**
- * Reports an album review, an artist review or a profile. Kept deliberately
- * quiet in the interface: a small text link that opens the form only when
- * needed.
+ * Once a report is sent, the offer to block whoever wrote it too, as the app
+ * makes it. A block hides each from the other, so the page tidies itself.
+ */
+function AlsoBlock({ id, username, name }: ReportedPerson) {
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (done) return <span>Blocked {name}.</span>;
+
+  function block() {
+    setError(null);
+    startTransition(async () => {
+      const result = await setBlocked(id, username, true);
+      if (result.ok) setDone(true);
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <>
+      <button type="button" onClick={block} disabled={pending} className={quietLink}>
+        {pending ? "Blocking…" : `Also block ${name}`}
+      </button>
+      {error && (
+        <span role="alert" className="text-error-soft">
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Reports an album review, an artist review, a take, a list or a profile.
+ * Kept deliberately quiet in the interface: a small text link that opens the
+ * form only when needed.
  */
 export default function ReportButton({
   ratingId,
@@ -31,6 +68,7 @@ export default function ReportButton({
   profileId,
   takeId,
   listId,
+  author,
   signedIn,
   label = "Report",
 }: {
@@ -41,6 +79,8 @@ export default function ReportButton({
   takeId?: number;
   /** Somebody's list of albums. */
   listId?: number;
+  /** Who wrote it, to offer to block them once it's reported. */
+  author?: ReportedPerson;
   signedIn: boolean;
   label?: string;
 }) {
@@ -52,7 +92,12 @@ export default function ReportButton({
   }
 
   if (state.message) {
-    return <span className="text-xs text-text-muted">{state.message}</span>;
+    return (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+        <span>{state.message}</span>
+        {author && <AlsoBlock {...author} />}
+      </span>
+    );
   }
 
   if (!open) {
