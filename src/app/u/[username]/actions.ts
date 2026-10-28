@@ -6,6 +6,7 @@ import { userIdSchema, usernameSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { logQueryError } from "@/lib/supabase/errors";
 import type { FollowResult } from "@/lib/app-api";
+import type { ReportReason } from "@/lib/report-reasons";
 
 export type { FollowResult };
 
@@ -85,6 +86,21 @@ export async function setBlocked(
     if (error && error.code !== "23505") {
       logQueryError("blocks", error, "0020");
       return { ok: false, error: "Couldn't block them. Please try again." };
+    }
+
+    // A block tells MULO too, as the App Store asks of community apps: the
+    // person lands in the reports inbox. Reported already is fine, and the
+    // block stands even if the report can't be filed.
+    if (!error) {
+      const { error: reportError } = await supabase.from("reports").insert({
+        reporter_id: user.id,
+        reported_profile_id: targetId,
+        reason: "Something else" satisfies ReportReason,
+        detail: "Sent when they blocked this person.",
+      });
+      if (reportError && reportError.code !== "23505") {
+        logQueryError("reports", reportError, "0006");
+      }
     }
 
     await supabase
