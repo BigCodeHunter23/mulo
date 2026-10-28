@@ -12,7 +12,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms"
-      intro="The deal between you and MULO, in plain words. Using the site means you're happy with what's below."
+      intro="The deal between you and MULO, in plain words. Using the website or the app means you're happy with what's below."
     >
       <Section title="Who you're dealing with">
         <p>
@@ -29,9 +29,9 @@ export default function TermsPage() {
 
       <Section title="Your account">
         <p>
-          You need to be at least {MINIMUM_AGE} years old, give a real email address, and keep your
-          password to yourself. What happens on your account is treated as you. One person, one
-          account.
+          You need to be at least {MINIMUM_AGE} years old, give a real email address (Apple&rsquo;s
+          private relay address counts), and keep your password to yourself. What happens on your
+          account is treated as you. One person, one account.
         </p>
       </Section>
 
@@ -52,9 +52,13 @@ export default function TermsPage() {
           ]}
         />
         <p>
-          Reviews and profiles can be reported from the app. Reports are read by a person, and
-          anything over the line is removed. Persistently over the line, and the account goes with
-          it.
+          <strong className="text-text">
+            MULO has no tolerance for objectionable content or abusive users.
+          </strong>{" "}
+          Every review, take, list and profile can be reported, on the website and in the app, and
+          anybody can be blocked from their profile, which hides each of you from the other. Every
+          report is read by a person within 24 hours: anything over the line is removed, and the
+          account that posted it can be closed with it.
         </p>
       </Section>
 

@@ -12,7 +12,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy"
-      intro="MULO is a place to rate music and see what your friends thought. It makes no money from you and sells nothing about you, so this page is short and says what actually happens."
+      intro="MULO is a place to rate music and see what your friends thought, on the website and in the app for iPhone and Android. It makes no money from you and sells nothing about you, so this page is short and says what actually happens."
     >
       <Section title="Who runs MULO">
         <p>
@@ -37,8 +37,17 @@ export default function PrivacyPage() {
               Supabase, who handle logins, and we never see it.
             </>,
             <>
+              <strong className="text-text">If you continue with Apple or Google:</strong> what they
+              share when you agree — your email address, your name, and from Google a profile
+              picture. Apple can give a private relay address instead of your own, which forwards to
+              you; MULO only ever sees the relay. For Apple, MULO also keeps the token Apple issues,
+              encrypted, so deleting your account can end MULO&rsquo;s link to your Apple Account
+              too.
+            </>,
+            <>
               <strong className="text-text">Your profile:</strong> username, display name, picture
-              and bio, if you add them.
+              and bio, if you add them. In the app, a picture comes from your photo library only
+              when you choose one, and only that picture leaves your phone.
             </>,
             <>
               <strong className="text-text">What you put in:</strong> scores, reviews, lists, your
@@ -51,9 +60,21 @@ export default function PrivacyPage() {
               and ordinary server logs.
             </>,
             <>
-              <strong className="text-text">A cookie that keeps you logged in</strong>, and a few
-              small notes stored in your own browser — recent searches, which tips you&rsquo;ve
-              seen. Those never leave your device and aren&rsquo;t used to follow you anywhere.
+              <strong className="text-text">
+                On the website, a cookie that keeps you logged in
+              </strong>
+              , and a few small notes stored in your own browser — recent searches, which tips
+              you&rsquo;ve seen. Those never leave your device and aren&rsquo;t used to follow you
+              anywhere.
+            </>,
+            <>
+              <strong className="text-text">
+                In the app, the same kind of thing on your phone:
+              </strong>{" "}
+              what keeps you logged in, held in the phone&rsquo;s secure keychain, and small notes —
+              records you&rsquo;ve looked at, recent searches, tips you&rsquo;ve seen, your best
+              Guess the score, the badges already celebrated, and when you last looked at your
+              notifications. They stay on the phone, and deleting your account clears them.
             </>,
           ]}
         />
@@ -102,17 +123,31 @@ export default function PrivacyPage() {
               <strong className="text-text">Resend</strong> sends the few emails MULO sends:
               confirming your address, and resetting a password.
             </>,
+            <>
+              <strong className="text-text">Apple and Google</strong>, only if you continue with
+              them: they confirm it&rsquo;s you, and know you signed in to MULO.
+            </>,
+            <>
+              <strong className="text-text">Expo</strong> delivers fixes to the app. Your phone asks
+              it for them, so it sees the phone&rsquo;s network address and the app&rsquo;s version,
+              never your account.
+            </>,
           ]}
         />
         <p>
-          Those companies store data on servers that may be outside Australia. Album information
-          comes from MusicBrainz and song previews from Apple — they&rsquo;re asked about records,
-          never about you.
+          Those companies store data on servers that may be outside Australia. Album and artist
+          information comes from MusicBrainz and Wikipedia, and song previews from Apple —
+          they&rsquo;re asked about records, never about you. In the app, a preview is fetched from
+          Apple by your phone itself, so Apple sees your phone&rsquo;s network address and the song,
+          but not who you are on MULO.
         </p>
       </Section>
 
       <Section title="Taking it with you, or taking it back">
-        <p>Two buttons, both on your account page, both doing exactly what they say:</p>
+        <p>
+          Two buttons, both on your account page (in the app, under You and then the settings
+          button), both doing exactly what they say:
+        </p>
         <List
           items={[
             <>
@@ -120,9 +155,11 @@ export default function PrivacyPage() {
               everything you&rsquo;ve put in — every score, review, list and follow.
             </>,
             <>
-              <strong className="text-text">Delete my account</strong> removes your profile and
+              <strong className="text-text">Deleting your account</strong> removes your profile and
               everything attached to it. It isn&rsquo;t hidden or deactivated; it&rsquo;s gone, and
-              it can&rsquo;t be undone.
+              it can&rsquo;t be undone. If you joined with Apple, it also asks Apple to end
+              MULO&rsquo;s link to your Apple Account, and says so if you need to remove it
+              yourself.
             </>,
           ]}
         />
