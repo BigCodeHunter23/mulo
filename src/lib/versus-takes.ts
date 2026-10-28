@@ -1,5 +1,6 @@
 import "server-only";
 import type { VersusTake } from "@/lib/app-api";
+import { hiddenFilter } from "@/lib/blocks";
 import { getReactions } from "@/lib/reactions";
 import { createPublicClient } from "@/lib/supabase/public";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export type Takes = {
 export async function getTakes(matchupId: number): Promise<Takes> {
   const supabase = createPublicClient();
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("versus_takes")
     .select(
       "id, body, created_at, user_id, profiles!inner ( id, username, display_name, avatar_url )",
@@ -25,6 +26,12 @@ export async function getTakes(matchupId: number): Promise<Takes> {
     .eq("matchup_id", matchupId)
     .order("created_at", { ascending: false })
     .limit(200);
+
+  // Somebody blocked has no take on any matchup, either way round.
+  const hidden = await hiddenFilter();
+  if (hidden) query.not("user_id", "in", hidden);
+
+  const { data, error } = await query;
 
   if (error) return { available: false, takes: [] };
 
