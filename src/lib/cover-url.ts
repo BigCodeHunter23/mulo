@@ -32,3 +32,14 @@ export function artistPhotoSrc(url: string | null | undefined, width = 300): str
     ? url.replace(/([?&])width=\d+/, `$1width=${width}`)
     : url;
 }
+
+const COMMONS_PHOTO = /^https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/([^?#/]+)/;
+
+/**
+ * The Commons page of an artist photo, which names its author and licence.
+ * Linking there is how the photo is credited, as its licence asks.
+ */
+export function commonsFilePage(url: string | null | undefined): string | null {
+  const file = url?.match(COMMONS_PHOTO)?.[1];
+  return file ? `https://commons.wikimedia.org/wiki/File:${file}` : null;
+}

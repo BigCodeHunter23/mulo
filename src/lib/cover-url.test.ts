@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverSrc } from "./cover-url";
+import { commonsFilePage, coverSrc } from "./cover-url";
 
 const MBID = "72d15666-99a7-321e-b1f3-a3f8c09dff9f";
 const ARCHIVE = `https://coverartarchive.org/release-group/${MBID}`;
@@ -21,5 +21,21 @@ describe("coverSrc", () => {
     expect(coverSrc(avatar)).toBe(avatar);
     expect(coverSrc("")).toBeNull();
     expect(coverSrc(null)).toBeNull();
+  });
+});
+
+describe("commonsFilePage", () => {
+  it("finds the Commons page that credits an artist photo", () => {
+    expect(
+      commonsFilePage(
+        "https://commons.wikimedia.org/wiki/Special:FilePath/Queen_%28band%29_1984.jpg?width=600",
+      ),
+    ).toBe("https://commons.wikimedia.org/wiki/File:Queen_%28band%29_1984.jpg");
+  });
+
+  it("has nothing for a photo from anywhere else, or none", () => {
+    expect(commonsFilePage("https://example.com/wiki/Special:FilePath/x.jpg")).toBeNull();
+    expect(commonsFilePage("")).toBeNull();
+    expect(commonsFilePage(null)).toBeNull();
   });
 });

@@ -27,6 +27,7 @@ import FinishTheSet from "@/components/FinishTheSet";
 import TrackView from "@/components/TrackView";
 import { getSetProgress } from "@/lib/gauntlet";
 import { getUsername } from "@/lib/social";
+import { commonsFilePage } from "@/lib/cover-url";
 
 export async function generateMetadata({
   params,
@@ -62,6 +63,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
 
   const artist = await getCachedArtist(mbid);
   if (!artist) notFound();
+  const photoPage = commonsFilePage(artist.image_url);
 
   const user = await getCurrentUser();
   const signedIn = Boolean(user);
@@ -179,6 +181,19 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
                 className="underline-offset-4 hover:text-text hover:underline"
               >
                 CC BY-SA 4.0
+              </a>
+            </p>
+          )}
+          {photoPage && (
+            <p className="mt-1 text-xs text-text-muted">
+              Photo from{" "}
+              <a
+                href={photoPage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-4 hover:text-text hover:underline"
+              >
+                Wikimedia Commons
               </a>
             </p>
           )}
