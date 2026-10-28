@@ -16,6 +16,9 @@ export default function Footer() {
         <Link href="/terms" className="transition-colors hover:text-text">
           Terms
         </Link>
+        <Link href="/support" className="transition-colors hover:text-text">
+          Help
+        </Link>
         <a href={`mailto:${CONTACT_EMAIL}`} className="transition-colors hover:text-text">
           Get in touch
         </a>
