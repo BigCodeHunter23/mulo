@@ -8,19 +8,30 @@ export type ArtistExtras = {
   imageUrl: string | null;
   /** First paragraph of the Wikipedia article, or null. */
   bio: string | null;
+  /** That article's address, to credit it, or null without a bio. */
+  bioUrl: string | null;
+  /**
+   * False when Wikidata or Wikipedia didn't answer, so what's missing may
+   * only be missing for now and is worth asking for again.
+   */
+  answered: boolean;
 };
 
-async function getJson<T>(url: string): Promise<T | null> {
+/** A request that got no answer, as opposed to one that found nothing (null). */
+const NO_ANSWER = Symbol("no answer");
+
+async function getJson<T>(url: string): Promise<T | null | typeof NO_ANSWER> {
   try {
     const response = await fetch(url, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       cache: "no-store",
     });
-    if (!response.ok) return null;
+    if (response.status === 404) return null;
+    if (!response.ok) return NO_ANSWER;
     return (await response.json()) as T;
   } catch {
     // These are enrichment extras: if they fail, the page still works.
-    return null;
+    return NO_ANSWER;
   }
 }
 
@@ -41,8 +52,9 @@ export async function getArtistExtras(wikidataQid: string): Promise<ArtistExtras
     `https://www.wikidata.org/wiki/Special:EntityData/${wikidataQid}.json`,
   );
 
+  if (entity === NO_ANSWER) return { imageUrl: null, bio: null, bioUrl: null, answered: false };
   const data = entity?.entities?.[wikidataQid];
-  if (!data) return { imageUrl: null, bio: null };
+  if (!data) return { imageUrl: null, bio: null, bioUrl: null, answered: true };
 
   const imageFile = data.claims?.P18?.[0]?.mainsnak?.datavalue?.value ?? null;
   const imageUrl = imageFile
@@ -53,13 +65,20 @@ export async function getArtistExtras(wikidataQid: string): Promise<ArtistExtras
 
   const title = data.sitelinks?.enwiki?.title;
   let bio: string | null = null;
+  let answered = true;
 
   if (title) {
     const summary = await getJson<{ extract?: string }>(
       `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
     );
-    bio = summary?.extract?.trim() || null;
+    if (summary === NO_ANSWER) answered = false;
+    else bio = summary?.extract?.trim() || null;
   }
 
-  return { imageUrl, bio };
+  const bioUrl =
+    bio && title
+      ? `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`
+      : null;
+
+  return { imageUrl, bio, bioUrl, answered };
 }

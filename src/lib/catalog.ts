@@ -85,21 +85,54 @@ async function saveWithSeed<T extends Record<SeedColumn, unknown>>(
  */
 const isMbid = (value: unknown) => mbidSchema.safeParse(value).success;
 
-export async function getCachedArtist(mbid: string): Promise<Artist | null> {
-  if (!isMbid(mbid)) return null;
-  const supabase = await createClient();
+/**
+ * Where a bio came from (`bio_url`) only exists once migration 0022 has been
+ * run. As with the seed, the first read that finds it missing stops asking for
+ * it for the life of the server, and artists carry on without a credit.
+ */
+let bioUrlColumnExists = true;
 
-  const { data: cached } = await supabase
+/** A cached artist; `bio_url` is absent while this database hasn't got it. */
+type CachedArtist = Omit<Artist, "bio_url"> & { bio_url?: string | null };
+
+/** Postgres's "no such column" on a read, or PostgREST's naming bio_url on a write. */
+function isMissingBioUrl(error: { code?: string; message?: string } | null) {
+  return error?.code === "42703" || (error?.message?.includes("bio_url") ?? false);
+}
+
+async function readCachedArtist(mbid: string): Promise<CachedArtist | null> {
+  const supabase = await createClient();
+  if (bioUrlColumnExists) {
+    const { data, error } = await supabase
+      .from("artists")
+      .select("mbid, name, image_url, bio, bio_url")
+      .eq("mbid", mbid)
+      .maybeSingle();
+    if (!isMissingBioUrl(error)) return data;
+    bioUrlColumnExists = false;
+  }
+  const { data } = await supabase
     .from("artists")
     .select("mbid, name, image_url, bio")
     .eq("mbid", mbid)
     .maybeSingle();
+  return data;
+}
+
+/** An empty `bio_url` means the bio isn't Wikipedia's: nobody to credit. */
+const shown = (cached: CachedArtist): Artist => ({ ...cached, bio_url: cached.bio_url || null });
+
+export async function getCachedArtist(mbid: string): Promise<Artist | null> {
+  if (!isMbid(mbid)) return null;
+  const cached = await readCachedArtist(mbid);
 
   // image_url null means we have never looked for a photo; an empty string
   // means we looked and there wasn't one, so we don't ask again every visit.
-  if (cached && cached.image_url !== null) return cached;
+  // bio_url null means the bio's source was never noted (it was cached before
+  // migration 0022), so it's looked up once more to credit it.
+  if (cached && cached.image_url !== null && cached.bio_url !== null) return shown(cached);
   if (!(await allowAddress("catalog"))) {
-    if (cached) return cached;
+    if (cached) return shown(cached);
     throw new RateLimitedError("catalog");
   }
 
@@ -107,20 +140,26 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   try {
     mb = await getArtist(mbid);
   } catch (error) {
-    if (error instanceof MbNotFoundError) return null;
     // Already cached and MusicBrainz is unhappy: show what we have.
-    if (cached) return cached;
+    if (cached) return shown(cached);
+    if (error instanceof MbNotFoundError) return null;
     throw error;
   }
 
   const qid = wikidataQid(mb);
-  const extras = qid ? await getArtistExtras(qid) : { imageUrl: null, bio: null };
+  const extras = qid
+    ? await getArtistExtras(qid)
+    : { imageUrl: null, bio: null, bioUrl: null, answered: true };
+  // Wikidata or Wikipedia didn't answer: saving now would swap a cached photo
+  // and bio for nothing, for good. Keep them, and look again another visit.
+  if (!extras.answered && cached) return shown(cached);
 
   const artist: Artist = {
     mbid: mb.id,
     name: mb.name,
     image_url: extras.imageUrl ?? "",
     bio: extras.bio || mb.disambiguation || null,
+    bio_url: extras.bio ? extras.bioUrl : null,
   };
 
   // Aliases too, so "Kanye West" still finds the artist now called Ye.
@@ -128,12 +167,25 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
     ...new Set([mb.name, ...(mb.aliases ?? []).map((a) => a.name)].filter(Boolean)),
   ].join(" | ");
 
+  const { bio_url, ...rest } = artist;
   const artists = createAdminClient().from("artists");
-  await saveWithSeed((row) => artists.upsert(row), {
-    ...artist,
-    search_names: searchNames,
-    ...seedFrom(mb.rating),
-  });
+  await saveWithSeed(
+    async (row) => {
+      const saved = await artists.upsert(row);
+      // Another visit's read may not have found the column missing yet.
+      if (!("bio_url" in row) || !isMissingBioUrl(saved.error)) return saved;
+      bioUrlColumnExists = false;
+      const { bio_url: unsaved, ...without } = row;
+      void unsaved;
+      return artists.upsert(without);
+    },
+    {
+      ...rest,
+      ...(bioUrlColumnExists ? { bio_url: bio_url ?? "" } : {}),
+      search_names: searchNames,
+      ...seedFrom(mb.rating),
+    },
+  );
 
   return artist;
 }

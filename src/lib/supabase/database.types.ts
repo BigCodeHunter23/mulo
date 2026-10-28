@@ -85,6 +85,7 @@ export type Database = {
         Row: {
           albums_cached_at: string | null
           bio: string | null
+          bio_url: string | null
           cached_at: string
           image_url: string | null
           mbid: string
@@ -98,6 +99,7 @@ export type Database = {
         Insert: {
           albums_cached_at?: string | null
           bio?: string | null
+          bio_url?: string | null
           cached_at?: string
           image_url?: string | null
           mbid: string
@@ -111,6 +113,7 @@ export type Database = {
         Update: {
           albums_cached_at?: string | null
           bio?: string | null
+          bio_url?: string | null
           cached_at?: string
           image_url?: string | null
           mbid?: string

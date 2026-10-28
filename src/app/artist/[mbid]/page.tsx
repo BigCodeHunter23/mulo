@@ -160,6 +160,28 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
           </div>
 
           {artist.bio && <ReadMore text={artist.bio} className="mt-7 max-w-3xl" />}
+          {artist.bio && artist.bio_url && (
+            <p className="mt-2 text-xs text-text-muted">
+              From{" "}
+              <a
+                href={artist.bio_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-4 hover:text-text hover:underline"
+              >
+                Wikipedia
+              </a>
+              , under{" "}
+              <a
+                href="https://creativecommons.org/licenses/by-sa/4.0/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-4 hover:text-text hover:underline"
+              >
+                CC BY-SA 4.0
+              </a>
+            </p>
+          )}
         </div>
       </div>
 

@@ -29,6 +29,8 @@ export type Artist = {
   name: string;
   image_url: string | null;
   bio: string | null;
+  /** The Wikipedia article the bio is from, to credit it; null when it isn't Wikipedia's. */
+  bio_url: string | null;
 };
 
 export type Release = {
