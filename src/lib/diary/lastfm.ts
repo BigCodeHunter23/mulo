@@ -1,12 +1,14 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Play } from "@/lib/diary-shared";
+import { readTimeZone, touchClock } from "@/lib/push/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Last.fm: the approval page that proves an account is yours, the session it
- * gives back, and reading somebody's plays. Keys come from LASTFM_API_KEY and
- * LASTFM_API_SECRET; without them, Connect Last.fm isn't offered.
+ * Last.fm: the approval page that proves an account is yours, and reading
+ * somebody's plays, which are public. The session Last.fm gives back only
+ * proves whose account it is; it's never kept. Keys come from LASTFM_API_KEY
+ * and LASTFM_API_SECRET; without them, Connect Last.fm isn't offered.
  */
 
 const API = "https://ws.audioscrobbler.com/2.0/";
@@ -90,7 +92,7 @@ export function approvalUrl(keys: LastfmKeys, callback: string): string {
   return `${AUTH}?${new URLSearchParams({ api_key: keys.key, cb: callback })}`;
 }
 
-/** Swaps the token Last.fm sent back for the account's name and session key. */
+/** Swaps the token Last.fm sent back for the account's name, proving it's theirs. */
 export async function sessionFor(
   token: string,
   keys: LastfmKeys,
@@ -118,7 +120,8 @@ type LfTrack = {
   "@attr"?: { nowplaying?: string };
 };
 
-export type RecentPage = { page: number; totalPages: number; plays: Play[] };
+/** `totalPages` is null when Last.fm didn't say, which is no answer to go on. */
+export type RecentPage = { page: number; totalPages: number | null; plays: Play[] };
 
 /** One page of somebody's plays, newest first. `from` and `to` are in seconds. */
 export async function recentTracks(
@@ -160,9 +163,10 @@ export async function recentTracks(
     });
   }
   const attr = body.recenttracks?.["@attr"];
+  const totalPages = String(attr?.totalPages ?? "");
   return {
     page: Number(attr?.page ?? options.page) || options.page,
-    totalPages: Number(attr?.totalPages ?? 0) || 0,
+    totalPages: /^\d{1,9}$/.test(totalPages) ? Number(totalPages) : null,
     plays,
   };
 }
@@ -170,10 +174,38 @@ export async function recentTracks(
 export const stateHash = (state: string) => createHash("sha256").update(state).digest("hex");
 
 /**
- * Starts connecting: a single-use state naming the person, kept only as a
- * hash for ten minutes, and where to go back to afterwards.
+ * A connect started on the website is finished only in the browser that
+ * started it, so nobody can send somebody else a link that connects their
+ * Last.fm to the sender's MULO. This cookie (path /diary/lastfm, ten
+ * minutes) holds a hash of the state, unlike the one kept in the database.
+ * The app's browser sheet has no cookies; its connects rely on the
+ * single-use state.
  */
-export async function createConnectState(userId: string, to: "web" | "app"): Promise<string> {
+export const CONNECT_COOKIE = "mulo_lastfm";
+export const CONNECT_COOKIE_PATH = "/diary/lastfm";
+export const CONNECT_COOKIE_SECONDS = STATE_MINUTES * 60;
+
+export const connectCookie = (state: string) =>
+  createHash("sha256").update(`browser:${state}`).digest("hex");
+
+/** Whether the cookie came from the browser that started this state's connect. */
+export function sameBrowser(cookie: string | undefined, state: string): boolean {
+  if (!cookie) return false;
+  const given = Buffer.from(cookie);
+  const wanted = Buffer.from(connectCookie(state));
+  return given.length === wanted.length && timingSafeEqual(given, wanted);
+}
+
+/**
+ * Starts connecting: a single-use state naming the person, kept only as a
+ * hash for ten minutes, where to go back to afterwards, and the time zone it
+ * started in (a new import reads days on that clock).
+ */
+export async function createConnectState(
+  userId: string,
+  to: "web" | "app",
+  timeZone: string | null = null,
+): Promise<string> {
   const state = randomBytes(24).toString("base64url");
   const { error } = await createAdminClient()
     .from("diary_sources")
@@ -184,6 +216,7 @@ export async function createConnectState(userId: string, to: "web" | "app"): Pro
         pending_hash: stateHash(state),
         pending_until: new Date(Date.now() + STATE_MINUTES * 60_000).toISOString(),
         pending_to: to,
+        pending_zone: timeZone,
       },
       { onConflict: "user_id,source" },
     );
@@ -191,50 +224,77 @@ export async function createConnectState(userId: string, to: "web" | "app"): Pro
   return state;
 }
 
-/** Takes a connect's state once: who started it and where they go back to, or null. */
-export async function takeConnectState(
-  state: string,
-): Promise<{ userId: string; to: "web" | "app" } | null> {
+/**
+ * Notes the zone a connect started in as the person's own when none is kept
+ * yet (they've never had pushes, say), for streaks and the like. Never stops
+ * a connect.
+ */
+export async function noteTimeZone(userId: string, timeZone: string | null): Promise<void> {
+  if (!timeZone) return;
+  try {
+    if (!(await readTimeZone(userId))) await touchClock(userId, timeZone);
+  } catch (error) {
+    console.error("[diary] noting the time zone failed:", error);
+  }
+}
+
+export type ConnectStarted = { userId: string; to: "web" | "app"; timeZone: string | null };
+
+/**
+ * Takes a connect's state once: who started it, where they go back to and
+ * the zone they were in; null for a state that's used, expired or made up.
+ * Throws when the states can't be read.
+ */
+export async function takeConnectState(state: string): Promise<ConnectStarted | null> {
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(state)) return null;
   const client = createAdminClient();
   const hash = stateHash(state);
-  const { data: found } = await client
+  const { data: found, error: readError } = await client
     .from("diary_sources")
-    .select("user_id, pending_to")
+    .select("user_id, pending_to, pending_zone")
     .eq("source", "lastfm")
     .eq("pending_hash", hash)
     .gt("pending_until", new Date().toISOString())
     .maybeSingle();
+  if (readError) throw readError;
   if (!found) return null;
   // Cleared only if it's still there, so two callbacks racing can't both win.
   const { data: taken, error } = await client
     .from("diary_sources")
-    .update({ pending_hash: null, pending_until: null, pending_to: null })
+    .update({ pending_hash: null, pending_until: null, pending_to: null, pending_zone: null })
     .eq("source", "lastfm")
     .eq("pending_hash", hash)
     .select("user_id");
-  if (error || !taken || taken.length === 0) return null;
-  return { userId: found.user_id, to: found.pending_to === "app" ? "app" : "web" };
+  if (error) throw error;
+  if (!taken || taken.length === 0) return null;
+  return {
+    userId: found.user_id,
+    to: found.pending_to === "app" ? "app" : "web",
+    timeZone: found.pending_zone,
+  };
 }
 
 /**
- * Saves a connected account. The same account keeps its progress: an import
- * it hadn't finished carries on, and one that had goes back to syncing.
- * Another account starts its import from now, back to the start.
+ * Saves a connected account by its name. The same account keeps its
+ * progress and its clock: an import it hadn't finished carries on, and one
+ * that had goes back to syncing. Another account starts its import from now,
+ * back to the start, on the clock it connected on.
  */
 export async function saveConnection(
   userId: string,
-  session: { user: string; key: string },
+  account: { user: string },
+  timeZone: string | null,
   at = new Date(),
 ): Promise<void> {
   const client = createAdminClient();
-  const { data: existing } = await client
+  const { data: existing, error: readError } = await client
     .from("diary_sources")
-    .select("lastfm_user, import_page")
+    .select("lastfm_user, import_page, time_zone")
     .eq("user_id", userId)
     .eq("source", "lastfm")
     .maybeSingle();
-  const same = existing?.lastfm_user?.toLowerCase() === session.user.toLowerCase();
+  if (readError) throw readError;
+  const same = existing?.lastfm_user?.toLowerCase() === account.user.toLowerCase();
   const fresh = {
     state: "importing",
     import_to: at.toISOString(),
@@ -243,14 +303,18 @@ export async function saveConnection(
     carry: null,
     reached_back: null,
     synced_to: at.toISOString(),
+    time_zone: timeZone,
+  };
+  const carryOn = {
+    state: existing?.import_page ? "importing" : "syncing",
+    ...(existing?.time_zone || !timeZone ? {} : { time_zone: timeZone }),
   };
   const { error } = await client.from("diary_sources").upsert(
     {
       user_id: userId,
       source: "lastfm",
-      lastfm_user: session.user,
-      lastfm_session: session.key,
-      ...(same ? { state: existing?.import_page ? "importing" : "syncing" } : fresh),
+      lastfm_user: account.user,
+      ...(same ? carryOn : fresh),
     },
     { onConflict: "user_id,source" },
   );

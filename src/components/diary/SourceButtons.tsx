@@ -26,8 +26,9 @@ export function ConnectLastfm({ again = false }: { again?: boolean }) {
     setError(null);
     startTransition(async () => {
       // On its way, the action leaves for Last.fm; it only answers when it can't.
-      const result = await startLastfm();
-      if (result?.error) setError(result.error);
+      // The browser's time zone is the clock a new import reads days by.
+      const result = await startLastfm(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      if (result && !result.ok) setError(result.error);
     });
   }
 

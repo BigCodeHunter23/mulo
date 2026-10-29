@@ -444,6 +444,12 @@ export type DiaryBatchResult = { ok: true; added: number; merged: number } | App
 /** `POST diary/entries`: Log a listen. */
 export type LogListen = { mbid: string; day: string; score?: number };
 
+/**
+ * `POST diary/lastfm/start`, with the phone's IANA time zone ("Europe/London"),
+ * which a new import reads days by. The body may be left out.
+ */
+export type LastfmStart = { timeZone?: string };
+
 /** `POST diary/lastfm/start`: Last.fm's approval page, for the browser sheet. */
 export type LastfmStartResult = { ok: true; url: string } | AppError;
 

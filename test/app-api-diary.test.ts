@@ -15,7 +15,7 @@ type Fn = (...args: unknown[]) => Promise<unknown>;
 const lib = vi.hoisted(() => ({
   getDiaryPage: vi.fn<Fn>(async () => null),
   logListen: vi.fn<Fn>(async () => ({ ok: true })),
-  saveAlbumDays: vi.fn<Fn>(async () => ({ ok: true, added: 3, merged: 1 })),
+  saveAlbumDays: vi.fn<Fn>(async () => ({ ok: true, added: 3, merged: 1, skipped: 2 })),
   finishImport: vi.fn<Fn>(async () => undefined),
   deleteEntry: vi.fn<Fn>(async () => ({ ok: true })),
   fixAlbum: vi.fn<Fn>(async () => ({ ok: true })),
@@ -26,6 +26,7 @@ const lib = vi.hoisted(() => ({
     secret: "SECRET",
   })),
   createConnectState: vi.fn<Fn>(async () => "STATE"),
+  noteTimeZone: vi.fn<Fn>(async () => undefined),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -59,6 +60,7 @@ vi.mock("@/lib/diary/lastfm", async (original) => ({
   ...(await original<typeof import("@/lib/diary/lastfm")>()),
   lastfmKeys: lib.lastfmKeys,
   createConnectState: lib.createConnectState,
+  noteTimeZone: lib.noteTimeZone,
 }));
 
 import * as diaryOf from "@/app/api/app/v1/diary/[username]/route";
@@ -278,8 +280,10 @@ describe("DELETE diary/sources/{source}", () => {
 });
 
 describe("POST diary/lastfm/start", () => {
+  const start = (body?: unknown) => lastfmStart.POST(req("POST", body));
+
   it("answers Last.fm's approval page, coming back to the website with the state", async () => {
-    const res = await lastfmStart.POST();
+    const res = await start({ timeZone: "Europe/London" });
     const body = await res.json();
     expect(body.ok).toBe(true);
     const url = new URL(body.url);
@@ -288,13 +292,32 @@ describe("POST diary/lastfm/start", () => {
     expect(url.searchParams.get("cb")).toBe(
       "https://getmulo.com/diary/lastfm/callback?state=STATE&to=app",
     );
-    expect(lib.createConnectState).toHaveBeenCalledWith("me", "app");
+    expect(lib.createConnectState).toHaveBeenCalledWith("me", "app", "Europe/London");
+    expect(lib.noteTimeZone).toHaveBeenCalledWith("me", "Europe/London");
+  });
+
+  it("takes no body at all, from an app that doesn't send the time zone", async () => {
+    expect((await start()).status).toBe(200);
+    expect((await start({})).status).toBe(200);
+    expect(lib.createConnectState).toHaveBeenCalledWith("me", "app", null);
+  });
+
+  it("keeps a time zone in its own spelling", async () => {
+    await start({ timeZone: "europe/london" });
+    expect(lib.createConnectState).toHaveBeenCalledWith("me", "app", "Europe/London");
+  });
+
+  it("refuses a time zone that isn't one", async () => {
+    for (const timeZone of ["Mars/Olympus_Mons", 7, "x".repeat(65)]) {
+      expect((await start({ timeZone })).status).toBe(400);
+    }
+    expect(lib.createConnectState).not.toHaveBeenCalled();
   });
 
   it("comes back to a preview deployment's own address", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("VERCEL_BRANCH_URL", "mulo-git-diary.vercel.app");
-    const url = new URL((await (await lastfmStart.POST()).json()).url);
+    const url = new URL((await (await start()).json()).url);
     expect(url.searchParams.get("cb")).toBe(
       "https://mulo-git-diary.vercel.app/diary/lastfm/callback?state=STATE&to=app",
     );
@@ -302,7 +325,7 @@ describe("POST diary/lastfm/start", () => {
 
   it("says so when Last.fm isn't set up", async () => {
     lib.lastfmKeys.mockReturnValueOnce(null);
-    const res = await lastfmStart.POST();
+    const res = await start();
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ ok: false, error: "Last.fm isn't set up yet." });
     expect(lib.createConnectState).not.toHaveBeenCalled();
@@ -311,7 +334,7 @@ describe("POST diary/lastfm/start", () => {
   it("needs somebody signed in", async () => {
     caller.token = null;
     caller.user = null;
-    expect((await lastfmStart.POST()).status).toBe(401);
+    expect((await start()).status).toBe(401);
   });
 });
 

@@ -168,8 +168,8 @@ export default function PrivacyPage() {
             <>
               <strong className="text-text">Last.fm</strong>, once you connect it on Last.fm&rsquo;s
               own page. MULO reads your plays there (when each was, and its song, album and artist)
-              every hour until you disconnect, and keeps the key Last.fm gives it for that until you
-              do.
+              every hour until you disconnect. It keeps your Last.fm name and the time zone you
+              connected in, so each play lands on your own day, and never a key to your account.
             </>,
             <>
               <strong className="text-text">Spotify&rsquo;s extended streaming history</strong>, the

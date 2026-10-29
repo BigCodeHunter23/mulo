@@ -1,9 +1,10 @@
 import "server-only";
+import { z } from "zod";
 import { albumDays, localDay, type AlbumDay, type Play } from "@/lib/diary-shared";
 import { DIARY_FULL, finishImport, saveAlbumDays, type SaveDaysResult } from "@/lib/diary/entries";
 import { lastfmKeys, needsReconnect, recentTracks, type RecentPage } from "@/lib/diary/lastfm";
 import { readTimeZone } from "@/lib/push/store";
-import { zoneOrSydney } from "@/lib/push/zones";
+import { canonicalZone } from "@/lib/push/zones";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -14,6 +15,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * whole of today is always counted; merging keeps the larger counts, so
  * reading a day again never lowers it. A full diary ends an import where it
  * is and lets syncs move on, so neither asks Last.fm for plays it can't keep.
+ *
+ * Days are read on the clock kept with the account (the zone it connected
+ * in), so a sync re-reading yesterday from somewhere else files nothing on a
+ * different day. An account without one takes the person's own zone, or
+ * UTC, and keeps it from then on.
  */
 
 export type LastfmRow = {
@@ -25,6 +31,7 @@ export type LastfmRow = {
   import_added: number;
   carry: Play[] | null;
   synced_to: string | null;
+  time_zone: string | null;
 };
 
 export type LastfmPatch = Partial<{
@@ -35,6 +42,7 @@ export type LastfmPatch = Partial<{
   reached_back: string;
   synced_to: string;
   worked_at: string;
+  time_zone: string;
 }>;
 
 type PageOptions = { page: number; from?: number; to?: number };
@@ -42,6 +50,7 @@ type PageOptions = { page: number; from?: number; to?: number };
 export type LastfmDeps = {
   due: (at: Date) => Promise<LastfmRow[]>;
   page: (user: string, options: PageOptions) => Promise<RecentPage>;
+  /** The person's own zone, for an account that keeps none. */
   timeZoneOf: (userId: string) => Promise<string>;
   save: (userId: string, days: AlbumDay[]) => Promise<SaveDaysResult>;
   update: (userId: string, patch: LastfmPatch) => Promise<void>;
@@ -57,6 +66,24 @@ const CARRY_MAX = 5_000;
 /** People started per run, the longest waiting first. */
 const PEOPLE_PER_RUN = 50;
 
+const carrySchema = z
+  .array(
+    z.object({
+      at: z.number().finite(),
+      artist: z.string(),
+      album: z.string(),
+      song: z.string(),
+      ms: z.number().finite().nullable(),
+    }),
+  )
+  .max(CARRY_MAX);
+
+/** The plays an import carried over, as this file saved them; nothing when they aren't. */
+export function parseCarry(value: unknown): Play[] {
+  const parsed = carrySchema.safeParse(value);
+  return parsed.success ? parsed.data : [];
+}
+
 const real = (): LastfmDeps => {
   const keys = lastfmKeys();
   const db = () => createAdminClient();
@@ -67,7 +94,7 @@ const real = (): LastfmDeps => {
       const { data, error } = await db()
         .from("diary_sources")
         .select(
-          "user_id, lastfm_user, state, import_to, import_page, import_added, carry, synced_to",
+          "user_id, lastfm_user, state, import_to, import_page, import_added, carry, synced_to, time_zone",
         )
         .eq("source", "lastfm")
         .not("lastfm_user", "is", null)
@@ -75,15 +102,25 @@ const real = (): LastfmDeps => {
         .order("worked_at", { ascending: true, nullsFirst: true })
         .limit(PEOPLE_PER_RUN);
       if (error) throw error;
-      // The filter above leaves only importing and syncing rows with a Last.fm
-      // name, and `carry` is only ever written by this file, as plays.
-      return (data ?? []) as LastfmRow[];
+      return (data ?? []).flatMap((row): LastfmRow[] =>
+        // The filter above leaves only importing and syncing rows with a name.
+        row.lastfm_user && (row.state === "importing" || row.state === "syncing")
+          ? [
+              {
+                ...row,
+                lastfm_user: row.lastfm_user,
+                state: row.state,
+                carry: parseCarry(row.carry),
+              },
+            ]
+          : [],
+      );
     },
     page: (user, options) => {
       if (!keys) throw new Error("Last.fm has no keys");
       return recentTracks(user, options, keys);
     },
-    timeZoneOf: async (userId) => zoneOrSydney(await readTimeZone(userId)),
+    timeZoneOf: async (userId) => canonicalZone(await readTimeZone(userId)) ?? "UTC",
     save: (userId, days) => saveAlbumDays(userId, "lastfm", days),
     update: async (userId, patch) => {
       const { error } = await db()
@@ -115,6 +152,32 @@ export function splitOldestDay(plays: Play[], timeZone: string): { done: Play[];
 const oldestOf = (plays: Play[]) =>
   plays.reduce((min, p) => Math.min(min, p.at), Number.POSITIVE_INFINITY);
 
+/** The account's clock, and the patch that keeps it when it had none. */
+async function clockOf(row: LastfmRow, deps: LastfmDeps) {
+  const kept = canonicalZone(row.time_zone);
+  if (kept) return { zone: kept, keep: {} };
+  const zone = await deps.timeZoneOf(row.user_id);
+  return { zone, keep: { time_zone: zone } };
+}
+
+/**
+ * Whether this is the import's last page. Last.fm says how many pages there
+ * are; an answer that doesn't say is tried again next run, rather than
+ * taken as the end. An account with nothing played has no pages at all.
+ */
+function isLastPage(page: RecentPage): boolean {
+  if (page.totalPages === null) throw new Error("Last.fm didn't say how many pages there are");
+  if (page.totalPages === 0) {
+    if (page.plays.length > 0) throw new Error("Last.fm sent plays on no pages");
+    return true;
+  }
+  return page.page >= page.totalPages;
+}
+
+/** Whether a save found the diary full: nothing more goes in. */
+const isFull = (saved: SaveDaysResult) =>
+  saved.ok ? saved.skipped > 0 : saved.error === DIARY_FULL;
+
 async function importTurn(
   row: LastfmRow,
   at: Date,
@@ -122,20 +185,20 @@ async function importTurn(
   deps: LastfmDeps,
   pages: number,
 ) {
-  const zone = await deps.timeZoneOf(row.user_id);
+  const { zone, keep: keepZone } = await clockOf(row, deps);
   const to = (row.import_to ? Date.parse(row.import_to) : at.getTime()) / 1000;
   let pageNumber = row.import_page ?? 1;
   let carry = row.carry ?? [];
   let added = row.import_added;
   for (let turn = 0; turn < pages && Date.now() < deadline; turn++) {
     const page = await deps.page(row.lastfm_user, { page: pageNumber, to });
+    const last = isLastPage(page);
     const plays = [...carry, ...page.plays];
-    const last = page.plays.length === 0 || page.page >= page.totalPages;
     const split = last ? { done: plays, carry: [] } : splitOldestDay(plays, zone);
     const keep = split.carry.length > CARRY_MAX ? { done: plays, carry: [] } : split;
     const saved = await deps.save(row.user_id, albumDays(keep.done, zone));
     // A full diary takes nothing more, so the import ends here, with what it added.
-    const full = !saved.ok && saved.error === DIARY_FULL;
+    const full = isFull(saved);
     if (!saved.ok && !full) throw new Error(saved.error);
     if (saved.ok) added += saved.added;
     carry = keep.carry;
@@ -150,6 +213,7 @@ async function importTurn(
         carry: null,
         worked_at: at.toISOString(),
         ...reached,
+        ...keepZone,
       });
       await deps.finished(row.user_id, added);
       return;
@@ -161,6 +225,7 @@ async function importTurn(
       carry,
       worked_at: at.toISOString(),
       ...reached,
+      ...keepZone,
     });
   }
 }
@@ -179,12 +244,15 @@ async function syncTurn(
   deps: LastfmDeps,
   pages: number,
 ) {
-  const zone = await deps.timeZoneOf(row.user_id);
+  const { zone, keep: keepZone } = await clockOf(row, deps);
   const since = row.synced_to ? Date.parse(row.synced_to) : at.getTime() - SYNC_BACK_MS;
   const from = (since - SYNC_BACK_MS) / 1000;
   const first = await deps.page(row.lastfm_user, { page: 1, from });
   const plays = [...first.plays];
-  const total = first.plays.length === 0 ? 1 : Math.max(first.page, first.totalPages);
+  if (first.plays.length > 0 && first.totalPages === null) {
+    throw new Error("Last.fm didn't say how many pages there are");
+  }
+  const total = first.plays.length === 0 ? 1 : Math.max(first.page, first.totalPages ?? 1);
   const behind = total > pages;
   // Newest first when it all fits; otherwise the oldest pages, upwards (at
   // least one, or a turn of one page would never move on).
@@ -212,6 +280,7 @@ async function syncTurn(
     ...(syncedTo !== null && syncedTo > since
       ? { synced_to: new Date(syncedTo).toISOString() }
       : {}),
+    ...keepZone,
   });
 }
 

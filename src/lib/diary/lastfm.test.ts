@@ -7,11 +7,13 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.fake.client
 import { fakeSupabase } from "../../../test/fake-supabase";
 import {
   approvalUrl,
+  connectCookie,
   createConnectState,
   LastfmError,
   lastfmKeys,
   needsReconnect,
   recentTracks,
+  sameBrowser,
   saveConnection,
   sessionFor,
   signature,
@@ -157,6 +159,13 @@ describe("recentTracks", () => {
     });
     expect(new URL(String(fetcher.mock.calls[0]?.[0])).searchParams.get("from")).toBe("10");
   });
+
+  it("says nothing of the pages when Last.fm doesn't", async () => {
+    for (const attr of [{ page: "2" }, { page: "2", totalPages: "" }, undefined]) {
+      const fetcher = answer({ recenttracks: { track: [], "@attr": attr } });
+      expect((await recentTracks("fran", { page: 2 }, keys, fetcher)).totalPages).toBeNull();
+    }
+  });
 });
 
 describe("the connect state", () => {
@@ -183,15 +192,36 @@ describe("the connect state", () => {
     expect(until - at).toBeGreaterThanOrEqual(10 * 60_000 - 1000);
     expect(until - at).toBeLessThanOrEqual(10 * 60_000 + 1000);
     expect(JSON.stringify(upsert?.args)).not.toContain(state);
+    expect(row.pending_zone).toBeNull();
+  });
+
+  it("keeps the time zone it started in", async () => {
+    await createConnectState("u1", "web", "Europe/London");
+    const upsert = db.fake.callsOn("diary_sources").find((c) => c.method === "upsert");
+    expect(upsert?.args[0]).toMatchObject({ pending_zone: "Europe/London" });
+  });
+
+  it("ties a website connect to the browser that started it", () => {
+    const cookie = connectCookie(STATE);
+    expect(cookie).not.toContain(STATE);
+    expect(cookie).not.toBe(stateHash(STATE));
+    expect(sameBrowser(cookie, STATE)).toBe(true);
+    expect(sameBrowser(cookie, `${STATE}x`)).toBe(false);
+    expect(sameBrowser(undefined, STATE)).toBe(false);
+    expect(sameBrowser("short", STATE)).toBe(false);
   });
 
   it("is taken once: who started it, and where they go back to", async () => {
     db.fake.answer(
       "diary_sources",
-      { data: { user_id: "u1", pending_to: "app" }, error: null },
+      { data: { user_id: "u1", pending_to: "app", pending_zone: "Europe/London" }, error: null },
       { data: [{ user_id: "u1" }], error: null },
     );
-    expect(await takeConnectState(STATE)).toEqual({ userId: "u1", to: "app" });
+    expect(await takeConnectState(STATE)).toEqual({
+      userId: "u1",
+      to: "app",
+      timeZone: "Europe/London",
+    });
     const calls = db.fake.callsOn("diary_sources");
     expect(calls).toContainEqual({
       table: "diary_sources",
@@ -201,8 +231,14 @@ describe("the connect state", () => {
     expect(calls).toContainEqual({
       table: "diary_sources",
       method: "update",
-      args: [{ pending_hash: null, pending_until: null, pending_to: null }],
+      args: [{ pending_hash: null, pending_until: null, pending_to: null, pending_zone: null }],
     });
+  });
+
+  it("throws when it can't be read, so the callback says it failed", async () => {
+    const failure = { code: "57014", message: "slow" };
+    db.fake.answer("diary_sources", { data: null, error: failure });
+    await expect(takeConnectState(STATE)).rejects.toBe(failure);
   });
 
   it("is nothing when somebody else took it first, or it ran out", async () => {
@@ -230,13 +266,12 @@ describe("saveConnection", () => {
       unknown
     >;
 
-  it("starts a new account's import from now", async () => {
-    await saveConnection("u1", { user: "fran", key: "SK" }, at);
+  it("starts a new account's import from now, on the clock it connected on", async () => {
+    await saveConnection("u1", { user: "fran" }, "Europe/London", at);
     expect(saved()).toEqual({
       user_id: "u1",
       source: "lastfm",
       lastfm_user: "fran",
-      lastfm_session: "SK",
       state: "importing",
       import_to: at.toISOString(),
       import_page: 1,
@@ -244,34 +279,45 @@ describe("saveConnection", () => {
       carry: null,
       reached_back: null,
       synced_to: at.toISOString(),
+      time_zone: "Europe/London",
     });
   });
 
-  it("lets the same account carry on with an import it hadn't finished", async () => {
-    db.fake.answer("diary_sources", { data: { lastfm_user: "Fran", import_page: 7 }, error: null });
-    await saveConnection("u1", { user: "fran", key: "SK2" }, at);
+  it("never keeps Last.fm's session key", async () => {
+    await saveConnection("u1", { user: "fran", key: "SK" } as { user: string }, null, at);
+    expect(JSON.stringify(saved())).not.toContain("SK");
+  });
+
+  it("lets the same account carry on with an import it hadn't finished, on its own clock", async () => {
+    db.fake.answer("diary_sources", {
+      data: { lastfm_user: "Fran", import_page: 7, time_zone: "Australia/Perth" },
+      error: null,
+    });
+    await saveConnection("u1", { user: "fran" }, "Europe/London", at);
     expect(saved()).toEqual({
       user_id: "u1",
       source: "lastfm",
       lastfm_user: "fran",
-      lastfm_session: "SK2",
       state: "importing",
     });
   });
 
   it("goes back to syncing the same account once its import is done", async () => {
     db.fake.answer("diary_sources", {
-      data: { lastfm_user: "fran", import_page: null },
+      data: { lastfm_user: "fran", import_page: null, time_zone: null },
       error: null,
     });
-    await saveConnection("u1", { user: "fran", key: "SK2" }, at);
-    expect(saved()).toMatchObject({ state: "syncing" });
+    await saveConnection("u1", { user: "fran" }, "Europe/London", at);
+    expect(saved()).toMatchObject({ state: "syncing", time_zone: "Europe/London" });
     expect(saved()).not.toHaveProperty("import_page");
   });
 
-  it("throws a failed save", async () => {
+  it("throws a failed read or save, rather than starting over", async () => {
     const failure = { code: "57014", message: "slow" };
+    db.fake.answer("diary_sources", { data: null, error: failure });
+    await expect(saveConnection("u1", { user: "fran" }, null, at)).rejects.toBe(failure);
+    expect(saved()).toBeUndefined();
     db.fake.answer("diary_sources", { data: null, error: null }, { error: failure });
-    await expect(saveConnection("u1", { user: "fran", key: "SK" }, at)).rejects.toBe(failure);
+    await expect(saveConnection("u1", { user: "fran" }, null, at)).rejects.toBe(failure);
   });
 });
