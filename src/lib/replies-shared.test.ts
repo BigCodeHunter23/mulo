@@ -9,6 +9,7 @@ import {
   splitMentions,
   THREAD_GONE,
   threadHref,
+  withoutFormatting,
 } from "@/lib/replies-shared";
 
 describe("parseMentions", () => {
@@ -85,5 +86,23 @@ describe("the rest", () => {
     expect(REPLY_LIMIT).toBe(1000);
     expect(COUNT_FROM).toBe(900);
     expect(THREAD_GONE).toBe("This review has gone.");
+  });
+});
+
+describe("withoutFormatting", () => {
+  it("drops direction overrides, isolates and invisible characters", () => {
+    expect(withoutFormatting("\u202Eevil\u202C \u2066x\u2069")).toBe("evil x");
+    expect(withoutFormatting("a\u200Bb\uFEFFc\u00ADd\u2060e")).toBe("abcde");
+  });
+
+  it("keeps the joiners that emoji and some scripts need, and every line break", () => {
+    const family = "\u{1F469}\u200D\u{1F467}";
+    expect(withoutFormatting(family)).toBe(family);
+    expect(withoutFormatting("\u0645\u200C\u06CC")).toBe("\u0645\u200C\u06CC");
+    expect(withoutFormatting("one\ntwo\r\n\tthree")).toBe("one\ntwo\r\n\tthree");
+  });
+
+  it("leaves nothing of a reply made only of them", () => {
+    expect(withoutFormatting("\u202E\u200B\u2066").trim()).toBe("");
   });
 });

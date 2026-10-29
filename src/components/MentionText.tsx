@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { splitMentions } from "@/lib/replies-shared";
 
-/** A reply's words, each real person's @name a link to their profile. */
+/**
+ * A reply's words, each real person's @name a link to their profile. Kept
+ * in a `<bdi>`, so whatever direction the words run in can't spill into the
+ * page around them.
+ */
 export default function MentionText({
   text,
   people,
@@ -11,7 +15,7 @@ export default function MentionText({
   people: readonly string[];
 }) {
   return (
-    <>
+    <bdi>
       {splitMentions(text, people).map((part, i) =>
         part.mention ? (
           <Link
@@ -25,6 +29,6 @@ export default function MentionText({
           <span key={i}>{part.text}</span>
         ),
       )}
-    </>
+    </bdi>
   );
 }

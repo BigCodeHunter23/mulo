@@ -7,7 +7,7 @@ import { notifyReply, recordMentions } from "@/lib/push/events";
 import { later } from "@/lib/push/later";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { mentionedIn, NOT_YET, PICK_FIRST, REPLY_COLUMNS, replyable } from "@/lib/replies";
-import { REPLY_LIMIT, THREAD_GONE, type ThreadKind } from "@/lib/replies-shared";
+import { REPLY_LIMIT, THREAD_GONE, withoutFormatting, type ThreadKind } from "@/lib/replies-shared";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TablesInsert } from "@/lib/supabase/database.types";
 import { isMissingTable } from "@/lib/supabase/errors";
@@ -62,7 +62,7 @@ export async function postReply(
   if (!target.safeParse({ kind, targetId }).success || typeof body !== "string") {
     return { ok: false, error: TRY_AGAIN };
   }
-  const text = body.trim();
+  const text = withoutFormatting(body).trim();
   if (text.length === 0) return { ok: false, error: "Say something first." };
   if (text.length > REPLY_LIMIT) return { ok: false, error: TOO_LONG };
   if (!isRespectful(text)) return { ok: false, error: NOT_RESPECTFUL };

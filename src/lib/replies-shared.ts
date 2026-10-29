@@ -14,6 +14,22 @@ export const REPLY_LIMIT = 1000;
 /** The reply box counts down from this many characters. */
 export const COUNT_FROM = 900;
 
+/**
+ * Unicode's format characters (direction overrides and isolates, zero-width
+ * spaces, soft hyphens), except the zero-width joiner and non-joiner, which
+ * emoji families and some scripts need. The same rule as a push's `clean()`.
+ */
+const FORMAT = /(?![\u200C\u200D])\p{Cf}/gu;
+
+/**
+ * A reply's words without format characters, before they're measured or
+ * saved, so nobody can flip how a thread reads or post an invisible reply.
+ * Line breaks and tabs are left for trimming.
+ */
+export function withoutFormatting(body: string): string {
+  return body.replace(FORMAT, "");
+}
+
 /** Only the first five different people named in a reply count. */
 export const MENTIONS_MAX = 5;
 

@@ -225,6 +225,34 @@ describe("postReply", () => {
     expect(await postReply("artist", 8, "Again.")).toMatchObject({ ok: true });
   });
 
+  it("drops format characters before measuring and saving", async () => {
+    // A direction override would flip how the rest of the thread reads.
+    saves();
+    await postReply("album", 7, "\u202Eright\u200B way\u202C");
+    expect(inserted()).toContainEqual({
+      table: "replies",
+      method: "insert",
+      args: [{ user_id: ME, body: "right way", rating_id: 7 }],
+    });
+    // 1,000 characters of words fit, however many invisible ones come with them.
+    saves();
+    await postReply("album", 7, "x".repeat(1000) + "\u200B".repeat(20));
+    expect(inserted()).toContainEqual({
+      table: "replies",
+      method: "insert",
+      args: [{ user_id: ME, body: "x".repeat(1000), rating_id: 7 }],
+    });
+  });
+
+  it("refuses a reply made only of invisible characters", async () => {
+    expect(await postReply("album", 7, " \u202E\u200B\uFEFF\u2066 ")).toEqual({
+      ok: false,
+      error: "Say something first.",
+    });
+    expect(db.fake.calls).toEqual([]);
+    expect(db.admin.calls).toEqual([]);
+  });
+
   it("refuses a kind or id it doesn't know", async () => {
     expect(await postReply("song" as "album", 7, "Hi.")).toMatchObject({ ok: false });
     expect(await postReply("album", -1, "Hi.")).toMatchObject({ ok: false });
