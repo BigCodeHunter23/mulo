@@ -560,6 +560,26 @@ export type OwnProfile = {
 /** `PUT me/profile`, and any other write that has nothing more to say. */
 export type SaveResult = { ok: true } | AppError;
 
+/** Which pushes somebody gets. Every one is on until they turn it off. */
+export type NotificationSettings = {
+  follows: boolean;
+  loves: boolean;
+  /** For replies on reviews, which arrive later; on by default like the rest. */
+  replies: boolean;
+  versus: boolean;
+  drop: boolean;
+  streak: boolean;
+};
+
+export type PushPlatform = "ios" | "android";
+
+/** A phone asking for pushes: Expo's address for it, and its time zone. */
+export type PushDeviceInput = {
+  token: string;
+  platform: PushPlatform;
+  timeZone: string | null;
+};
+
 /**
  * `DELETE me`. Body: `{ confirm: "DELETE", current? }`, where `current` is the
  * password, needed only when `Me.hasPassword`; an account without one must
