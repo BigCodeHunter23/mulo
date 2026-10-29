@@ -640,6 +640,65 @@ export type Database = {
           },
         ]
       }
+      replies: {
+        Row: {
+          artist_rating_id: number | null
+          body: string
+          created_at: string
+          id: number
+          rating_id: number | null
+          user_id: string
+          versus_take_id: number | null
+        }
+        Insert: {
+          artist_rating_id?: number | null
+          body: string
+          created_at?: string
+          id?: never
+          rating_id?: number | null
+          user_id: string
+          versus_take_id?: number | null
+        }
+        Update: {
+          artist_rating_id?: number | null
+          body?: string
+          created_at?: string
+          id?: never
+          rating_id?: number | null
+          user_id?: string
+          versus_take_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replies_artist_rating_id_fkey"
+            columns: ["artist_rating_id"]
+            isOneToOne: false
+            referencedRelation: "artist_ratings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replies_rating_id_fkey"
+            columns: ["rating_id"]
+            isOneToOne: false
+            referencedRelation: "ratings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replies_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "replies_versus_take_id_fkey"
+            columns: ["versus_take_id"]
+            isOneToOne: false
+            referencedRelation: "versus_takes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           created_at: string
@@ -650,6 +709,7 @@ export type Database = {
           reported_list_id: number | null
           reported_profile_id: string | null
           reported_rating_id: number | null
+          reported_reply_id: number | null
           reported_versus_take_id: number | null
           reporter_id: string
           status: string
@@ -663,6 +723,7 @@ export type Database = {
           reported_list_id?: number | null
           reported_profile_id?: string | null
           reported_rating_id?: number | null
+          reported_reply_id?: number | null
           reported_versus_take_id?: number | null
           reporter_id: string
           status?: string
@@ -676,6 +737,7 @@ export type Database = {
           reported_list_id?: number | null
           reported_profile_id?: string | null
           reported_rating_id?: number | null
+          reported_reply_id?: number | null
           reported_versus_take_id?: number | null
           reporter_id?: string
           status?: string
@@ -707,6 +769,13 @@ export type Database = {
             columns: ["reported_rating_id"]
             isOneToOne: false
             referencedRelation: "ratings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reported_reply_id_fkey"
+            columns: ["reported_reply_id"]
+            isOneToOne: false
+            referencedRelation: "replies"
             referencedColumns: ["id"]
           },
           {
@@ -1191,6 +1260,14 @@ export type Database = {
           p_window_seconds: number
         }
         Returns: boolean
+      }
+      reply_thread_owner: {
+        Args: {
+          p_rating_id: number
+          p_artist_rating_id: number
+          p_versus_take_id: number
+        }
+        Returns: string
       }
       score_totals: {
         Args: {
