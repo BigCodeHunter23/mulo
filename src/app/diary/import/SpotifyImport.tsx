@@ -6,15 +6,20 @@ import { uploadDiaryBatch } from "@/app/diary/actions";
 import DiaryPrivacy from "@/components/diary/DiaryPrivacy";
 import { buttonClass } from "@/components/ui";
 import { batches, MIN_MINUTES, MIN_SONGS, type AlbumDay } from "@/lib/diary-shared";
-import { readSpotifyFiles, type PickedFile, type SpotifyRead } from "@/lib/diary/read-spotify";
+import {
+  COULD_NOT_READ,
+  readSpotifyFiles,
+  type PickedFile,
+  type SpotifyRead,
+} from "@/lib/diary/read-spotify";
 
-type Found = { days: AlbumDay[]; first: string | null; last: string | null };
+type Found = { days: AlbumDay[]; first: string | null; last: string | null; unreadable: number };
 
 type Step =
   | { name: "pick"; error?: string }
   | { name: "reading" }
   | { name: "found"; found: Found }
-  | { name: "importing"; found: Found; done: number; of: number }
+  | { name: "importing"; found: Found; done: number; of: number; waiting?: boolean }
   | { name: "stopped"; found: Found; next: number; added: number; error: string }
   | { name: "finished"; found: Found; added: number };
 
@@ -28,13 +33,22 @@ function years(found: Found): string {
 
 const albums = (count: number) => `${count.toLocaleString("en")} album${count === 1 ? "" : "s"}`;
 
+/** "2 files couldn't be read, so some listening may be missing." */
+const unreadableLine = (count: number) =>
+  `${count.toLocaleString("en")} file${count === 1 ? "" : "s"} couldn't be read, so some listening may be missing.`;
+
 /** Lets the page paint (a "Reading…" line) before a long piece of work. */
 const breathe = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** How long an import held by the rate limit waits before carrying on. */
+const LIMIT_WAIT_MS = 60_000;
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Spotify's extended streaming history, read here in the browser: only the
- * albums are sent, in batches, never the file. A batch that fails stops the
- * import, and Try again carries on from it.
+ * Spotify's extended streaming history, read here in the browser a file at
+ * a time: only the albums are sent, in batches, never the file. A batch held
+ * by the rate limit waits a minute and goes again, once; any other failure
+ * stops the import, and Try again carries on from it.
  */
 export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
   const [step, setStep] = useState<Step>({ name: "pick" });
@@ -44,14 +58,15 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
     setStep({ name: "reading" });
     let read: SpotifyRead;
     try {
-      const files: PickedFile[] = [];
-      for (const file of Array.from(list)) {
-        files.push({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
-        await breathe();
-      }
-      read = readSpotifyFiles(files, Intl.DateTimeFormat().resolvedOptions().timeZone);
+      // Each file is read only when its turn comes, so a big history is never held at once.
+      const files: PickedFile[] = Array.from(list, (file) => ({
+        name: file.name,
+        read: async () => new Uint8Array(await file.arrayBuffer()),
+      }));
+      await breathe();
+      read = await readSpotifyFiles(files, Intl.DateTimeFormat().resolvedOptions().timeZone);
     } catch {
-      setStep({ name: "pick", error: "Couldn't read that file. Please try again." });
+      setStep({ name: "pick", error: COULD_NOT_READ });
       return;
     }
     if (!read.ok) {
@@ -65,7 +80,10 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
       });
       return;
     }
-    setStep({ name: "found", found: { days: read.days, first: read.first, last: read.last } });
+    setStep({
+      name: "found",
+      found: { days: read.days, first: read.first, last: read.last, unreadable: read.unreadable },
+    });
   }
 
   /** Sends the batches from `start` on; the last call says the import is done. */
@@ -73,12 +91,20 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
     const runs = batches(found.days);
     let added = addedBefore;
     for (let i = start; i <= runs.length; i++) {
-      setStep({ name: "importing", found, done: Math.min(i + 1, runs.length), of: runs.length });
+      const progress = { found, done: Math.min(i + 1, runs.length), of: runs.length };
+      setStep({ name: "importing", ...progress });
       // After the albums, an empty batch saying how many were added, for the bell.
-      const result =
+      const upload = () =>
         i < runs.length
-          ? await uploadDiaryBatch({ source: "spotify", days: runs[i] ?? [] })
-          : await uploadDiaryBatch({ source: "spotify", days: [], done: { total: added } });
+          ? uploadDiaryBatch({ source: "spotify", days: runs[i] ?? [] })
+          : uploadDiaryBatch({ source: "spotify", days: [], done: { total: added } });
+      let result = await upload();
+      if (!result.ok && "limited" in result) {
+        setStep({ name: "importing", ...progress, waiting: true });
+        await wait(LIMIT_WAIT_MS);
+        setStep({ name: "importing", ...progress });
+        result = await upload();
+      }
       if (!result.ok) {
         setStep({ name: "stopped", found, next: i, added, error: result.error });
         return;
@@ -110,7 +136,9 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
   if (step.name === "importing") {
     return (
       <p role="status" className="text-sm text-text-secondary">
-        Importing… {step.done} of {step.of}
+        {step.waiting
+          ? "Taking a breath… carrying on in a minute."
+          : `Importing… ${step.done} of ${step.of}`}
       </p>
     );
   }
@@ -123,6 +151,9 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
           Found {albums(found.days.length)}
           {years(found)}.
         </p>
+        {found.unreadable > 0 && (
+          <p className="text-sm text-text-secondary">{unreadableLine(found.unreadable)}</p>
+        )}
         {step.name === "stopped" && (
           <p role="alert" className="text-sm text-error-soft">
             {step.error}

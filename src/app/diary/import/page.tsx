@@ -28,6 +28,7 @@ export default async function ImportPage() {
   const own = await getOwnDiary(user.id);
   const keys = own ? own.lastfm : lastfmKeys() !== null;
   const lastfm = own?.sources.find((source) => source.source === "lastfm");
+  const isPublic = own?.public ?? true;
   // As the diary's own Last.fm line counts it: a row left from before is no connection.
   const connected = lastfm !== undefined && !(lastfm.state === "idle" && !lastfm.lastfmUser);
 
@@ -44,6 +45,23 @@ export default async function ImportPage() {
         <p className="mt-2 text-sm text-text-secondary">
           Each album you played on a day goes in your diary: four of its songs, or twenty minutes of
           it.
+        </p>
+        <p className="mt-2 text-sm text-text-secondary">
+          {isPublic ? (
+            <>
+              Your diary shows on your profile, like your ratings, unless you switch off Show my
+              diary in{" "}
+              <Link
+                href="/profile/account"
+                className="font-medium text-accent underline-offset-4 hover:underline"
+              >
+                your account
+              </Link>
+              .
+            </>
+          ) : (
+            "Your diary is private: only you see it."
+          )}
         </p>
       </header>
 
@@ -78,7 +96,7 @@ export default async function ImportPage() {
               on this device: only the albums are sent.
             </li>
           </ol>
-          <SpotifyImport isPublic={own?.public ?? true} />
+          <SpotifyImport isPublic={isPublic} />
         </Part>
 
         <Part title="Apple Music">

@@ -34,8 +34,11 @@ export const LIMITS = {
    * deleting them. Tight, since a stolen session could otherwise guess at it.
    */
   password: { limit: 10, windowSeconds: 15 * 60 },
-  /** Per person: diary uploads, 500 album-days each. A big Spotify history is ~20 batches. */
-  import: { limit: 20, windowSeconds: 60 },
+  /**
+   * Per person: diary uploads, 500 album-days each. A big Spotify history is
+   * ~20 batches, a full diary 100; the import page waits a minute when held.
+   */
+  import: { limit: 60, windowSeconds: 60 },
   /** Per person, or per address signed out: the app's heavier reads. */
   read: { limit: 120, windowSeconds: 60 },
   /**
