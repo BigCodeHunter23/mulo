@@ -39,38 +39,48 @@ vi.mock("@/lib/supabase/errors", async (original) => ({
 import { fakeSupabase } from "../../test/fake-supabase";
 import { getReplyCounts, getThread, mentionedIn, replyable } from "@/lib/replies";
 import { getPick } from "@/lib/versus";
+import { logQueryError } from "@/lib/supabase/errors";
 
 beforeEach(() => {
+  vi.mocked(logQueryError).mockClear();
   db.fake = fakeSupabase();
   db.user = { id: "me", email: null };
   db.hidden = new Set();
 });
 
 describe("getReplyCounts", () => {
-  it("counts each review's replies in one read", async () => {
-    db.fake.answer("replies", {
+  const COUNTS = "rpc:reply_counts";
+
+  it("asks the database to count each review's replies, in one call", async () => {
+    db.fake.answer(COUNTS, {
       data: [
-        { id: 1, rating_id: 7 },
-        { id: 2, rating_id: 7 },
-        { id: 3, rating_id: 9 },
+        { id: 7, replies: 2 },
+        { id: 9, replies: 1 },
       ],
       error: null,
     });
     expect(await getReplyCounts("album", [7, 8, 9])).toEqual({ 7: 2, 8: 0, 9: 1 });
-    expect(db.fake.callsOn("replies")).toContainEqual({
-      table: "replies",
-      method: "in",
-      args: ["rating_id", [7, 8, 9]],
-    });
+    expect(db.fake.calls).toEqual([
+      {
+        table: COUNTS,
+        method: "rpc",
+        args: ["reply_counts", { p_kind: "album", p_ids: [7, 8, 9] }],
+      },
+    ]);
   });
 
-  it("reads a long list a hundred at a time", async () => {
+  it("asks about a long list a hundred at a time", async () => {
     const ids = Array.from({ length: 150 }, (_, i) => i + 1);
-    await getReplyCounts("take", ids);
+    db.fake.answer(
+      COUNTS,
+      { data: [{ id: 1, replies: 3 }], error: null },
+      { data: [{ id: 150, replies: 4 }], error: null },
+    );
+    const counts = await getReplyCounts("take", ids);
+    expect([counts[1], counts[2], counts[150]]).toEqual([3, 0, 4]);
     const lists = db.fake
-      .callsOn("replies")
-      .filter((call) => call.method === "in")
-      .map((call) => (call.args[1] as number[]).length);
+      .callsOn(COUNTS)
+      .map((call) => (call.args[1] as { p_ids: number[] }).p_ids.length);
     expect(lists).toEqual([100, 50]);
   });
 
@@ -82,9 +92,21 @@ describe("getReplyCounts", () => {
     expect(db.fake.calls).toEqual([]);
   });
 
-  it("counts 0 before migration 0024 runs", async () => {
-    db.fake.answer("replies", { data: null, error: { code: "PGRST205", message: "no table" } });
+  it("counts 0, quietly, before migration 0024 runs", async () => {
+    db.fake.answer(
+      COUNTS,
+      { data: null, error: { code: "PGRST202", message: "no function" } },
+      { data: null, error: { code: "PGRST205", message: "no table" } },
+    );
     expect(await getReplyCounts("album", [7])).toEqual({ 7: 0 });
+    expect(await getReplyCounts("album", [7])).toEqual({ 7: 0 });
+    expect(logQueryError).not.toHaveBeenCalled();
+  });
+
+  it("counts 0 and says why when the database fails", async () => {
+    db.fake.answer(COUNTS, { data: null, error: { code: "57014", message: "timeout" } });
+    expect(await getReplyCounts("album", [7])).toEqual({ 7: 0 });
+    expect(logQueryError).toHaveBeenCalled();
   });
 });
 

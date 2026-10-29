@@ -551,6 +551,39 @@ describe("0024 replies", () => {
     ).toEqual([{ body: "Fair." }]);
   });
 
+  it("counts each review's replies, leaving out people hidden from the reader", async () => {
+    const counts = (user: string | null, kind: string, ids: number[]) =>
+      as<{ id: number; replies: number }>(
+        user,
+        `select id::int as id, replies::int as replies
+         from public.reply_counts('${kind}', array[${ids.join(",")}]::bigint[]) order by id`,
+      );
+    const albums = [review, blockerReview, bareScore];
+    expect(await counts(U(1), "album", albums)).toEqual([
+      { id: review, replies: 1 },
+      { id: blockerReview, replies: 1 },
+    ]);
+    // U(3) blocked U(2): U(2)'s reply on U(1)'s review isn't counted for U(3),
+    expect(await counts(U(3), "album", albums)).toEqual([{ id: blockerReview, replies: 1 }]);
+    // and U(3)'s review, with everything on it, isn't counted for U(2).
+    expect(await counts(U(2), "album", albums)).toEqual([{ id: review, replies: 1 }]);
+    expect(await counts(U(1), "artist", [artistReview])).toEqual([
+      { id: artistReview, replies: 1 },
+    ]);
+    expect(await counts(U(1), "take", [take])).toEqual([{ id: take, replies: 1 }]);
+    expect(await counts(U(1), "song", [review])).toEqual([]);
+    // Signed out there are no replies to read, so nothing is counted.
+    expect(await counts(null, "album", albums)).toEqual([]);
+  });
+
+  it("lets anybody ask for counts, which hold to replies' own rules", async () => {
+    const { rows } = await db.query<{ anon: boolean; signed_in: boolean }>(
+      `select has_function_privilege('anon', 'public.reply_counts(text,bigint[])', 'execute') as anon,
+              has_function_privilege('authenticated', 'public.reply_counts(text,bigint[])', 'execute') as signed_in`,
+    );
+    expect(rows[0]).toEqual({ anon: true, signed_in: true });
+  });
+
   it("lets you delete your own reply, and any on your own review, and nothing else", async () => {
     const [mine] = await replyAs(U(4), "rating_id", review, "Mine.");
     // U(4) can't delete U(2)'s reply: nothing happens.

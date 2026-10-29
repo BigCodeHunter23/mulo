@@ -1287,6 +1287,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      reply_counts: {
+        Args: {
+          p_kind: string
+          p_ids: number[]
+        }
+        Returns: {
+          id: number | null
+          replies: number | null
+        }[]
+      }
       reply_thread_owner: {
         Args: {
           p_rating_id: number

@@ -4,8 +4,7 @@ import type { Person, Reply, ThreadHead, ThreadPage } from "@/lib/app-api";
 import { hiddenPeople } from "@/lib/blocks";
 import { getReactions, NO_REACTIONS } from "@/lib/reactions";
 import { parseMentions, type ThreadKind } from "@/lib/replies-shared";
-import { isMissingTable, logQueryError } from "@/lib/supabase/errors";
-import { readAll } from "@/lib/supabase/read-all";
+import { isMissingFunction, isMissingTable, logQueryError } from "@/lib/supabase/errors";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
 
@@ -34,7 +33,7 @@ export const PICK_FIRST = "Pick a side first, then join in.";
 
 const GONE: ThreadPage = { state: "gone" };
 
-/** `.in()` puts every id in the address, so long lists go this many at a time. */
+/** Ids sent in one call for counts, to keep each request small. */
 const CHUNK = 100;
 
 /** Names asked about in one `or()`, to keep the address short. */
@@ -46,9 +45,11 @@ const THREAD_MAX = 500;
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
 
 /**
- * How many replies each review or take has: a read per hundred ids, however
- * many there are. Signed out there's nothing to count, and before migration
- * 0024 runs every count is 0.
+ * How many replies each review or take has, counted by the database
+ * (`reply_counts`, migration 0024) as the visitor, so replies hidden from
+ * them aren't counted: a call per hundred ids. Signed out there's nothing to
+ * count (the page says "Replies"), and before migration 0024 runs every
+ * count is 0.
  */
 export async function getReplyCounts(
   kind: ThreadKind,
@@ -60,26 +61,18 @@ export async function getReplyCounts(
   if (!(await getCurrentUser())) return counts;
 
   const supabase = await createClient();
-  const column = REPLY_COLUMNS[kind];
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const chunk = ids.slice(i, i + CHUNK);
-    const { data, error } = await readAll((from, to) =>
-      supabase
-        .from("replies")
-        .select(`id, ${column}`)
-        .in(column, chunk)
-        .order("id")
-        .range(from, to),
-    );
+  const chunks: number[][] = [];
+  for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+  const answers = await Promise.all(
+    chunks.map((chunk) => supabase.rpc("reply_counts", { p_kind: kind, p_ids: chunk })),
+  );
+  for (const { data, error } of answers) {
     if (error) {
-      if (!isMissingTable(error)) logQueryError("replies", error);
-      return counts;
+      if (!isMissingFunction(error) && !isMissingTable(error)) logQueryError("replies", error);
+      continue;
     }
-    // The column changes with the kind, which the typed query builder can't
-    // follow, so the row's shape is spelled out here.
-    for (const row of data as unknown as Partial<Record<typeof column, number | null>>[]) {
-      const id = row[column];
-      if (typeof id === "number" && id in counts) counts[id] = (counts[id] ?? 0) + 1;
+    for (const row of data ?? []) {
+      if (row.id !== null && row.id in counts) counts[row.id] = row.replies ?? 0;
     }
   }
   return counts;

@@ -1,10 +1,10 @@
 -- Replies on reviews: anyone signed in can answer a written album or artist
 -- review, or a Versus take, in one flat thread, oldest first.
 --
--- Nothing else is stored: counts are worked out when a page is read. A block
--- hides replies both ways, through hidden_profiles() (0020). Signed-out
--- visitors can't read replies at all. Replies can't be edited; delete and
--- post again.
+-- Nothing else is stored: counts are worked out when a page is read
+-- (reply_counts below). A block hides replies both ways, through
+-- hidden_profiles() (0020). Signed-out visitors can't read replies at all.
+-- Replies can't be edited; delete and post again.
 --
 -- Only the website writes replies, with the service role, after its own
 -- checks: the rate limit, the word filter, a block either way, the
@@ -131,6 +131,43 @@ create policy "People delete their own replies, and any on their own review"
     (select auth.uid()) = replies.user_id
     or (select auth.uid()) = replies.thread_owner_id
   );
+
+/**
+ * How many replies each of some reviews or takes has, for the reader: one
+ * row per review or take with any (`p_kind` is album, artist or take). Runs
+ * as the reader, so replies by or to people hidden from them aren't counted.
+ * Signed out there are no replies to read, so it answers nothing, without
+ * touching a table anon can't read.
+ */
+create or replace function public.reply_counts(p_kind text, p_ids bigint[])
+returns table (id bigint, replies bigint)
+language plpgsql
+stable
+security invoker
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null then
+    return;
+  end if;
+  if p_kind = 'album' then
+    return query
+      select r.rating_id, count(*) from public.replies r
+      where r.rating_id = any (p_ids) group by r.rating_id;
+  elsif p_kind = 'artist' then
+    return query
+      select r.artist_rating_id, count(*) from public.replies r
+      where r.artist_rating_id = any (p_ids) group by r.artist_rating_id;
+  elsif p_kind = 'take' then
+    return query
+      select r.versus_take_id, count(*) from public.replies r
+      where r.versus_take_id = any (p_ids) group by r.versus_take_id;
+  end if;
+end;
+$$;
+
+revoke execute on function public.reply_counts(text, bigint[]) from public;
+grant execute on function public.reply_counts(text, bigint[]) to anon, authenticated, service_role;
 
 /**
  * A review whose words are cleared (by its author, or the admin's Remove
