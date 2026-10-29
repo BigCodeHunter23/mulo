@@ -59,6 +59,8 @@ const lib = vi.hoisted(() => ({
   getChart: vi.fn(),
   getChartProgress: vi.fn(),
   getStack: vi.fn(),
+  getListeningStack: vi.fn(),
+  listeningWaiting: vi.fn(),
   // feed
   getFollowingFeed: vi.fn(),
   getGlobalFeed: vi.fn(),
@@ -159,6 +161,8 @@ vi.mock("@/lib/stack", () => ({
   STACK_DECADES: [1980, 1990],
   STACK_RUN: 10,
   getStack: lib.getStack,
+  getListeningStack: lib.getListeningStack,
+  listeningWaiting: lib.listeningWaiting,
 }));
 vi.mock("@/lib/search", () => ({ searchCatalog: lib.searchCatalog }));
 vi.mock("@/lib/feed", () => ({
@@ -774,6 +778,8 @@ describe("GET stack", () => {
   beforeEach(() => {
     signIn();
     lib.getStack.mockResolvedValue([{ mbid: "a" }]);
+    lib.getListeningStack.mockResolvedValue([{ mbid: "heard" }]);
+    lib.listeningWaiting.mockResolvedValue(0);
   });
 
   it("draws a run for the signed-in person, with the filters on offer", async () => {
@@ -793,6 +799,32 @@ describe("GET stack", () => {
 
   it("is never kept by a cache: every run is new", async () => {
     expect((await stack()).headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("says how many albums from your listening wait for a score", async () => {
+    lib.listeningWaiting.mockResolvedValue(48);
+    const body = await (await stack()).json();
+    expect(body.listening).toBe(48);
+    expect(body.from).toBeNull();
+    expect(lib.getListeningStack).not.toHaveBeenCalled();
+  });
+
+  it("draws From your listening, without the filters", async () => {
+    lib.listeningWaiting.mockResolvedValue(48);
+    const body = await (await stack("?from=listening&decade=1990&genre=hip-hop")).json();
+    expect(lib.getListeningStack).toHaveBeenCalledWith(10);
+    expect(lib.getStack).not.toHaveBeenCalled();
+    expect(body.albums).toEqual([{ mbid: "heard" }]);
+    expect(body.from).toBe("listening");
+    expect(body.decade).toBeNull();
+    expect(body.genre).toBeNull();
+    expect(body.listening).toBe(48);
+  });
+
+  it("draws the usual run for any other from", async () => {
+    const body = await (await stack("?from=elsewhere")).json();
+    expect(lib.getStack).toHaveBeenCalled();
+    expect(body.from).toBeNull();
   });
 });
 

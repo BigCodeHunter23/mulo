@@ -2,7 +2,13 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { withQuery } from "@/lib/redirects";
 import Link from "next/link";
-import { getStack, STACK_DECADES, STACK_RUN } from "@/lib/stack";
+import {
+  getListeningStack,
+  getStack,
+  listeningWaiting,
+  STACK_DECADES,
+  STACK_RUN,
+} from "@/lib/stack";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
 import { getStreak } from "@/lib/streak";
 import StreakFlame from "@/components/StreakFlame";
@@ -24,18 +30,29 @@ export const dynamic = "force-dynamic";
 export default async function StackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ run?: string; decade?: string; genre?: string }>;
+  searchParams: Promise<{ run?: string; decade?: string; genre?: string; from?: string }>;
 }) {
   // "Another run" points at a new ?run= value. The address has to change for
   // the deck to be built again rather than left sitting on its finished
   // screen, and the value keys the deck so its state starts over.
-  const { run, decade: decadeParam, genre: genreParam } = await searchParams;
-  const user = await requireUser(withQuery("/stack", { decade: decadeParam, genre: genreParam }));
-  const decade = STACK_DECADES.includes(Number(decadeParam)) ? Number(decadeParam) : null;
-  const genre = GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
-  const [albums, streak] = await Promise.all([
-    getStack(user.id, STACK_RUN, { decade, genre }),
+  const { run, decade: decadeParam, genre: genreParam, from } = await searchParams;
+  // From your listening draws from your diary instead, and takes no filters.
+  const fromListening = from === "listening";
+  const user = await requireUser(
+    withQuery("/stack", {
+      decade: decadeParam,
+      genre: genreParam,
+      from: fromListening ? from : undefined,
+    }),
+  );
+  const decade =
+    !fromListening && STACK_DECADES.includes(Number(decadeParam)) ? Number(decadeParam) : null;
+  const genre =
+    !fromListening && GENRE_FAMILIES.some((f) => f.id === genreParam) ? genreParam! : null;
+  const [albums, streak, listening] = await Promise.all([
+    fromListening ? getListeningStack(STACK_RUN) : getStack(user.id, STACK_RUN, { decade, genre }),
     getStreak(user.id),
+    listeningWaiting(),
   ]);
 
   return (
@@ -52,10 +69,16 @@ export default async function StackPage({
         </div>
       </header>
 
-      <Filters decade={decade} genre={genre} />
+      <Filters decade={decade} genre={genre} fromListening={fromListening} listening={listening} />
 
       {albums.length === 0 ? (
-        decade || genre ? (
+        fromListening ? (
+          <EmptyState
+            title="Nothing left from your listening"
+            body="You've rated everything from your listening."
+            action={<ButtonLink href="/stack">Back to The Stack</ButtonLink>}
+          />
+        ) : decade || genre ? (
           <EmptyState
             title="Nothing left for that mix"
             body="You've rated everything MULO has lined up there. Try another decade or genre."
@@ -70,10 +93,14 @@ export default async function StackPage({
         )
       ) : (
         <StackDeck
-          key={`${run ?? "first"}-${decade ?? ""}-${genre ?? ""}`}
+          key={`${run ?? "first"}-${fromListening ? "listening" : `${decade ?? ""}-${genre ?? ""}`}`}
           albums={albums}
           runId={Number(run) || 0}
-          filters={`${decade ? `&decade=${decade}` : ""}${genre ? `&genre=${genre}` : ""}`}
+          filters={
+            fromListening
+              ? "&from=listening"
+              : `${decade ? `&decade=${decade}` : ""}${genre ? `&genre=${genre}` : ""}`
+          }
         />
       )}
     </main>
@@ -81,10 +108,22 @@ export default async function StackPage({
 }
 
 /**
- * Narrow a run to one decade or one genre, or both. Plain links, so the
- * address says what the run is and a phone's back button undoes a pick.
+ * Narrow a run to one decade or one genre, or both, or draw it from your
+ * listening. Plain links, so the address says what the run is and a phone's
+ * back button undoes a pick.
  */
-function Filters({ decade, genre }: { decade: number | null; genre: string | null }) {
+function Filters({
+  decade,
+  genre,
+  fromListening,
+  listening,
+}: {
+  decade: number | null;
+  genre: string | null;
+  fromListening: boolean;
+  /** How many albums from your listening wait for a score. */
+  listening: number;
+}) {
   const href = (next: { decade?: number | null; genre?: string | null }) => {
     const d = next.decade === undefined ? decade : next.decade;
     const g = next.genre === undefined ? genre : next.genre;
@@ -103,8 +142,25 @@ function Filters({ decade, genre }: { decade: number | null; genre: string | nul
 
   return (
     <div className="mb-6 flex flex-col gap-2">
+      {listening > 0 || fromListening ? (
+        <div className="flex justify-center">
+          <Link
+            href="/stack?from=listening"
+            className={chip(fromListening)}
+            aria-current={fromListening ? "page" : undefined}
+            scroll={false}
+          >
+            From your listening
+            {listening > 0 ? ` (${listening.toLocaleString("en")})` : ""}
+          </Link>
+        </div>
+      ) : null}
       <div className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:justify-center sm:px-0">
-        <Link href={href({ decade: null })} className={chip(decade === null)} scroll={false}>
+        <Link
+          href={href({ decade: null })}
+          className={chip(!fromListening && decade === null)}
+          scroll={false}
+        >
           Any decade
         </Link>
         {STACK_DECADES.map((d) => (
@@ -114,7 +170,11 @@ function Filters({ decade, genre }: { decade: number | null; genre: string | nul
         ))}
       </div>
       <div className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:justify-center sm:px-0">
-        <Link href={href({ genre: null })} className={chip(genre === null)} scroll={false}>
+        <Link
+          href={href({ genre: null })}
+          className={chip(!fromListening && genre === null)}
+          scroll={false}
+        >
           Any genre
         </Link>
         {GENRE_FAMILIES.map((family) => (

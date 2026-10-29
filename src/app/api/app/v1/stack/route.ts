@@ -2,12 +2,20 @@ import type { NextRequest } from "next/server";
 import type { StackRun } from "@/lib/app-api";
 import { appJson, appRoute, limitReads, signedInCaller } from "@/lib/app-route";
 import { GENRE_FAMILIES } from "@/lib/badge-catalog";
-import { getStack, STACK_DECADES, STACK_RUN } from "@/lib/stack";
+import {
+  getListeningStack,
+  getStack,
+  listeningWaiting,
+  STACK_DECADES,
+  STACK_RUN,
+} from "@/lib/stack";
 
 /**
  * The Stack (`stack/page.tsx`): a fresh run of records to rate, picked for
  * the signed-in person, never anything they've already scored. A new run is
  * drawn on every call, so nothing may cache it (`appJson` sees to that).
+ * `from=listening` draws From your listening instead: the albums in their
+ * diary they haven't rated, with no filters.
  */
 export const GET = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
@@ -21,16 +29,19 @@ export const GET = appRoute(async (request: NextRequest) => {
   const family = search.get("genre");
   const genre = family && GENRE_FAMILIES.some((f) => f.id === family) ? family : null;
 
-  const albums = await getStack(user.id, STACK_RUN, { decade, genre });
+  const fromListening = search.get("from") === "listening";
+  const [albums, listening] = await Promise.all([
+    fromListening ? getListeningStack(STACK_RUN) : getStack(user.id, STACK_RUN, { decade, genre }),
+    listeningWaiting(),
+  ]);
 
   return appJson<StackRun>({
     albums,
-    decade,
-    genre,
+    decade: fromListening ? null : decade,
+    genre: fromListening ? null : genre,
     decades: [...STACK_DECADES],
     genres: GENRE_FAMILIES.map(({ id, name }) => ({ id, label: name })),
-    // From your listening isn't drawn yet: every run is the usual one.
-    from: null,
-    listening: 0,
+    from: fromListening ? "listening" : null,
+    listening,
   });
 });

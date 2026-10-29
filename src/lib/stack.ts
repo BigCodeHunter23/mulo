@@ -5,6 +5,7 @@ import { getRaisedOn } from "@/lib/raised-on";
 import { GENRE_FAMILIES, familiesFor } from "@/lib/badge-catalog";
 import { getArtistGenres } from "@/lib/artist-genres";
 import { playCounts } from "@/lib/hits";
+import { isMissingFunction, logQueryError } from "@/lib/supabase/errors";
 import type { StackAlbum, StackHit } from "@/lib/app-api";
 
 export type { StackAlbum, StackHit };
@@ -244,6 +245,62 @@ export async function getStack(
       hitsByPlays: found.byPlays,
     };
   });
+}
+
+/**
+ * From your listening: the albums in your diary the signed-in person hasn't
+ * rated, most played first. The database function reads whoever is signed in,
+ * so this runs on their own client. Empty before migration 0025, or with
+ * nothing waiting.
+ */
+export async function getListeningStack(limit = STACK_RUN): Promise<StackAlbum[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("diary_to_rate", { p_limit: limit });
+  if (error) {
+    if (!isMissingFunction(error)) logQueryError("stack", error);
+    return [];
+  }
+  // The generated types call every column of a function's answer nullable.
+  const rows = (data ?? []).flatMap((row) =>
+    row.release_mbid ? [{ mbid: row.release_mbid, plays: Number(row.plays ?? 0) }] : [],
+  );
+  if (rows.length === 0) return [];
+
+  const mbids = rows.map((row) => row.mbid);
+  const [{ data: releases }, hits] = await Promise.all([
+    supabase
+      .from("releases")
+      .select("mbid, title, artist_credit, cover_art_url, release_date")
+      .in("mbid", mbids),
+    hitsForAlbums(mbids),
+  ]);
+  const byMbid = new Map((releases ?? []).map((release) => [release.mbid, release]));
+
+  // An album that has left the catalogue has nothing to show, so it waits out of the run.
+  return rows.flatMap(({ mbid, plays }) => {
+    const release = byMbid.get(mbid);
+    if (!release) return [];
+    const found = hits.get(mbid) ?? { hits: [], byPlays: false };
+    return [
+      {
+        mbid,
+        title: release.title,
+        artist: release.artist_credit,
+        cover: release.cover_art_url,
+        year: release.release_date ? release.release_date.slice(0, 4) : null,
+        reason:
+          plays > 1 ? `You played it ${plays.toLocaleString("en")} times` : "From your listening",
+        hits: found.hits,
+        hitsByPlays: found.byPlays,
+      },
+    ];
+  });
+}
+
+/** How many albums from the signed-in person's listening wait for a score; 0 on any error. */
+export async function listeningWaiting(): Promise<number> {
+  const { data, error } = await (await createClient()).rpc("diary_waiting");
+  return error ? 0 : Number(data ?? 0);
 }
 
 /**
