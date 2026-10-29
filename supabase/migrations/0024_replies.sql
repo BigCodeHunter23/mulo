@@ -20,6 +20,11 @@ create table if not exists public.replies (
   versus_take_id bigint references public.versus_takes (id) on delete cascade,
   body text not null check (char_length(btrim(body, E' \t\r\n')) between 1 and 1000),
   created_at timestamptz not null default now(),
+  -- Whose review or take it answers, set by replies_thread_owner below, so
+  -- the bell finds the replies to somebody without joining three tables. No
+  -- foreign key: a second link to profiles would make the `profiles` embeds
+  -- on replies ambiguous, and the reply goes with the review or take anyway.
+  thread_owner_id uuid,
   constraint replies_one_target
     check (num_nonnulls(rating_id, artist_rating_id, versus_take_id) = 1)
 );
@@ -32,6 +37,8 @@ create index if not exists replies_versus_take_idx
   on public.replies (versus_take_id, created_at) where versus_take_id is not null;
 create index if not exists replies_user_idx
   on public.replies (user_id, created_at desc);
+create index if not exists replies_thread_owner_idx
+  on public.replies (thread_owner_id, created_at desc);
 
 /**
  * Whose review or take a reply hangs off. Only a written review counts: a
@@ -61,6 +68,31 @@ $$;
 revoke execute on function public.reply_thread_owner(bigint, bigint, bigint) from public, anon;
 grant execute on function public.reply_thread_owner(bigint, bigint, bigint) to authenticated, service_role;
 
+/**
+ * Fills in thread_owner_id, whatever the writer sent. Runs before the
+ * insert's row-level checks, so they see the owner it sets.
+ */
+create or replace function public.set_reply_thread_owner()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.thread_owner_id := public.reply_thread_owner(
+    new.rating_id, new.artist_rating_id, new.versus_take_id);
+  return new;
+end;
+$$;
+
+revoke execute on function public.set_reply_thread_owner() from public, anon, authenticated;
+
+drop trigger if exists replies_thread_owner on public.replies;
+create trigger replies_thread_owner
+  before insert or update of rating_id, artist_rating_id, versus_take_id, thread_owner_id
+  on public.replies
+  for each row
+  execute function public.set_reply_thread_owner();
+
 alter table public.replies enable row level security;
 
 -- Signed out, nothing at all; and nobody edits a reply.
@@ -73,9 +105,7 @@ create policy "Signed-in people read replies, except hidden people's"
   using (
     not exists (
       select 1 from public.hidden_profiles((select auth.uid())) h
-      where h.id = replies.user_id
-         or h.id = public.reply_thread_owner(
-              replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
+      where h.id = replies.user_id or h.id = replies.thread_owner_id
     )
   );
 
@@ -98,8 +128,7 @@ create policy "People delete their own replies, and any on their own review"
   on public.replies for delete to authenticated
   using (
     (select auth.uid()) = replies.user_id
-    or (select auth.uid()) = public.reply_thread_owner(
-         replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
+    or (select auth.uid()) = replies.thread_owner_id
   );
 
 /**
@@ -175,3 +204,32 @@ alter table public.reports
 create unique index if not exists reports_unique_reply
   on public.reports (reporter_id, reported_reply_id)
   where reported_reply_id is not null;
+
+-- Who each reply names, kept when it's posted, for the bell: the first five
+-- @names that are real people allowed to read the thread (not the replier or
+-- the thread's owner, nobody blocked either way with either, and on a take
+-- whose matchup is still open, only people who've picked). The website
+-- writes it with the service role; each person reads only their own rows,
+-- and a reply hidden from them stays hidden through replies' own rules.
+--
+-- user_id points at the account, not the profile: a table whose key is a
+-- reply and a profile would look to PostgREST like a link between replies
+-- and profiles, and make every `profiles` embed on replies ambiguous.
+create table if not exists public.reply_mentions (
+  reply_id bigint not null references public.replies (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  primary key (reply_id, user_id)
+);
+
+create index if not exists reply_mentions_user_idx
+  on public.reply_mentions (user_id, reply_id desc);
+
+alter table public.reply_mentions enable row level security;
+
+revoke all on public.reply_mentions from anon;
+revoke insert, update, delete, truncate on public.reply_mentions from authenticated;
+
+drop policy if exists "People read where they're named" on public.reply_mentions;
+create policy "People read where they're named"
+  on public.reply_mentions for select to authenticated
+  using (user_id = (select auth.uid()));

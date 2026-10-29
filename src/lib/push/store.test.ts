@@ -21,6 +21,7 @@ import {
   pushCopyOf,
   readTimeZone,
   replyTarget,
+  saveMentions,
   tickCandidates,
   toColumns,
   uncheckedTickets,
@@ -438,5 +439,30 @@ describe("peopleNamed", () => {
     client.current = null;
     expect(await peopleNamed([])).toEqual([]);
     expect(await peopleNamed(["a,b", "x"])).toEqual([]);
+  });
+});
+
+describe("saveMentions", () => {
+  it("keeps a row for each person named, with the service role", async () => {
+    const calls: [string, unknown[]][] = [];
+    const from = vi.fn(() => query({ data: null, error: null }, calls));
+    client.current = { from };
+    await saveMentions(41, [A, B]);
+    expect(from).toHaveBeenCalledWith("reply_mentions");
+    expect(calls).toContainEqual([
+      "insert",
+      [
+        [
+          { reply_id: 41, user_id: A },
+          { reply_id: 41, user_id: B },
+        ],
+      ],
+    ]);
+  });
+
+  it("asks nothing for nobody, and throws a failed write", async () => {
+    await saveMentions(41, []);
+    client.current = { from: () => query({ data: null, error: { code: "57014" } }) };
+    await expect(saveMentions(41, [A])).rejects.toEqual({ code: "57014" });
   });
 });

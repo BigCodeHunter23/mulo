@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FakeSupabase } from "../../../test/fake-supabase";
 
 const ME = "11111111-1111-4111-8111-111111111111";
+const OWNER = "22222222-2222-4222-8222-222222222222";
+const KIM = "33333333-3333-4333-8333-333333333333";
+const LEE = "44444444-4444-4444-8444-444444444444";
 
 const db = vi.hoisted(() => ({
   fake: null as unknown as FakeSupabase,
@@ -29,12 +32,33 @@ vi.mock("@/lib/replies", () => ({
   replyable: vi.fn(async () => db.state),
   mentionedIn: vi.fn(async () => ["Kim"]),
 }));
-vi.mock("@/lib/push/events", () => ({ notifyReply: vi.fn(async () => {}) }));
+// Who a reply names is kept by the real rule, over a stand-in store.
+vi.mock("@/lib/push/events", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/push/events")>()),
+  notifyReply: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/push/send", () => ({}));
+vi.mock("@/lib/push/store", () => ({
+  personOf: vi.fn(),
+  peoplePushesSince: vi.fn(),
+  loveTarget: vi.fn(),
+  replyTarget: vi.fn(async () => ({
+    ownerId: OWNER,
+    owner: { username: "sam", display_name: null },
+    subject: { kind: "album", mbid: "m1", id: 7, title: "Blonde" },
+    openMatchup: null,
+  })),
+  peopleNamed: vi.fn(async () => []),
+  picksIn: vi.fn(async () => new Set()),
+  blockedEitherWay: vi.fn(async () => false),
+  saveMentions: vi.fn(async () => {}),
+}));
 vi.mock("@/lib/push/later", () => ({ later: (task: () => Promise<unknown>) => void task() }));
 
 import { fakeSupabase } from "../../../test/fake-supabase";
 import { allowUser } from "@/lib/rate-limit";
 import { notifyReply } from "@/lib/push/events";
+import * as store from "@/lib/push/store";
 import { replyable } from "@/lib/replies";
 import { deleteReply, postReply } from "./actions";
 
@@ -50,6 +74,7 @@ beforeEach(() => {
   db.user = { id: ME, email: null };
   db.limited = false;
   db.state = "open";
+  vi.mocked(store.blockedEitherWay).mockImplementation(async () => false);
 });
 
 describe("postReply", () => {
@@ -80,6 +105,35 @@ describe("postReply", () => {
       replierId: ME,
       body: "@kim fair.",
     });
+  });
+
+  it("keeps who it names, of the people who may read the thread", async () => {
+    vi.mocked(store.peopleNamed).mockResolvedValueOnce([
+      { id: KIM, username: "kim", display_name: null },
+      { id: LEE, username: "lee", display_name: null },
+    ]);
+    // Lee and the replier blocked each other.
+    vi.mocked(store.blockedEitherWay).mockImplementation(
+      async (a, b) => [a, b].includes(LEE) && [a, b].includes(ME),
+    );
+    db.fake.answer("replies", { data: saved, error: null });
+    expect(await postReply("album", 7, "@kim @lee fair.")).toMatchObject({ ok: true });
+    expect(store.replyTarget).toHaveBeenCalledWith("album", 7);
+    expect(store.saveMentions).toHaveBeenCalledWith(41, [KIM]);
+  });
+
+  it("still posts when keeping who it names fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(store.peopleNamed).mockResolvedValueOnce([
+      { id: KIM, username: "kim", display_name: null },
+    ]);
+    vi.mocked(store.saveMentions).mockRejectedValueOnce(new Error("down"));
+    db.fake.answer("replies", { data: saved, error: null });
+    expect(await postReply("album", 7, "@kim fair.")).toMatchObject({
+      ok: true,
+      reply: { id: 41, mentions: ["Kim"] },
+    });
+    expect(console.error).toHaveBeenCalled();
   });
 
   it("refuses nothing, too much, and the disrespectful, before asking anything", async () => {

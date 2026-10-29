@@ -631,3 +631,15 @@ export async function peopleNamed(
   if (error) throw error;
   return (data ?? []).filter((row) => wanted.has(row.username.toLowerCase()));
 }
+
+/**
+ * Who a reply names (migration 0024), kept for their bells. The table is
+ * closed to the public roles; the caller has already checked who may be named.
+ */
+export async function saveMentions(replyId: number, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const { error } = await db()
+    .from("reply_mentions")
+    .insert(userIds.map((userId) => ({ reply_id: replyId, user_id: userId })));
+  if (error) throw error;
+}

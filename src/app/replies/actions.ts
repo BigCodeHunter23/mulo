@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { ReplyResult, SaveResult } from "@/lib/app-api";
 import { isRespectful, NOT_RESPECTFUL } from "@/lib/content-filter";
-import { notifyReply } from "@/lib/push/events";
+import { notifyReply, recordMentions } from "@/lib/push/events";
 import { later } from "@/lib/push/later";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { mentionedIn, NOT_YET, PICK_FIRST, REPLY_COLUMNS, replyable } from "@/lib/replies";
@@ -75,11 +75,16 @@ export async function postReply(
     .single();
   if (error || !data) return { ok: false, error: refusal(error) };
 
-  later(() => notifyReply({ kind, targetId, replierId: user.id, body: text }));
+  const event = { kind, targetId, replierId: user.id, body: text };
+  later(() => notifyReply(event));
 
-  // The reply is saved: a failed name lookup only costs its links, never a
-  // "try again" that would post it twice.
-  const mentions = await mentionedIn(text).catch(() => []);
+  // The reply is saved: a failed name lookup only costs its links, and a
+  // failure keeping who it names only its bell lines, never a "try again"
+  // that would post it twice.
+  const [mentions] = await Promise.all([
+    mentionedIn(text).catch(() => []),
+    recordMentions(data.id, event),
+  ]);
 
   return {
     ok: true,

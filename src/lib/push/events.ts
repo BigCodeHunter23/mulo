@@ -20,6 +20,7 @@ export type EventDeps = {
   replyTarget: typeof store.replyTarget;
   peopleNamed: typeof store.peopleNamed;
   picksIn: typeof store.picksIn;
+  saveMentions: typeof store.saveMentions;
   send: (messages: Parameters<typeof sendPushes>[0]) => Promise<number>;
 };
 
@@ -31,6 +32,7 @@ const real = (): EventDeps => ({
   replyTarget: store.replyTarget,
   peopleNamed: store.peopleNamed,
   picksIn: store.picksIn,
+  saveMentions: store.saveMentions,
   send: (messages) => sendPushes(messages),
 });
 
@@ -106,6 +108,69 @@ export type ReplyEvent = {
   body: string;
 };
 
+/** Somebody named in a reply who may hear about it. */
+export type Named = { id: string; username: string; display_name: string | null };
+
+/**
+ * Of the first five @names in a reply, the people who may hear they were
+ * named: real people other than the replier and the thread's owner (who
+ * hears as its owner), nobody blocked either way with either of them, and on
+ * a take whose matchup is still open, only people who've picked, since
+ * nobody else can read the thread yet. Pushes and the bell both go by this.
+ */
+export async function resolveMentions(
+  event: Pick<ReplyEvent, "replierId" | "body">,
+  target: Pick<store.ReplyTarget, "ownerId" | "openMatchup">,
+  deps: Pick<EventDeps, "peopleNamed" | "picksIn" | "blockedEitherWay">,
+): Promise<Named[]> {
+  const names = parseMentions(event.body);
+  if (names.length === 0) return [];
+  let named = (await deps.peopleNamed(names)).filter(
+    (person) => person.id !== event.replierId && person.id !== target.ownerId,
+  );
+  if (target.openMatchup !== null && named.length > 0) {
+    const picked = await deps.picksIn(
+      target.openMatchup,
+      named.map((person) => person.id),
+    );
+    named = named.filter((person) => picked.has(person.id));
+  }
+  const blocked = await Promise.all(
+    named.map(
+      async (person) =>
+        (await deps.blockedEitherWay(person.id, event.replierId)) ||
+        (await deps.blockedEitherWay(person.id, target.ownerId)),
+    ),
+  );
+  return named.filter((_, i) => !blocked[i]);
+}
+
+/**
+ * Keeps who a just-posted reply names, for their bells (migration 0024), by
+ * the same rule as the pushes. Never throws: the reply is saved either way,
+ * and a failure here only costs the bell its mention lines.
+ */
+export async function recordMentions(
+  replyId: number,
+  event: ReplyEvent,
+  deps: EventDeps = real(),
+): Promise<void> {
+  if (parseMentions(event.body).length === 0) return;
+  try {
+    const target = await deps.replyTarget(event.kind, event.targetId);
+    if (!target) return;
+    const named = await resolveMentions(event, target, deps);
+    if (named.length > 0) {
+      await deps.saveMentions(
+        replyId,
+        named.map((person) => person.id),
+      );
+    }
+  } catch (error) {
+    console.error("[replies] couldn't keep who a reply names:", error);
+  }
+}
+
 /**
  * "Jo replied to your review of Blonde" for the author, and "Jo mentioned you
  * on Sam's review of Blonde" for each of the first five people named, at
@@ -143,21 +208,7 @@ export async function notifyReply(
       });
     }
 
-    const names = parseMentions(event.body);
-    let named = names.length > 0 ? await deps.peopleNamed(names) : [];
-    named = named.filter((person) => person.id !== event.replierId && person.id !== target.ownerId);
-    // A take on today's Versus can only be read by people who've picked.
-    if (target.openMatchup !== null && named.length > 0) {
-      const picked = await deps.picksIn(
-        target.openMatchup,
-        named.map((person) => person.id),
-      );
-      named = named.filter((person) => picked.has(person.id));
-    }
-
-    for (const person of named) {
-      if (await deps.blockedEitherWay(person.id, event.replierId)) continue;
-      if (await deps.blockedEitherWay(person.id, target.ownerId)) continue;
+    for (const person of await resolveMentions(event, target, deps)) {
       if (await overCap(person.id, at, deps)) continue;
       messages.push({
         userId: person.id,

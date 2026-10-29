@@ -577,6 +577,19 @@ describe("0024 replies", () => {
     expect(rows[0]).toEqual({ anon: false, signed_in: true });
   });
 
+  it("records whose thread a reply is in, whatever the writer sends", async () => {
+    const [reply] = await as<{ id: number }>(
+      U(4),
+      `insert into public.replies (user_id, artist_rating_id, thread_owner_id, body)
+       values ('${U(4)}', ${artistReview}, '${U(4)}', 'Mine now?') returning id::int as id`,
+    );
+    const { rows } = await db.query<{ owner: string }>(
+      `select thread_owner_id as owner from public.replies where id = ${reply?.id ?? 0}`,
+    );
+    expect(rows).toEqual([{ owner: U(1) }]);
+    await db.exec(`delete from public.replies where id = ${reply?.id ?? 0}`);
+  });
+
   it("can't be edited", async () => {
     await replyAs(U(2), "rating_id", review, "First.");
     await expect(
@@ -612,5 +625,96 @@ describe("0024 replies", () => {
       `insert into public.reports (reporter_id, reported_reply_id, reported_profile_id, reason)
        values ('${U(1)}', ${reply?.id ?? 0}, '${U(4)}', 'Spam or advertising')`,
     );
+  });
+});
+
+describe("0024 reply mentions", () => {
+  let db: PGlite;
+  // U(2) replies on U(1)'s review naming U(3) and U(4); U(4) has blocked U(2).
+  let reply = 0;
+
+  beforeAll(async () => {
+    db = await localDatabase();
+    await db.exec(`
+      insert into auth.users (id) values ('${U(1)}'), ('${U(2)}'), ('${U(3)}'), ('${U(4)}');
+      insert into public.profiles (id, username) values
+        ('${U(1)}', 'author'), ('${U(2)}', 'replier'), ('${U(3)}', 'named'), ('${U(4)}', 'blocker');
+      insert into public.artists (mbid, name) values ('44444444-4444-4444-8444-444444444444', 'Nas');
+      insert into public.releases (mbid, title, artist_mbid)
+        values ('${ALBUM}', 'Illmatic', '44444444-4444-4444-8444-444444444444');
+      insert into public.ratings (user_id, release_mbid, score, review)
+        values ('${U(1)}', '${ALBUM}', 10, 'Front to back.');
+      insert into public.replies (user_id, rating_id, body)
+        select '${U(2)}'::uuid, id, '@named @blocker' from public.ratings;
+      insert into public.reply_mentions (reply_id, user_id)
+        select id, '${U(3)}'::uuid from public.replies
+        union all select id, '${U(4)}'::uuid from public.replies;
+      insert into public.blocks (blocker_id, blocked_id) values ('${U(4)}', '${U(2)}');
+    `);
+    reply =
+      (await db.query<{ id: number }>("select id::int as id from public.replies")).rows[0]?.id ?? 0;
+  });
+  afterAll(() => db?.close());
+
+  async function as<T>(user: string | null, sql: string): Promise<T[]> {
+    await db.exec(`select set_config('request.jwt.claim.sub', '${user ?? ""}', false)`);
+    await db.exec(`set role ${user ? "authenticated" : "anon"}`);
+    try {
+      return (await db.query<T>(sql)).rows;
+    } finally {
+      await db.exec("reset role");
+    }
+  }
+
+  const count = async () =>
+    (await db.query<{ n: number }>("select count(*)::int as n from public.reply_mentions")).rows[0]
+      ?.n;
+
+  it("runs twice without complaint", async () => {
+    await db.exec(migrationSql("0024_replies.sql"));
+  });
+
+  it("lets each person read only where they're named", async () => {
+    expect(await as(U(3), "select user_id from public.reply_mentions")).toEqual([
+      { user_id: U(3) },
+    ]);
+    expect(await as(U(1), "select user_id from public.reply_mentions")).toEqual([]);
+    await expect(as(null, "select * from public.reply_mentions")).rejects.toThrow();
+  });
+
+  it("keeps a reply hidden from somebody blocked either way, though they were named", async () => {
+    const seen = `select r.id from public.reply_mentions m
+      join public.replies r on r.id = m.reply_id`;
+    expect(await as(U(3), seen)).toEqual([{ id: reply }]);
+    expect(await as(U(4), seen)).toEqual([]);
+  });
+
+  it("can't be written by the public roles", async () => {
+    await expect(
+      as(
+        U(1),
+        `insert into public.reply_mentions (reply_id, user_id) values (${reply}, '${U(1)}')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      as(U(3), `delete from public.reply_mentions where user_id = '${U(3)}'`),
+    ).rejects.toThrow();
+    await expect(
+      as(U(3), `update public.reply_mentions set user_id = '${U(1)}'`),
+    ).rejects.toThrow();
+    await expect(
+      as(
+        null,
+        `insert into public.reply_mentions (reply_id, user_id) values (${reply}, '${U(1)}')`,
+      ),
+    ).rejects.toThrow();
+    expect(await count()).toBe(2);
+  });
+
+  it("goes with the account named, and with the reply", async () => {
+    await db.exec(`delete from auth.users where id = '${U(3)}'`);
+    expect(await count()).toBe(1);
+    await db.exec(`delete from public.replies where id = ${reply}`);
+    expect(await count()).toBe(0);
   });
 });

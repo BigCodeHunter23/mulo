@@ -4,6 +4,7 @@ import {
   notifyLove,
   notifyReply,
   PEOPLE_PUSHES_PER_HOUR,
+  recordMentions,
   type EventDeps,
 } from "@/lib/push/events";
 
@@ -35,6 +36,7 @@ function deps(over: Partial<EventDeps> = {}): EventDeps {
       async () => [] as { id: string; username: string; display_name: string | null }[],
     ),
     picksIn: vi.fn(async () => new Set<string>()),
+    saveMentions: vi.fn(async () => {}),
     send: vi.fn(async () => 1),
     ...over,
   };
@@ -236,5 +238,75 @@ describe("reply pushes", () => {
       }),
     });
     await expect(notifyReply(reply(), at, broken)).resolves.toBeUndefined();
+  });
+});
+
+describe("keeping who a reply names", () => {
+  const event = (body: string) => ({
+    kind: "album" as const,
+    targetId: 7,
+    replierId: "joe-id",
+    body,
+  });
+  const kim = { id: "kim-id", username: "kim", display_name: "Kim" };
+  const lee = { id: "lee-id", username: "lee", display_name: null };
+
+  it("keeps the people named who may read the thread, by the pushes' rule", async () => {
+    const d = deps({
+      peopleNamed: vi.fn(async () => [
+        kim,
+        lee,
+        { id: "owner", username: "sam", display_name: "Sam" },
+        { id: "joe-id", username: "joe", display_name: "Jo" },
+        { id: "max-id", username: "max", display_name: null },
+      ]),
+      // Max and the replier blocked each other; Lee and the thread's owner did.
+      blockedEitherWay: vi.fn(async (a: string, b: string) =>
+        [
+          ["max-id", "joe-id"],
+          ["lee-id", "owner"],
+        ].some(([x, y]) => (a === x && b === y) || (a === y && b === x)),
+      ),
+    });
+    await recordMentions(41, event("@kim @lee @sam @joe @max"), d);
+    expect(d.peopleNamed).toHaveBeenCalledWith(["kim", "lee", "sam", "joe", "max"]);
+    expect(d.saveMentions).toHaveBeenCalledWith(41, ["kim-id"]);
+    expect(d.send).not.toHaveBeenCalled();
+  });
+
+  it("keeps only people who picked, on a take whose matchup is open", async () => {
+    const d = deps({
+      replyTarget: vi.fn(async () => ({
+        ownerId: "owner",
+        owner: { username: "sam", display_name: "Sam" },
+        subject: { kind: "take" as const, day: "2026-10-29", id: 9, title: "Under Pressure" },
+        openMatchup: 3 as number | null,
+      })),
+      peopleNamed: vi.fn(async () => [kim, lee]),
+      picksIn: vi.fn(async () => new Set(["lee-id"])),
+    });
+    await recordMentions(42, { ...event("@kim @lee"), kind: "take", targetId: 9 }, d);
+    expect(d.replyTarget).toHaveBeenCalledWith("take", 9);
+    expect(d.saveMentions).toHaveBeenCalledWith(42, ["lee-id"]);
+  });
+
+  it("asks nothing of a reply that names nobody, and keeps nothing when nobody's left", async () => {
+    const d = deps();
+    await recordMentions(43, event("No names. mail jo@example.com"), d);
+    expect(d.replyTarget).not.toHaveBeenCalled();
+    await recordMentions(43, event("@nobody"), d);
+    expect(d.saveMentions).not.toHaveBeenCalled();
+  });
+
+  it("never throws, so a reply is never lost to it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const d = deps({
+      peopleNamed: vi.fn(async () => [kim]),
+      saveMentions: vi.fn(async () => {
+        throw new Error("down");
+      }),
+    });
+    await expect(recordMentions(44, event("@kim"), d)).resolves.toBeUndefined();
+    expect(console.error).toHaveBeenCalled();
   });
 });

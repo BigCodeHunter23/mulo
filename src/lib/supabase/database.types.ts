@@ -647,6 +647,7 @@ export type Database = {
           created_at: string
           id: number
           rating_id: number | null
+          thread_owner_id: string | null
           user_id: string
           versus_take_id: number | null
         }
@@ -656,6 +657,7 @@ export type Database = {
           created_at?: string
           id?: never
           rating_id?: number | null
+          thread_owner_id?: string | null
           user_id: string
           versus_take_id?: number | null
         }
@@ -665,6 +667,7 @@ export type Database = {
           created_at?: string
           id?: never
           rating_id?: number | null
+          thread_owner_id?: string | null
           user_id?: string
           versus_take_id?: number | null
         }
@@ -695,6 +698,29 @@ export type Database = {
             columns: ["versus_take_id"]
             isOneToOne: false
             referencedRelation: "versus_takes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reply_mentions: {
+        Row: {
+          reply_id: number
+          user_id: string
+        }
+        Insert: {
+          reply_id: number
+          user_id: string
+        }
+        Update: {
+          reply_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reply_mentions_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: false
+            referencedRelation: "replies"
             referencedColumns: ["id"]
           },
         ]
