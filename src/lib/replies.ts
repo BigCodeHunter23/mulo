@@ -227,7 +227,8 @@ async function realNames(
     const { data, error } = await supabase
       .from("profiles")
       .select("id, username")
-      .or(chunk.map((name) => `username.ilike.${name}`).join(","));
+      // "_" escaped, so "@a_c" can't match "abc" and crowd out real names.
+      .or(chunk.map((name) => `username.ilike.${name.replace(/_/g, "\\_")}`).join(","));
     if (error) {
       logQueryError("replies", error);
       break;

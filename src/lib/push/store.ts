@@ -625,7 +625,8 @@ export async function peopleNamed(
   const { data, error } = await db()
     .from("profiles")
     .select("id, username, display_name")
-    .or([...wanted].map((name) => `username.ilike.${name}`).join(","))
+    // "_" escaped, so "@a_c" can't match "abc" and crowd out real names.
+    .or([...wanted].map((name) => `username.ilike.${name.replace(/_/g, "\\_")}`).join(","))
     .limit(50);
   if (error) throw error;
   return (data ?? []).filter((row) => wanted.has(row.username.toLowerCase()));

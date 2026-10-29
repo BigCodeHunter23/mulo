@@ -77,6 +77,10 @@ export async function postReply(
 
   later(() => notifyReply({ kind, targetId, replierId: user.id, body: text }));
 
+  // The reply is saved: a failed name lookup only costs its links, never a
+  // "try again" that would post it twice.
+  const mentions = await mentionedIn(text).catch(() => []);
+
   return {
     ok: true,
     reply: {
@@ -84,7 +88,7 @@ export async function postReply(
       body: data.body,
       createdAt: data.created_at,
       author: data.profiles,
-      mentions: await mentionedIn(text),
+      mentions,
       mine: true,
       canDelete: true,
     },

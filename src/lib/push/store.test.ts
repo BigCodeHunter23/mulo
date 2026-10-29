@@ -427,6 +427,13 @@ describe("peopleNamed", () => {
     expect(calls).toContainEqual(["or", ["username.ilike.sam,username.ilike.jxo"]]);
   });
 
+  it("escapes underscores, so a name of underscores can't match everyone", async () => {
+    const calls: [string, unknown[]][] = [];
+    client.current = { from: () => query({ data: [], error: null }, calls) };
+    await peopleNamed(["a_c", "___"]);
+    expect(calls).toContainEqual(["or", ["username.ilike.a\\_c,username.ilike.\\_\\_\\_"]]);
+  });
+
   it("asks nothing for no names, or names that can't be usernames", async () => {
     client.current = null;
     expect(await peopleNamed([])).toEqual([]);
