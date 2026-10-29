@@ -706,6 +706,139 @@ describe("0024 replies", () => {
        values ('${U(1)}', '${U(4)}', 'Spam or advertising', repeat('x', 1601))`,
     );
   });
+
+  /** A report of a reply, filed as the website files it: as the reporter, with the reply's words. */
+  async function reportReply(reporter: string, reply: number, words: string) {
+    await as(
+      reporter,
+      `insert into public.reports (reporter_id, reported_reply_id, reason, detail)
+       values ('${reporter}', ${reply}, 'Harassment or bullying', 'Rude.' || E'\\n\\nReply: ' || '${words}')`,
+    );
+  }
+
+  const reportsOf = (words: string) =>
+    db.query<{ reply: number | null; detail: string; status: string }>(
+      `select reported_reply_id::int as reply, detail, status from public.reports
+       where detail like '%Reply: ${words}'`,
+    );
+
+  it("keeps a reply's report, with the words it copied, when its writer deletes the reply", async () => {
+    const [reply] = await replyAs(U(4), "artist_rating_id", artistReview, "Gone soon.");
+    await reportReply(U(1), reply?.id ?? 0, "Gone soon.");
+    await as(U(4), `delete from public.replies where id = ${reply?.id ?? 0}`);
+    expect(await count(`id = ${reply?.id ?? 0}`)).toBe(0);
+    expect((await reportsOf("Gone soon.")).rows).toEqual([
+      { reply: null, detail: "Rude.\n\nReply: Gone soon.", status: "open" },
+    ]);
+  });
+
+  it("keeps it when the review's writer deletes the reply, or clears the review", async () => {
+    const [onMine] = await replyAs(U(4), "artist_rating_id", artistReview, "Owner deletes.");
+    await reportReply(U(3), onMine?.id ?? 0, "Owner deletes.");
+    await as(U(1), `delete from public.replies where id = ${onMine?.id ?? 0}`);
+    expect((await reportsOf("Owner deletes.")).rows).toEqual([
+      expect.objectContaining({ reply: null, status: "open" }),
+    ]);
+
+    const [cleared] = await replyAs(U(4), "rating_id", blockerReview, "Review cleared.");
+    await reportReply(U(1), cleared?.id ?? 0, "Review cleared.");
+    await db.exec(`update public.ratings set review = null where id = ${blockerReview}`);
+    expect(await count(`id = ${cleared?.id ?? 0}`)).toBe(0);
+    expect((await reportsOf("Review cleared.")).rows).toEqual([
+      expect.objectContaining({ reply: null, status: "open" }),
+    ]);
+  });
+
+  it("refuses a report about nothing from somebody signed in, as about two things", async () => {
+    await expect(
+      as(
+        U(1),
+        `insert into public.reports (reporter_id, reason) values ('${U(1)}', 'Spam or advertising')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      as(
+        U(1),
+        `insert into public.reports (reporter_id, reported_profile_id, reported_artist_rating_id, reason)
+         values ('${U(1)}', '${U(4)}', ${artistReview}, 'Spam or advertising')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("still takes a report of a profile, a review or a list from somebody signed in", async () => {
+    await db.exec(`insert into public.lists (user_id, title) values ('${U(1)}', 'Best of')`);
+    const list =
+      (await db.query<{ id: number }>("select id::int as id from public.lists")).rows[0]?.id ?? 0;
+    for (const [column, target] of [
+      ["reported_profile_id", `'${U(1)}'`],
+      ["reported_artist_rating_id", artistReview],
+      ["reported_list_id", list],
+    ]) {
+      await as(
+        U(4),
+        `insert into public.reports (reporter_id, ${column}, reason)
+         values ('${U(4)}', ${target}, 'Spam or advertising')`,
+      );
+    }
+    expect(
+      (
+        await db.query<{ n: number }>(
+          `select count(*)::int as n from public.reports where reporter_id = '${U(4)}'`,
+        )
+      ).rows[0]?.n,
+    ).toBe(3);
+  });
+});
+
+describe("0024 over existing reports", () => {
+  let db: PGlite;
+
+  beforeAll(async () => {
+    db = await localDatabase({ before: "0024" });
+    // Reports of every kind there was before replies.
+    await db.exec(`
+      insert into auth.users (id) values ('${U(1)}'), ('${U(2)}');
+      insert into public.profiles (id, username) values ('${U(1)}', 'one'), ('${U(2)}', 'two');
+      insert into public.artists (mbid, name) values ('${ALBUM}', 'Nas');
+      insert into public.releases (mbid, title, artist_mbid) values ('${ALBUM}', 'Illmatic', '${ALBUM}');
+      insert into public.ratings (user_id, release_mbid, score, review)
+        values ('${U(2)}', '${ALBUM}', 9, 'Yes.');
+      insert into public.artist_ratings (user_id, artist_mbid, score, review)
+        values ('${U(2)}', '${ALBUM}', 9, 'Yes.');
+      insert into public.lists (user_id, title) values ('${U(2)}', 'Mine');
+      insert into public.reports (reporter_id, reported_profile_id, reason)
+        values ('${U(1)}', '${U(2)}', 'Spam or advertising');
+      insert into public.reports (reporter_id, reported_rating_id, reason)
+        select '${U(1)}', id, 'Spam or advertising' from public.ratings;
+      insert into public.reports (reporter_id, reported_artist_rating_id, reason)
+        select '${U(1)}', id, 'Spam or advertising' from public.artist_ratings;
+      insert into public.reports (reporter_id, reported_list_id, reason)
+        select '${U(1)}', id, 'Spam or advertising' from public.lists;
+    `);
+    for (const name of migrationFiles().filter((f) => f >= "0024")) {
+      await db.exec(migrationSql(name));
+    }
+  });
+  afterAll(() => db?.close());
+
+  it("keeps every report, under a target rule they all pass", async () => {
+    const { rows } = await db.query<{ conname: string; convalidated: boolean }>(
+      `select conname, convalidated from pg_constraint
+       where conrelid = 'public.reports'::regclass and pg_get_constraintdef(oid) like '%num_nonnulls%'`,
+    );
+    expect(rows).toEqual([{ conname: "reports_at_most_one_target", convalidated: true }]);
+    expect(
+      (await db.query<{ n: number }>("select count(*)::int as n from public.reports")).rows[0]?.n,
+    ).toBe(4);
+  });
+
+  it("still refuses a report about two things", async () => {
+    await refuses(
+      db,
+      `insert into public.reports (reporter_id, reported_profile_id, reported_rating_id, reason)
+       select '${U(2)}', '${U(1)}', id, 'Spam or advertising' from public.ratings`,
+    );
+  });
 });
 
 describe("0024 reply mentions", () => {

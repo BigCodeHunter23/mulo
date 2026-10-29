@@ -40,6 +40,32 @@ describe("removeReply", () => {
     ]);
   });
 
+  it("closes the open reports about it once it's gone, which keep its words", async () => {
+    // Its reports outlive it with no target (0024), so they're found first.
+    state.fake.answer("reports", { data: [{ id: 5 }, { id: 6 }], error: null });
+    await removeReply(41);
+    expect(state.fake.callsOn("reports")).toEqual([
+      { table: "reports", method: "from", args: ["reports"] },
+      { table: "reports", method: "select", args: ["id"] },
+      { table: "reports", method: "eq", args: ["reported_reply_id", 41] },
+      { table: "reports", method: "eq", args: ["status", "open"] },
+      { table: "reports", method: "from", args: ["reports"] },
+      { table: "reports", method: "update", args: [{ status: "reviewed" }] },
+      { table: "reports", method: "in", args: ["id", [5, 6]] },
+    ]);
+    const order = state.fake.calls.filter((call) => call.method === "from").map((c) => c.table);
+    expect(order).toEqual(["reports", "replies", "reports"]);
+  });
+
+  it("leaves its reports open when the reply couldn't be deleted, or there are none", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    state.fake.answer("reports", { data: [{ id: 5 }], error: null });
+    state.fake.answer("replies", { data: null, error: { message: "down" } });
+    await removeReply(41);
+    await removeReply(42);
+    expect(state.fake.callsOn("reports").filter((call) => call.method === "update")).toEqual([]);
+  });
+
   it("does nothing for somebody who isn't an admin", async () => {
     state.admin = null;
     await removeReply(41);

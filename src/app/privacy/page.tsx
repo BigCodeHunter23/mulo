@@ -205,7 +205,8 @@ export default function PrivacyPage() {
               everything attached to it. It isn&rsquo;t hidden or deactivated; it&rsquo;s gone, and
               it can&rsquo;t be undone. If you joined with Apple, it also asks Apple to end
               MULO&rsquo;s link to your Apple Account, and says so if you need to remove it
-              yourself.
+              yourself. One thing stays: if somebody reported a reply of yours, their report keeps a
+              copy of its words, without your name, so it can still be dealt with.
             </>,
           ]}
         />
@@ -222,8 +223,9 @@ export default function PrivacyPage() {
 
       <Section title="How long it's kept">
         <p>
-          For as long as you have an account. Delete it and the lot goes with it. Technical logs are
-          kept briefly and then discarded.
+          For as long as you have an account. Delete it and the lot goes with it, apart from the
+          words of a reported reply, which stay with the report. Technical logs are kept briefly and
+          then discarded.
         </p>
       </Section>
 

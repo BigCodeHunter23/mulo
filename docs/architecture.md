@@ -299,7 +299,14 @@ both, reading follows and earlier replies with the service role. The bell's
 Reported replies land in the admin inbox with Remove reply; a report reads
 the reply as the reporter (so one hidden from them can't be reported) and
 keeps its first 1,000 characters in the report's detail, after the
-reporter's own words.
+reporter's own words (`src/lib/reported-reply.ts`). The report outlives
+the reply: `reported_reply_id` is set to null when the reply goes (deleted
+by its writer, the review's owner or the admin, a cleared review, or a
+deleted account), and the inbox shows it as "Reply removed" with the words
+it kept and no Remove button. Remove reply also closes the open reports about
+it. The database allows at most one target per report; the insert
+policy, like the report form, still asks for exactly one, so a report with
+none is always one whose reply has gone.
 
 The app API: `GET threads/{album|artist|take}/{id}` (answers `state: "open"`,
 `"gone"` or `"locked"`), `POST replies`, `DELETE replies/{id}`, and `POST

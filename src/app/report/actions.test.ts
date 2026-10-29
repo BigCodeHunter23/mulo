@@ -108,6 +108,17 @@ describe("reporting a reply", () => {
   });
 });
 
+describe("a report about nothing", () => {
+  // The database lets a report outlive its reply with no target (0024), so
+  // the form, and the policy behind it, are what refuse one filed that way.
+  it("is refused before anything is written", async () => {
+    expect(await submitReport({}, form({ reason: "Spam or advertising", detail: "Hm." }))).toEqual(
+      NOT_SENT,
+    );
+    expect(inserted()).toEqual([]);
+  });
+});
+
 describe("reporting anything else", () => {
   it("keeps only the reporter's own words, and reads no reply", async () => {
     expect(

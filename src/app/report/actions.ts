@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { REPORT_REASONS } from "@/lib/report-reasons";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
+import { reportDetail } from "@/lib/reported-reply";
 import { field, firstError, rowIdText, textSchema, userIdSchema } from "@/lib/validation";
 
 export type ReportState = { error?: string; message?: string };
@@ -33,16 +34,14 @@ const reportInput = z
 
 const NOT_SENT = "Couldn't send that report. Please try again.";
 
-/** How much of a reported reply is kept with the report. */
-const REPLY_KEPT = 1000;
-
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /**
  * What a report of a reply says: the reporter's own words, then "Reply: "
  * and the reply's first 1,000 characters, so the report carries the words
- * it's about. Read through the reporter's own session, so a reply hidden
- * from them (or gone) can't be reported: null.
+ * it's about, and still has them once the reply is gone. Read through the
+ * reporter's own session, so a reply hidden from them (or gone) can't be
+ * reported: null.
  */
 async function withReply(
   supabase: Supabase,
@@ -55,8 +54,7 @@ async function withReply(
     .eq("id", replyId)
     .maybeSingle();
   if (error || !data) return null;
-  const words = `Reply: ${Array.from(data.body).slice(0, REPLY_KEPT).join("")}`;
-  return detail ? `${detail}\n\n${words}` : words;
+  return reportDetail(detail, data.body);
 }
 
 export async function submitReport(_prev: ReportState, formData: FormData): Promise<ReportState> {

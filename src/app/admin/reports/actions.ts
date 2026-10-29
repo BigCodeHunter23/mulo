@@ -93,17 +93,29 @@ export async function removeTake(takeId: number) {
 }
 
 /**
- * Deletes a reply. Its reports go with it, since there is nothing left to
- * look at. Its count shows on album and artist pages and the Versus, so
- * those refresh too.
+ * Deletes a reply, then closes any open reports about it. They stay, with
+ * the reply's words they kept (migration 0024), but no longer say which reply
+ * they were about, so they're found before it goes. Its count shows on album
+ * and artist pages and the Versus, so those refresh too.
  */
 export async function removeReply(replyId: number) {
   const admin = await requireAdmin();
   if (!admin) return;
   if (!rowIdSchema.safeParse(replyId).success) return;
 
-  const { error } = await createAdminClient().from("replies").delete().eq("id", replyId);
+  const db = createAdminClient();
+  const { data: open } = await db
+    .from("reports")
+    .select("id")
+    .eq("reported_reply_id", replyId)
+    .eq("status", "open");
+
+  const { error } = await db.from("replies").delete().eq("id", replyId);
   record(admin, `removed reply ${replyId}`, error);
+  const reports = (open ?? []).map((report) => report.id);
+  if (!error && reports.length > 0) {
+    await db.from("reports").update({ status: "reviewed" }).in("id", reports);
+  }
   revalidatePath("/admin/reports");
   revalidatePath("/album", "layout");
   revalidatePath("/artist", "layout");

@@ -207,11 +207,23 @@ create trigger artist_ratings_review_cleared
   when (nullif(btrim(old.review), '') is not null and nullif(btrim(new.review), '') is null)
   execute function public.forget_replies_to_cleared_review();
 
--- Replies can be reported, like reviews and takes.
+-- Replies can be reported, like reviews and takes. Unlike them, a report
+-- outlives what it's about: a reply goes when its writer or the review's
+-- owner deletes it, when the review's words are cleared, or with its
+-- writer's account, and the report stays, with no target, keeping the
+-- reply's words it copied into its detail (below), so the inbox can still
+-- deal with it. Every other target takes its reports with it, so a report
+-- with no target is always one whose reply has gone. The link is named and
+-- set here, so a rerun changes it on a database that ran an earlier draft.
+alter table public.reports add column if not exists reported_reply_id bigint;
+alter table public.reports drop constraint if exists reports_reported_reply_id_fkey;
 alter table public.reports
-  add column if not exists reported_reply_id bigint
-    references public.replies (id) on delete cascade;
+  add constraint reports_reported_reply_id_fkey
+    foreign key (reported_reply_id) references public.replies (id) on delete set null;
 
+-- A report is about one thing, or (once its reply has gone) nothing. Nobody
+-- files one about nothing: the insert policy below asks for exactly one, as
+-- the website's report form does.
 do $$
 declare
   existing text;
@@ -228,8 +240,24 @@ begin
 end $$;
 
 alter table public.reports
-  add constraint reports_one_target check (
+  add constraint reports_at_most_one_target check (
     num_nonnulls(
+      reported_rating_id,
+      reported_artist_rating_id,
+      reported_profile_id,
+      reported_versus_take_id,
+      reported_list_id,
+      reported_reply_id
+    ) <= 1
+  );
+
+-- 0006's policy, now also holding a new report to exactly one target.
+drop policy if exists "Users can file their own reports" on public.reports;
+create policy "Users can file their own reports"
+  on public.reports for insert
+  with check (
+    (select auth.uid()) = reporter_id
+    and num_nonnulls(
       reported_rating_id,
       reported_artist_rating_id,
       reported_profile_id,

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/moderation";
 import { buttonClass, EmptyState, SectionHeading } from "@/components/ui";
 import { threadHref } from "@/lib/replies-shared";
+import { replyWordsIn } from "@/lib/reported-reply";
 import { removeList, removeReply, removeReview, removeTake, setReportStatus } from "./actions";
 
 export const metadata: Metadata = {
@@ -173,6 +174,12 @@ export default async function ReportsInbox({
           {reports.map((report) => {
             const rating = report.ratings ?? report.artist_ratings;
             const kind = report.ratings ? "album" : "artist";
+            // Every other target takes its reports with it, so a report with
+            // nothing attached is about a reply that's gone (migration 0024).
+            const attached =
+              report.replies ?? report.lists ?? report.versus_takes ?? report.reported ?? rating;
+            const kept = report.replies || !attached ? replyWordsIn(report.detail) : null;
+            const said = kept ? kept.said : report.detail;
             const subject = report.ratings
               ? report.ratings.releases && {
                   title: report.ratings.releases.title,
@@ -291,14 +298,19 @@ export default async function ReportsInbox({
                         )}
                       </blockquote>
                     </>
+                  ) : kept ? (
+                    <>
+                      <p className="text-text-muted">Reply removed</p>
+                      <blockquote className="mt-2 border-l-2 border-border-strong pl-3 text-text">
+                        {kept.words}
+                      </blockquote>
+                    </>
                   ) : (
                     <p className="text-text-muted">What was reported has since been deleted.</p>
                   )}
 
-                  {report.detail && (
-                    <p className="mt-2 text-xs italic text-text-muted">
-                      &ldquo;{report.detail}&rdquo;
-                    </p>
+                  {said && (
+                    <p className="mt-2 text-xs italic text-text-muted">&ldquo;{said}&rdquo;</p>
                   )}
                 </div>
 
