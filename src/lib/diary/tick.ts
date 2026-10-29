@@ -5,7 +5,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type DiaryTickDeps = {
   match: (at: Date, deadline: number) => Promise<MatchReport>;
-  /** Gives entries the albums their names were matched to after they were saved. */
+  /**
+   * Gives entries the albums their names were matched to after they were
+   * saved, and files again any name an unmatched entry lost.
+   */
   sweep: () => Promise<number>;
   lastfm: (at: Date, deadline: number) => Promise<LastfmReport>;
 };
@@ -41,8 +44,8 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : err
 /**
  * The diary's share of each run of the clock, after the pushes: matching
  * names to albums, a sweep for entries saved just as their name was matched
- * (migration 0025's `diary_sweep`), then Last.fm imports and syncs. A
- * failure in one is logged and counted, and the others still run.
+ * or forgotten (migration 0025's `diary_sweep`), then Last.fm imports and
+ * syncs. A failure in one is logged and counted, and the others still run.
  */
 export async function runDiaryTick(
   at = new Date(),

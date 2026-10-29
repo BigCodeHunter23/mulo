@@ -252,7 +252,8 @@ grant execute on function public.diary_merge(uuid, text, jsonb) to service_role;
 /**
  * Forgets names nobody's diary is waiting on any more: not matched yet, and
  * with no unmatched entry left. Run after entries are deleted, so matching
- * never works for a diary that's gone.
+ * never works for a diary that's gone. A merge saving the same name at that
+ * moment can lose it; diary_sweep files it again.
  */
 create or replace function public.diary_forget_names(p_keys text[])
 returns void
@@ -313,6 +314,12 @@ grant execute on function public.diary_remove_source(uuid, text) to service_role
  * saved: a merge can read a name a moment before matching writes its album.
  * Looks at matches from the last two days, at most 5,000 entries a run, and
  * answers how many it gave an album.
+ *
+ * First it files again the names of unmatched entries that have none in
+ * album_matches, newest first, at most 500 a run: diary_forget_names can
+ * delete a name just as somebody else's merge saves an entry with it, which
+ * would otherwise wait for a match forever. Entries their owner chose an
+ * album for are left alone.
  */
 create or replace function public.diary_sweep()
 returns integer
@@ -323,6 +330,24 @@ as $$
 declare
   swept integer;
 begin
+  insert into public.album_matches (album_key, artist_name, album_name, song_hint, added_by)
+  select distinct on (e.album_key)
+    e.album_key, e.artist_name, e.album_name, e.song_hint, e.user_id
+  from (
+    select o.album_key
+    from public.diary_entries o
+    where o.release_mbid is null
+      and not o.fixed
+      and not exists (select 1 from public.album_matches m where m.album_key = o.album_key)
+    group by o.album_key
+    order by max(o.id) desc
+    limit 500
+  ) lost
+  join public.diary_entries e on e.album_key = lost.album_key
+  where e.release_mbid is null and not e.fixed
+  order by e.album_key, e.song_hint is null, e.id desc
+  on conflict (album_key) do nothing;
+
   update public.diary_entries d
      set release_mbid = w.release_mbid
     from (

@@ -1242,6 +1242,69 @@ describe("0025 listening diary", () => {
     await expect(as(U(2), "select public.diary_sweep()")).rejects.toThrow();
   });
 
+  it("files a name again when it was forgotten just as an entry was saved with it", async () => {
+    const filed = async (key: string) =>
+      (
+        await db.query<{
+          artist_name: string;
+          album_name: string;
+          song_hint: string | null;
+          added_by: string | null;
+          tries: number;
+        }>(
+          `select artist_name, album_name, song_hint, added_by, tries
+           from public.album_matches where album_key = $1`,
+          [key],
+        )
+      ).rows;
+    const total = async () =>
+      (await db.query<{ n: number }>("select count(*)::int as n from public.album_matches"))
+        .rows[0]!.n;
+
+    // Lost: a merge saved it as diary_forget_names deleted its name.
+    await merge(U(2), "spotify", [
+      day({
+        key: "mos def|black on both sides",
+        artist: "Mos Def",
+        album: "Black on Both Sides",
+        songHint: "Ms. Fat Booty",
+      }),
+    ]);
+    // Filed already, part way through matching.
+    await merge(U(4), "spotify", [day({ key: "nas|nastradamus", album: "Nastradamus" })]);
+    // Chosen by its owner, though the album has since gone.
+    await db.exec(
+      `delete from public.album_matches
+       where album_key in ('mos def|black on both sides');
+       update public.album_matches set tries = 2 where album_key = 'nas|nastradamus';
+       insert into public.diary_entries
+         (user_id, day, album_key, artist_name, album_name, fixed, sources)
+       values ('${U(4)}', '2026-10-13', 'mos def|the ecstatic', 'Mos Def', 'The Ecstatic', true, array['hand'])`,
+    );
+    const before = await total();
+
+    await db.query("select public.diary_sweep()");
+
+    expect(await filed("mos def|black on both sides")).toEqual([
+      {
+        artist_name: "Mos Def",
+        album_name: "Black on Both Sides",
+        song_hint: "Ms. Fat Booty",
+        added_by: U(2),
+        tries: 0,
+      },
+    ]);
+    expect(await filed("nas|nastradamus")).toEqual([
+      expect.objectContaining({ added_by: U(4), tries: 2 }),
+    ]);
+    expect(await filed("mos def|the ecstatic")).toEqual([]);
+    // The full diary's names were never filed: 500 a run, newest first.
+    expect((await total()) - before).toBe(500);
+    await db.query("select public.diary_sweep()");
+    expect((await total()) - before).toBe(1000);
+    expect(await filed("mos def|black on both sides")).toHaveLength(1);
+  });
+
   it("forgets names nobody is waiting on once their entries go", async () => {
     await merge(U(2), "apple", [day({ key: "nas|kings disease", album: "King's Disease" })]);
     await merge(U(4), "apple", [day({ key: "nas|kings disease", album: "King's Disease" })]);
