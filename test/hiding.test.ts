@@ -41,6 +41,8 @@ vi.mock("@/lib/reply-notifications", () => ({
       subject: { title: "Blonde", href: "/album/m1/reviews/7" },
     },
   ]),
+  // Read through row-level security, which leaves hidden people out itself.
+  latestReplyActivityAt: vi.fn(async () => null),
 }));
 vi.mock("@/lib/social", () => ({ getFollowingIds: vi.fn(async () => []) }));
 vi.mock("@/lib/versus", () => ({

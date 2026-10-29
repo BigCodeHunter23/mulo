@@ -1,6 +1,7 @@
 import "server-only";
 import type { Notification, Person } from "@/lib/app-api";
-import { parseMentions, threadHref, type ThreadKind } from "@/lib/replies-shared";
+import { threadHref, type ThreadKind } from "@/lib/replies-shared";
+import { isMissingTable, logQueryError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import { MATCHUP_SELECT, toMatchup, type MatchupRow } from "@/lib/versus";
 
@@ -9,7 +10,9 @@ import { MATCHUP_SELECT, toMatchup, type MatchupRow } from "@/lib/versus";
  * like the rest of the bell: replies on your own review or take, being named
  * in somebody else's thread, and what's new in threads you've replied in.
  * Read through your own session, so row-level security leaves out anybody
- * blocked either way.
+ * blocked either way. Who a reply names is kept when it's posted
+ * (`reply_mentions`, migration 0024), so it's never searched for in the
+ * words.
  */
 
 /** The thread a reply is in, as the bell names it. */
@@ -133,11 +136,11 @@ function byThread(replies: BellReply[]): BellReply[][] {
  * in a `thread` line.
  */
 export function replyBell(
-  me: { id: string; username: string },
+  me: { id: string },
   read: {
     /** Replies on your own reviews and takes. */
     onMine: BellReply[];
-    /** Replies whose words might name you. */
+    /** Replies that named you. */
     mentions: BellReply[];
     /** Replies in threads you've replied in. */
     followUps: BellReply[];
@@ -164,11 +167,9 @@ export function replyBell(
     });
   }
 
-  const name = me.username.toLowerCase();
   const named = new Set<number>();
   for (const reply of read.mentions) {
     if (!others(reply) || reply.thread.ownerId === me.id || named.has(reply.id)) continue;
-    if (!parseMentions(reply.body).includes(name)) continue;
     named.add(reply.id);
     lines.push({
       kind: "mention",
@@ -211,97 +212,182 @@ export function replyBell(
 
 const REPLY =
   "id, body, created_at, user_id, profiles!inner ( id, username, display_name, avatar_url )";
-const ON_ALBUM =
-  "ratings!inner ( id, user_id, release_mbid, releases ( title ), profiles ( username, display_name ) )";
-const ON_ARTIST =
-  "artist_ratings!inner ( id, user_id, artist_mbid, artists ( name ), profiles ( username, display_name ) )";
-const ON_TAKE = `versus_takes!inner ( id, user_id, profiles ( username, display_name ), versus_matchups ( ${MATCHUP_SELECT} ) )`;
-/** Any thread at all, for replies whose words might name you. */
-const ON_ANY = [ON_ALBUM, ON_ARTIST, ON_TAKE].map((join) => join.replace("!inner", "")).join(", ");
+/** Whichever thread a reply is in, named. */
+const THREAD = [
+  "ratings ( id, user_id, release_mbid, releases ( title ), profiles ( username, display_name ) )",
+  "artist_ratings ( id, user_id, artist_mbid, artists ( name ), profiles ( username, display_name ) )",
+  `versus_takes ( id, user_id, profiles ( username, display_name ), versus_matchups ( ${MATCHUP_SELECT} ) )`,
+].join(", ");
+const BELL = `${REPLY}, ${THREAD}`;
 
 const COLUMN = { album: "rating_id", artist: "artist_rating_id", take: "versus_take_id" } as const;
+const NEWEST = { ascending: false } as const;
+
+/** How many of your own latest replies are read to find the threads you're in. */
+const MY_REPLIES_LOOK = 200;
+
+/** The most threads you've replied in that the bell follows, your most recent first. */
+export const THREADS_FOLLOWED = 50;
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+type Read = { data: unknown; error: { code?: string; message: string } | null };
 
 /**
- * Somebody's reply lines for the bell. Before migration 0024 there's nothing
- * to read, and there are none. At most `limit` threads are followed, so each
- * `.in()` list stays well under a hundred ids.
+ * A read's rows. A failed one is logged and reads as none, so the rest of the
+ * bell still shows; before migration 0024 has run there's nothing to log.
  */
-export async function getReplyNotifications(userId: string, limit = 50): Promise<Notification[]> {
-  const supabase = await createClient();
-  const newest = { ascending: false } as const;
+function rowsOf<Row>(result: Read | null): Row[] {
+  if (!result) return [];
+  if (result.error) {
+    if (!isMissingTable(result.error)) logQueryError("replies", result.error);
+    return [];
+  }
+  return (result.data ?? []) as Row[];
+}
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!profile) return [];
+type MyReply = {
+  rating_id: number | null;
+  artist_rating_id: number | null;
+  versus_take_id: number | null;
+  thread_owner_id: string | null;
+  created_at: string;
+};
 
-  const read = (join: string) =>
-    supabase
-      .from("replies")
-      .select(`${REPLY}, ${join}`)
-      .neq("user_id", userId)
-      .order("created_at", newest)
-      .limit(limit);
+/** A thread you've replied in, and when you last did. */
+type Followed = { kind: ThreadKind; id: number; at: string };
 
-  const [album, artist, take, mentions, mine] = await Promise.all([
-    read(ON_ALBUM).eq("ratings.user_id", userId),
-    read(ON_ARTIST).eq("artist_ratings.user_id", userId),
-    read(ON_TAKE).eq("versus_takes.user_id", userId),
-    // "_" is any one character to ilike; the words are checked properly after.
-    read(ON_ANY).ilike("body", `%@${profile.username}%`),
-    supabase
-      .from("replies")
-      .select("rating_id, artist_rating_id, versus_take_id, created_at")
-      .eq("user_id", userId)
-      .order("created_at", newest)
-      .limit(limit),
-  ]);
-  if (mine.error) return [];
+/**
+ * The threads on other people's reviews and takes you've replied in most
+ * recently, at most fifty, keyed by thread, each with your latest reply
+ * there. Replies on your own are `reply` lines already.
+ */
+async function threadsFollowed(supabase: Supabase, userId: string) {
+  const result = await supabase
+    .from("replies")
+    .select("rating_id, artist_rating_id, versus_take_id, thread_owner_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", NEWEST)
+    .limit(MY_REPLIES_LOOK);
 
   // Newest first, so the first seen of each thread is your latest there.
-  const myLatest = new Map<string, string>();
-  for (const row of mine.data ?? []) {
+  const threads = new Map<string, Followed>();
+  for (const row of rowsOf<MyReply>(result)) {
+    if (row.thread_owner_id === userId) continue;
     const kind: ThreadKind = row.rating_id ? "album" : row.artist_rating_id ? "artist" : "take";
     const id = row.rating_id ?? row.artist_rating_id ?? row.versus_take_id;
     if (id === null) continue;
-    const key = `${kind}-${id}`;
-    if (!myLatest.has(key)) myLatest.set(key, row.created_at);
+    const key = keyOf({ kind, id });
+    if (!threads.has(key)) threads.set(key, { kind, id, at: row.created_at });
+    if (threads.size === THREADS_FOLLOWED) break;
   }
-  const times = [...myLatest.values()].map((at) => Date.parse(at));
-  const oldest = times.length > 0 ? new Date(Math.min(...times)).toISOString() : null;
-  const idsOf = (kind: ThreadKind) =>
-    [...myLatest.keys()]
-      .filter((key) => key.startsWith(`${kind}-`))
-      .map((key) => Number(key.slice(kind.length + 1)));
+  return threads;
+}
 
-  const follow = async (kind: ThreadKind, join: string) => {
-    const ids = idsOf(kind);
-    if (ids.length === 0 || !oldest) return [];
-    const { data } = await read(join).in(COLUMN[kind], ids).gt("created_at", oldest);
-    return (data ?? []) as unknown as BellRow[];
-  };
-  const followUps = await Promise.all([
-    follow("album", ON_ALBUM),
-    follow("artist", ON_ARTIST),
-    follow("take", ON_TAKE),
+/**
+ * Replies by others newer than your own latest, in each thread you follow:
+ * exact per thread, so a busy thread can't crowd out what's new elsewhere.
+ * The times are quoted, since they hold "." and ":".
+ */
+function newerThanYours(supabase: Supabase, userId: string, threads: Map<string, Followed>) {
+  const since = [...threads.values()]
+    .map((t) => `and(${COLUMN[t.kind]}.eq.${t.id},created_at.gt."${t.at}")`)
+    .join(",");
+  return (columns: string) =>
+    supabase
+      .from("replies")
+      .select(columns)
+      .neq("user_id", userId)
+      .or(since)
+      .order("created_at", NEWEST);
+}
+
+const bell = (rows: BellRow[]) =>
+  rows.flatMap((row) => {
+    const reply = toBellReply(row);
+    return reply ? [reply] : [];
+  });
+
+/**
+ * Somebody's reply lines for the bell, in four reads at most: replies on
+ * their own reviews and takes, the replies that named them (kept when each
+ * was posted, by `recordMentions`), and their fifty most recent threads, then
+ * what's new in those.
+ */
+export async function getReplyNotifications(userId: string, limit = 50): Promise<Notification[]> {
+  const supabase = await createClient();
+
+  const [onMine, mentions, threads] = await Promise.all([
+    supabase
+      .from("replies")
+      .select(BELL)
+      .eq("thread_owner_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", NEWEST)
+      .limit(limit),
+    supabase
+      .from("reply_mentions")
+      .select(`replies!inner ( ${BELL} )`)
+      .eq("user_id", userId)
+      .order("reply_id", NEWEST)
+      .limit(limit),
+    threadsFollowed(supabase, userId),
   ]);
 
-  const bell = (rows: BellRow[]) =>
-    rows.flatMap((row) => {
-      const reply = toBellReply(row);
-      return reply ? [reply] : [];
-    });
-  const rowsOf = (result: { data: unknown }) => (result.data ?? []) as BellRow[];
+  const followUps =
+    threads.size > 0
+      ? rowsOf<BellRow>(await newerThanYours(supabase, userId, threads)(BELL).limit(limit * 2))
+      : [];
 
   return replyBell(
-    { id: userId, username: profile.username },
+    { id: userId },
     {
-      onMine: bell([...rowsOf(album), ...rowsOf(artist), ...rowsOf(take)]),
-      mentions: bell(rowsOf(mentions)),
-      followUps: bell(followUps.flat()),
-      myLatest,
+      onMine: bell(rowsOf<BellRow>(onMine)),
+      mentions: bell(rowsOf<{ replies: BellRow }>(mentions).map((row) => row.replies)),
+      followUps: bell(followUps),
+      myLatest: new Map([...threads].map(([key, thread]) => [key, thread.at])),
     },
   );
+}
+
+/**
+ * When the newest of somebody's reply lines happened, for the dot on the
+ * bell, without working the lines out: the newest reply to them, the newest
+ * that named them, and the newest in a thread they follow since their own
+ * latest there. Times only, in four small reads; row-level security leaves
+ * out anybody blocked either way.
+ */
+export async function latestReplyActivityAt(userId: string): Promise<string | null> {
+  const supabase = await createClient();
+
+  const followUp = async () => {
+    const threads = await threadsFollowed(supabase, userId);
+    if (threads.size === 0) return null;
+    return newerThanYours(supabase, userId, threads)("created_at").limit(1);
+  };
+
+  const [onMine, mention, followed] = await Promise.all([
+    supabase
+      .from("replies")
+      .select("created_at")
+      .eq("thread_owner_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", NEWEST)
+      .limit(1),
+    supabase
+      .from("reply_mentions")
+      .select("replies!inner ( created_at )")
+      .eq("user_id", userId)
+      .order("reply_id", NEWEST)
+      .limit(1),
+    followUp(),
+  ]);
+
+  const times = [
+    ...rowsOf<{ created_at: string }>(onMine),
+    ...rowsOf<{ replies: { created_at: string } }>(mention).map((row) => row.replies),
+    ...rowsOf<{ created_at: string }>(followed),
+  ]
+    .map((row) => row.created_at)
+    .sort((a, b) => Date.parse(b) - Date.parse(a));
+  return times[0] ?? null;
 }

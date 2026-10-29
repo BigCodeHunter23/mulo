@@ -1,7 +1,7 @@
 import "server-only";
 import { hiddenPeople } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
-import { getReplyNotifications } from "@/lib/reply-notifications";
+import { getReplyNotifications, latestReplyActivityAt } from "@/lib/reply-notifications";
 import { getFollowingIds } from "@/lib/social";
 import {
   getLatestVersusAt,
@@ -293,7 +293,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
   const [supabase, hidden] = await Promise.all([createClient(), hiddenPeople()]);
   const newest = { ascending: false } as const;
 
-  const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus, replyLines] =
+  const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus, reply] =
     await Promise.all([
       supabase
         .from("follows")
@@ -330,7 +330,8 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
         .order("created_at", newest)
         .limit(LATEST_LOOK),
       getLatestVersusAt(userId),
-      getReplyNotifications(userId, LATEST_LOOK),
+      // Times only; row-level security already leaves out anybody hidden.
+      latestReplyActivityAt(userId),
     ]);
 
   const times = [
@@ -346,11 +347,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     .filter((row) => !hidden.has(row.user_id ?? row.follower_id ?? ""))
     .map((row) => row.created_at)
     .concat(versus ? [versus] : [])
-    .concat(
-      replyLines
-        .filter((line) => !("person" in line && hidden.has(line.person.id)))
-        .map((line) => line.at),
-    )
+    .concat(reply ? [reply] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));
 
   return times[0] ?? null;
