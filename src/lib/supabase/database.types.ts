@@ -15,6 +15,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      album_matches: {
+        Row: {
+          album_key: string
+          album_name: string
+          artist_name: string
+          matched_by: string | null
+          next_try_at: string
+          release_mbid: string | null
+          song_hint: string | null
+          tried_at: string | null
+          tries: number
+        }
+        Insert: {
+          album_key: string
+          album_name: string
+          artist_name: string
+          matched_by?: string | null
+          next_try_at?: string
+          release_mbid?: string | null
+          song_hint?: string | null
+          tried_at?: string | null
+          tries?: number
+        }
+        Update: {
+          album_key?: string
+          album_name?: string
+          artist_name?: string
+          matched_by?: string | null
+          next_try_at?: string
+          release_mbid?: string | null
+          song_hint?: string | null
+          tried_at?: string | null
+          tries?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "album_matches_release_mbid_fkey"
+            columns: ["release_mbid"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["mbid"]
+          },
+        ]
+      }
       apple_tokens: {
         Row: {
           client_id: string
@@ -158,6 +202,132 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      diary_entries: {
+        Row: {
+          album_key: string
+          album_name: string
+          artist_name: string
+          created_at: string
+          day: string
+          fixed: boolean
+          id: number
+          minutes: number
+          plays: number
+          release_mbid: string | null
+          song_hint: string | null
+          songs: number
+          sources: string[]
+          user_id: string
+        }
+        Insert: {
+          album_key: string
+          album_name: string
+          artist_name: string
+          created_at?: string
+          day: string
+          fixed?: boolean
+          id?: never
+          minutes?: number
+          plays?: number
+          release_mbid?: string | null
+          song_hint?: string | null
+          songs?: number
+          sources: string[]
+          user_id: string
+        }
+        Update: {
+          album_key?: string
+          album_name?: string
+          artist_name?: string
+          created_at?: string
+          day?: string
+          fixed?: boolean
+          id?: never
+          minutes?: number
+          plays?: number
+          release_mbid?: string | null
+          song_hint?: string | null
+          songs?: number
+          sources?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diary_entries_release_mbid_fkey"
+            columns: ["release_mbid"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["mbid"]
+          },
+          {
+            foreignKeyName: "diary_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diary_sources: {
+        Row: {
+          carry: Json | null
+          import_added: number
+          import_page: number | null
+          import_to: string | null
+          last_count: number | null
+          last_import_at: string | null
+          lastfm_session: string | null
+          lastfm_user: string | null
+          pending_hash: string | null
+          pending_to: string | null
+          pending_until: string | null
+          reached_back: string | null
+          source: string
+          state: string
+          synced_to: string | null
+          user_id: string
+          worked_at: string | null
+        }
+        Insert: {
+          carry?: Json | null
+          import_added?: number
+          import_page?: number | null
+          import_to?: string | null
+          last_count?: number | null
+          last_import_at?: string | null
+          lastfm_session?: string | null
+          lastfm_user?: string | null
+          pending_hash?: string | null
+          pending_to?: string | null
+          pending_until?: string | null
+          reached_back?: string | null
+          source: string
+          state?: string
+          synced_to?: string | null
+          user_id: string
+          worked_at?: string | null
+        }
+        Update: {
+          carry?: Json | null
+          import_added?: number
+          import_page?: number | null
+          import_to?: string | null
+          last_count?: number | null
+          last_import_at?: string | null
+          lastfm_session?: string | null
+          lastfm_user?: string | null
+          pending_hash?: string | null
+          pending_to?: string | null
+          pending_until?: string | null
+          reached_back?: string | null
+          source?: string
+          state?: string
+          synced_to?: string | null
+          user_id?: string
+          worked_at?: string | null
+        }
+        Relationships: []
       }
       follows: {
         Row: {
@@ -315,6 +485,7 @@ export type Database = {
       personal_settings: {
         Row: {
           last_seen_at: string | null
+          notify_diary: boolean
           notify_drop: boolean
           notify_follows: boolean
           notify_loves: boolean
@@ -326,6 +497,7 @@ export type Database = {
         }
         Insert: {
           last_seen_at?: string | null
+          notify_diary?: boolean
           notify_drop?: boolean
           notify_follows?: boolean
           notify_loves?: boolean
@@ -337,6 +509,7 @@ export type Database = {
         }
         Update: {
           last_seen_at?: string | null
+          notify_diary?: boolean
           notify_drop?: boolean
           notify_follows?: boolean
           notify_loves?: boolean
@@ -353,6 +526,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          diary_public: boolean
           display_name: string | null
           id: string
           raised_era: string | null
@@ -365,6 +539,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          diary_public?: boolean
           display_name?: string | null
           id: string
           raised_era?: string | null
@@ -377,6 +552,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          diary_public?: boolean
           display_name?: string | null
           id?: string
           raised_era?: string | null
@@ -1245,6 +1421,57 @@ export type Database = {
           average: number | null
           votes: number | null
         }[]
+      }
+      diary_merge: {
+        Args: {
+          p_user: string
+          p_source: string
+          p_entries: Json
+        }
+        Returns: {
+          added: number | null
+          merged: number | null
+        }[]
+      }
+      diary_months: {
+        Args: {
+          p_user: string
+          p_from: string
+          p_to: string
+        }
+        Returns: {
+          month: string | null
+          albums: number | null
+          minutes: number | null
+        }[]
+      }
+      diary_remove_source: {
+        Args: {
+          p_user: string
+          p_source: string
+        }
+        Returns: number
+      }
+      diary_to_rate: {
+        Args: {
+          p_limit: number
+        }
+        Returns: {
+          release_mbid: string | null
+          plays: number | null
+          minutes: number | null
+          last_day: string | null
+        }[]
+      }
+      diary_visible: {
+        Args: {
+          p_owner: string
+        }
+        Returns: boolean
+      }
+      diary_waiting: {
+        Args: never
+        Returns: number
       }
       heavy_rotation: {
         Args: {

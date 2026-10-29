@@ -931,3 +931,237 @@ describe("0024 reply mentions", () => {
     expect(await count()).toBe(0);
   });
 });
+
+describe("0025 listening diary", () => {
+  let db: PGlite;
+  const NAS = "44444444-4444-4444-8444-444444444444";
+  const OTHER = "66666666-6666-4666-8666-666666666666";
+  // U(1) keeps a diary; U(2) reads it; U(3) has blocked U(1); U(4) keeps a private one.
+
+  beforeAll(async () => {
+    db = await localDatabase();
+    await db.exec(`
+      insert into auth.users (id) values ('${U(1)}'), ('${U(2)}'), ('${U(3)}'), ('${U(4)}');
+      insert into public.profiles (id, username) values
+        ('${U(1)}', 'keeper'), ('${U(2)}', 'reader'), ('${U(3)}', 'blocker'), ('${U(4)}', 'quiet');
+      update public.profiles set diary_public = false where id = '${U(4)}';
+      insert into public.artists (mbid, name) values ('${NAS}', 'Nas');
+      insert into public.releases (mbid, title, artist_mbid) values
+        ('${ALBUM}', 'Illmatic', '${NAS}'), ('${OTHER}', 'It Was Written', '${NAS}');
+      insert into public.blocks (blocker_id, blocked_id) values ('${U(3)}', '${U(1)}');
+    `);
+  });
+  afterAll(() => db?.close());
+
+  async function as<T>(user: string | null, sql: string): Promise<T[]> {
+    await db.exec(`select set_config('request.jwt.claim.sub', '${user ?? ""}', false)`);
+    await db.exec(`set role ${user ? "authenticated" : "anon"}`);
+    try {
+      return (await db.query<T>(sql)).rows;
+    } finally {
+      await db.exec("reset role");
+    }
+  }
+
+  const merge = (user: string, source: string, entries: object[]) =>
+    db.query<{ added: number; merged: number }>(
+      "select added, merged from public.diary_merge($1, $2, $3::jsonb)",
+      [user, source, JSON.stringify(entries)],
+    );
+
+  const day = (overrides: object = {}) => ({
+    day: "2026-10-12",
+    key: "nas|illmatic",
+    artist: "Nas",
+    album: "Illmatic",
+    songHint: "N.Y. State of Mind",
+    songs: 5,
+    minutes: 22,
+    plays: 6,
+    ...overrides,
+  });
+
+  const entries = async (user: string) =>
+    (
+      await db.query<{
+        day: string;
+        album_key: string;
+        sources: string[];
+        songs: number;
+        minutes: number;
+        plays: number;
+        release_mbid: string | null;
+        fixed: boolean;
+      }>(
+        `select day::text as day, album_key, sources, songs, minutes, plays, release_mbid, fixed
+         from public.diary_entries where user_id = $1 order by day, album_key`,
+        [user],
+      )
+    ).rows;
+
+  it("runs twice without complaint", async () => {
+    await db.exec(migrationSql("0025_listening_diary.sql"));
+  });
+
+  it("adds an album-day, and merges the same one from another source", async () => {
+    expect((await merge(U(1), "spotify", [day()])).rows[0]).toEqual({ added: 1, merged: 0 });
+    expect(
+      (await merge(U(1), "lastfm", [day({ songs: 7, minutes: 10, plays: 3 })])).rows[0],
+    ).toEqual({ added: 0, merged: 1 });
+    expect(await entries(U(1))).toEqual([
+      expect.objectContaining({
+        day: "2026-10-12",
+        sources: ["lastfm", "spotify"],
+        songs: 7,
+        minutes: 22,
+        plays: 6,
+      }),
+    ]);
+  });
+
+  it("keeps one entry for the same day and key sent twice in one batch", async () => {
+    await merge(U(1), "spotify", [
+      day({ day: "2026-10-13", songs: 4 }),
+      day({ day: "2026-10-13", songs: 9 }),
+    ]);
+    const rows = (await entries(U(1))).filter((r) => r.day === "2026-10-13");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.songs).toBe(9);
+  });
+
+  it("files every new name in the shared table, and uses a match already made", async () => {
+    await db.exec(
+      `update public.album_matches set release_mbid = '${ALBUM}', matched_by = 'musicbrainz'
+       where album_key = 'nas|illmatic'`,
+    );
+    await merge(U(1), "spotify", [day({ day: "2026-10-14" })]);
+    const row = (await entries(U(1))).find((r) => r.day === "2026-10-14");
+    expect(row?.release_mbid).toBe(ALBUM);
+    const names = await db.query("select album_key from public.album_matches");
+    expect(names.rows).toEqual([{ album_key: "nas|illmatic" }]);
+  });
+
+  it("logs by hand with the album chosen, kept out of the shared table", async () => {
+    await merge(U(1), "hand", [
+      day({
+        day: "2026-10-15",
+        key: "nas|it was written",
+        album: "It Was Written",
+        songs: 0,
+        minutes: 0,
+        plays: 0,
+        mbid: OTHER,
+      }),
+    ]);
+    const row = (await entries(U(1))).find((r) => r.day === "2026-10-15");
+    expect(row).toEqual(
+      expect.objectContaining({ release_mbid: OTHER, fixed: true, sources: ["hand"] }),
+    );
+    const names = await db.query(
+      "select 1 from public.album_matches where album_key = 'nas|it was written'",
+    );
+    expect(names.rows).toEqual([]);
+  });
+
+  it("can't be called, or written to, by the public roles", async () => {
+    await expect(
+      as(U(1), `select * from public.diary_merge('${U(1)}', 'hand', '[]'::jsonb)`),
+    ).rejects.toThrow();
+    await expect(
+      as(
+        U(1),
+        `insert into public.diary_entries (user_id, day, album_key, artist_name, album_name, sources)
+         values ('${U(1)}', '2026-01-01', 'a|b', 'A', 'B', array['hand'])`,
+      ),
+    ).rejects.toThrow();
+    await expect(as(U(1), "delete from public.diary_entries")).rejects.toThrow();
+    await expect(as(U(1), "select * from public.album_matches")).rejects.toThrow();
+    await expect(as(U(1), "select * from public.diary_sources")).rejects.toThrow();
+  });
+
+  it("shows a public diary to anyone, signed out too, but not across a block", async () => {
+    expect(
+      (await as(U(2), `select id from public.diary_entries where user_id = '${U(1)}'`)).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (await as(null, `select id from public.diary_entries where user_id = '${U(1)}'`)).length,
+    ).toBeGreaterThan(0);
+    expect(await as(U(3), `select id from public.diary_entries where user_id = '${U(1)}'`)).toEqual(
+      [],
+    );
+  });
+
+  it("shows a private diary to its owner only", async () => {
+    await merge(U(4), "spotify", [day()]);
+    expect(await as(U(2), `select id from public.diary_entries where user_id = '${U(4)}'`)).toEqual(
+      [],
+    );
+    expect(await as(null, `select id from public.diary_entries where user_id = '${U(4)}'`)).toEqual(
+      [],
+    );
+    expect(
+      (await as(U(4), `select id from public.diary_entries where user_id = '${U(4)}'`)).length,
+    ).toBe(1);
+  });
+
+  it("totals each month and counts what's waiting for a score", async () => {
+    const months = await as<{ month: string; albums: number; minutes: number }>(
+      null,
+      `select * from public.diary_months('${U(1)}', '2026-10-01', '2026-10-31')`,
+    );
+    expect(months).toEqual([{ month: "2026-10", albums: 2, minutes: 66 }]);
+    // Illmatic is matched and unrated; It Was Written was logged by hand.
+    expect(await as(U(1), "select public.diary_waiting() as n")).toEqual([{ n: 2 }]);
+    await db.exec(
+      `insert into public.ratings (user_id, release_mbid, score) values ('${U(1)}', '${ALBUM}', 9)`,
+    );
+    expect(await as(U(1), "select public.diary_waiting() as n")).toEqual([{ n: 1 }]);
+    expect(await as(U(1), "select release_mbid from public.diary_to_rate(10)")).toEqual([
+      { release_mbid: OTHER },
+    ]);
+  });
+
+  it("removes a source, keeping entries another source sent too", async () => {
+    const removed = await db.query<{ n: number }>(
+      `select public.diary_remove_source('${U(1)}', 'spotify') as n`,
+    );
+    expect(removed.rows[0]?.n).toBeGreaterThan(0);
+    const left = await entries(U(1));
+    expect(left.find((r) => r.day === "2026-10-12")?.sources).toEqual(["lastfm"]);
+    expect(left.find((r) => r.day === "2026-10-13")).toBeUndefined();
+  });
+
+  it("holds the rules on each column", async () => {
+    await refuses(
+      db,
+      `insert into public.diary_entries (user_id, day, album_key, artist_name, album_name, sources)
+       values ('${U(1)}', '1899-12-31', 'a|bc', 'A', 'B', array['hand'])`,
+    );
+    await refuses(
+      db,
+      `insert into public.diary_entries (user_id, day, album_key, artist_name, album_name, sources)
+       values ('${U(1)}', '2026-01-01', 'a|bc', 'A', 'B', array['tidal'])`,
+    );
+    await refuses(
+      db,
+      `insert into public.diary_entries (user_id, day, album_key, artist_name, album_name, sources)
+       values ('${U(1)}', '2026-01-01', 'a|bc', 'A', 'B', array[]::text[])`,
+    );
+  });
+
+  it("lets the push log take diary pushes, and has the switch", async () => {
+    await db.exec(
+      `insert into public.push_log (user_id, kind, key) values ('${U(1)}', 'diary', 'diary-import-lastfm-2026-10-30')`,
+    );
+    await db.exec(
+      `insert into public.personal_settings (user_id, notify_diary) values ('${U(2)}', false)`,
+    );
+  });
+
+  it("goes with the account, and lets go of an album that leaves", async () => {
+    await db.exec(`delete from public.releases where mbid = '${OTHER}'`);
+    expect((await entries(U(1))).find((r) => r.day === "2026-10-15")?.release_mbid).toBeNull();
+    await db.exec(`delete from auth.users where id = '${U(1)}'`);
+    expect(await entries(U(1))).toEqual([]);
+  });
+});
