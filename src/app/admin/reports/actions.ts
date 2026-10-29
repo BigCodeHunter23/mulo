@@ -91,3 +91,17 @@ export async function removeTake(takeId: number) {
   revalidatePath("/admin/reports");
   revalidatePath("/versus", "layout");
 }
+
+/**
+ * Deletes a reply. Its reports go with it, since there is nothing left to
+ * look at.
+ */
+export async function removeReply(replyId: number) {
+  const admin = await requireAdmin();
+  if (!admin) return;
+  if (!rowIdSchema.safeParse(replyId).success) return;
+
+  const { error } = await createAdminClient().from("replies").delete().eq("id", replyId);
+  record(admin, `removed reply ${replyId}`, error);
+  revalidatePath("/admin/reports");
+}

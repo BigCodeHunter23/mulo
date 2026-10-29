@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/moderation";
 import { buttonClass, EmptyState, SectionHeading } from "@/components/ui";
-import { removeList, removeReview, removeTake, setReportStatus } from "./actions";
+import { threadHref } from "@/lib/replies-shared";
+import { removeList, removeReply, removeReview, removeTake, setReportStatus } from "./actions";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -41,6 +42,15 @@ type ReportRow = {
     description: string | null;
     profiles: { username: string } | null;
   } | null;
+  /** Only there once replies exist (migration 0024). */
+  replies?: {
+    id: number;
+    body: string;
+    profiles: { username: string } | null;
+    ratings: { id: number; release_mbid: string } | null;
+    artist_ratings: { id: number; artist_mbid: string } | null;
+    versus_takes: { id: number; versus_matchups: { day: string } | null } | null;
+  } | null;
 };
 
 // Reports point at profiles twice (who reported, and who was reported), so
@@ -60,6 +70,28 @@ const SELECT_WITH_TAKES = `${SELECT},
 const SELECT_WITH_LISTS = `${SELECT_WITH_TAKES},
   lists ( id, title, description, profiles ( username ) )
 `;
+
+const SELECT_WITH_REPLIES = `${SELECT_WITH_LISTS},
+  replies ( id, body, profiles ( username ), ratings ( id, release_mbid ), artist_ratings ( id, artist_mbid ), versus_takes ( id, versus_matchups ( day ) ) )
+`;
+
+/** Where a reported reply's thread is, when it can still be found. */
+function replyThread(reply: NonNullable<ReportRow["replies"]>): string | null {
+  if (reply.ratings) {
+    return threadHref({ kind: "album", mbid: reply.ratings.release_mbid, id: reply.ratings.id });
+  }
+  if (reply.artist_ratings) {
+    return threadHref({
+      kind: "artist",
+      mbid: reply.artist_ratings.artist_mbid,
+      id: reply.artist_ratings.id,
+    });
+  }
+  const day = reply.versus_takes?.versus_matchups?.day;
+  return reply.versus_takes && day
+    ? threadHref({ kind: "take", day, id: reply.versus_takes.id })
+    : null;
+}
 
 function timeAgo(iso: string) {
   const minutes = Math.floor((Date.now() - Date.parse(iso)) / 60000);
@@ -94,8 +126,9 @@ export default async function ReportsInbox({
     return query;
   };
 
-  // Before takes exist their join fails, so fall back to reviews and profiles.
-  let { data, error } = await load(SELECT_WITH_LISTS);
+  // Before replies, takes or lists exist their joins fail, so fall back step by step.
+  let { data, error } = await load(SELECT_WITH_REPLIES);
+  if (error) ({ data, error } = await load(SELECT_WITH_LISTS));
   if (error) ({ data, error } = await load(SELECT_WITH_TAKES));
   if (error) ({ data, error } = await load(SELECT));
   // The select is chosen at runtime, so its shape can't be inferred; ReportRow
@@ -131,7 +164,7 @@ export default async function ReportsInbox({
           title={showAll ? "No reports yet" : "Nothing to review"}
           body={
             showAll
-              ? "When somebody reports a review or a profile, it lands here."
+              ? "When somebody reports a review, a reply or a profile, it lands here."
               : "Every report has been dealt with."
           }
         />
@@ -168,7 +201,26 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-3 text-sm text-text-secondary">
-                  {report.lists ? (
+                  {report.replies ? (
+                    <>
+                      <p>
+                        @{report.replies.profiles?.username ?? "unknown"}&rsquo;s{" "}
+                        {replyThread(report.replies) ? (
+                          <Link
+                            href={replyThread(report.replies) ?? "#"}
+                            className="font-medium text-text hover:text-accent"
+                          >
+                            reply
+                          </Link>
+                        ) : (
+                          "reply"
+                        )}
+                      </p>
+                      <blockquote className="mt-2 border-l-2 border-border-strong pl-3 text-text">
+                        {report.replies.body}
+                      </blockquote>
+                    </>
+                  ) : report.lists ? (
                     <>
                       <p>
                         @{report.lists.profiles?.username ?? "unknown"}&rsquo;s list{" "}
@@ -251,6 +303,13 @@ export default async function ReportsInbox({
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {report.replies && (
+                    <form action={removeReply.bind(null, report.replies.id)}>
+                      <button type="submit" className={buttonClass({ size: "sm" })}>
+                        Remove reply
+                      </button>
+                    </form>
+                  )}
                   {report.lists && (
                     <form action={removeList.bind(null, report.lists.id)}>
                       <button type="submit" className={buttonClass({ size: "sm" })}>
