@@ -292,6 +292,19 @@ export async function searchReleaseGroups(query: string): Promise<MbReleaseGroup
     .slice(0, 20);
 }
 
+/**
+ * Albums with this title by this artist, for matching a name from somebody's
+ * listening. Patient: one try after a busy answer, eight seconds at most.
+ */
+export async function findReleaseGroups(artist: string, album: string): Promise<MbReleaseGroup[]> {
+  const lucene = `releasegroup:"${escapeLucene(album)}" AND artist:"${escapeLucene(artist)}"`;
+  const data = await mbFetch<{ "release-groups": MbReleaseGroup[] }>(
+    `/release-group?query=${encodeURIComponent(lucene)}&limit=5&fmt=json`,
+    { retries: 1, timeoutMs: 8_000 },
+  );
+  return data["release-groups"] ?? [];
+}
+
 export async function getArtist(mbid: string): Promise<MbArtist> {
   return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels+aliases+ratings&fmt=json`);
 }
