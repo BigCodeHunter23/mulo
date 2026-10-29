@@ -67,6 +67,8 @@ export type Review = {
   score: number;
   review: string | null;
   created_at: string;
+  /** Replies on it, leaving out anybody hidden from the viewer; 0 signed out. */
+  replies: number;
 };
 
 /** Named to match the mockups: Ovr / You / Friends. */
@@ -174,6 +176,8 @@ export type FeedItem =
       author: Author;
       score: number;
       review: string | null;
+      /** Replies on the review: 0 for a score with no words, or signed out. */
+      replies: number;
       release: FeedAlbum;
     }
   | {
@@ -185,6 +189,8 @@ export type FeedItem =
       author: Author;
       score: number;
       review: string | null;
+      /** Replies on the review: 0 for a score with no words, or signed out. */
+      replies: number;
       artist: { mbid: string; name: string; image_url: string | null };
     }
   | {
@@ -385,6 +391,8 @@ export type VersusTake = {
   side: VersusSideKey | null;
   reactions: ReactionSummary;
   mine: boolean;
+  /** Replies on it, leaving out anybody hidden from the viewer. */
+  replies: number;
 };
 
 export type Nomination = {

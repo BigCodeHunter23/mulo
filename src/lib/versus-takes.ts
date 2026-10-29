@@ -2,6 +2,7 @@ import "server-only";
 import type { VersusTake } from "@/lib/app-api";
 import { hiddenFilter } from "@/lib/blocks";
 import { getReactions } from "@/lib/reactions";
+import { getReplyCounts } from "@/lib/replies";
 import { createPublicClient } from "@/lib/supabase/public";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { VersusSideKey } from "@/lib/versus-shared";
@@ -38,7 +39,7 @@ export async function getTakes(matchupId: number): Promise<Takes> {
   const rows = data ?? [];
   if (rows.length === 0) return { available: true, takes: [] };
 
-  const [{ data: picks }, reactions, user] = await Promise.all([
+  const [{ data: picks }, reactions, replyCounts, user] = await Promise.all([
     supabase
       .from("versus_votes")
       .select("user_id, pick")
@@ -48,6 +49,10 @@ export async function getTakes(matchupId: number): Promise<Takes> {
         rows.map((row) => row.user_id),
       ),
     getReactions(
+      "take",
+      rows.map((row) => row.id),
+    ),
+    getReplyCounts(
       "take",
       rows.map((row) => row.id),
     ),
@@ -69,6 +74,7 @@ export async function getTakes(matchupId: number): Promise<Takes> {
     side: sides.get(row.user_id) ?? null,
     reactions: reactions[row.id],
     mine: user?.id === row.user_id,
+    replies: replyCounts[row.id] ?? 0,
   }));
 
   // Most loved first; ties keep the newest on top.

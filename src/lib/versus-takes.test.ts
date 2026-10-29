@@ -34,6 +34,10 @@ vi.mock("@/lib/supabase/public", () => ({
   }),
 }));
 vi.mock("@/lib/supabase/server", () => ({ getCurrentUser: async () => ({ id: "me" }) }));
+vi.mock("@/lib/replies", () => ({
+  getReplyCounts: async (_kind: string, ids: number[]) =>
+    Object.fromEntries(ids.map((id) => [id, 0])),
+}));
 vi.mock("@/lib/reactions", () => ({
   getReactions: async (_kind: string, ids: number[]) =>
     Object.fromEntries(ids.map((id) => [id, { love: 0, dislike: 0, mine: null }])),

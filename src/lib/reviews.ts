@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { RATING_TABLES, reviewedTable } from "@/lib/rating-kinds";
 import { hiddenFilter } from "@/lib/blocks";
+import { getReplyCounts } from "@/lib/replies";
 import type { Review } from "@/lib/app-api";
 
 export type { Review };
@@ -17,7 +18,9 @@ export async function getReviews(kind: "album" | "artist", mbid: string): Promis
 
   const query = supabase
     .from(table)
-    .select("id, score, review, created_at, profiles!inner ( id, username, display_name, avatar_url )")
+    .select(
+      "id, score, review, created_at, profiles!inner ( id, username, display_name, avatar_url )",
+    )
     .eq(column, mbid)
     .not("review", "is", null)
     .order("created_at", { ascending: false })
@@ -28,8 +31,13 @@ export async function getReviews(kind: "album" | "artist", mbid: string): Promis
   if (hidden) query.not("user_id", "in", hidden);
 
   const { data } = await query;
+  const rows = data ?? [];
+  const replies = await getReplyCounts(
+    kind,
+    rows.map((row) => row.id),
+  );
 
-  return (data ?? []).map((row) => ({
+  return rows.map((row) => ({
     id: row.id,
     user_id: row.profiles.id,
     username: row.profiles.username,
@@ -38,5 +46,6 @@ export async function getReviews(kind: "album" | "artist", mbid: string): Promis
     score: row.score,
     review: row.review,
     created_at: row.created_at,
+    replies: replies[row.id] ?? 0,
   }));
 }

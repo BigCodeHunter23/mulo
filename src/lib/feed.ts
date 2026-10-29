@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { hiddenFilter } from "@/lib/blocks";
 import { getReactions, NO_REACTIONS } from "@/lib/reactions";
+import { getReplyCounts } from "@/lib/replies";
 import { MATCHUP_SELECT, sydneyDay, toMatchup } from "@/lib/versus";
 import { sideKey } from "@/lib/versus-shared";
 import type { Author, FeedAlbum, FeedItem } from "@/lib/app-api";
@@ -140,6 +141,7 @@ async function loadFeed(
       author: row.profiles,
       score: row.score,
       review: row.review,
+      replies: 0,
       release: toAlbum(row.releases),
     })),
     ...(artistResult.data ?? []).map((row): FeedItem => ({
@@ -151,6 +153,7 @@ async function loadFeed(
       author: row.profiles,
       score: row.score,
       review: row.review,
+      replies: 0,
       artist: row.artists,
     })),
     ...groupSongs(songResult.data ?? []),
@@ -174,29 +177,40 @@ async function loadFeed(
   const pickItems = visible.flatMap((item) => (item.kind === "pick" ? [item] : []));
   const pickMatchups = [...new Set(pickItems.map((item) => item.matchup.id))];
 
-  // Loves and nahs, for the items that made the cut, and which matchups the
-  // viewer has picked in themselves.
-  const [albumReactions, artistReactions, pickReactions, viewerPicks] = await Promise.all([
-    getReactions(
-      "album",
-      visible.flatMap((item) => (item.kind === "album" ? [item.ratingId] : [])),
-    ),
-    getReactions(
-      "artist",
-      visible.flatMap((item) => (item.kind === "artist" ? [item.ratingId] : [])),
-    ),
-    getReactions(
-      "pick",
-      pickItems.map((item) => item.ratingId),
-    ),
-    viewerId && pickMatchups.length > 0
-      ? supabase
-          .from("versus_votes")
-          .select("matchup_id")
-          .eq("user_id", viewerId)
-          .in("matchup_id", pickMatchups)
-      : Promise.resolve({ data: [] }),
-  ]);
+  /** Rating ids of the written reviews of one kind that made the cut. */
+  const written = (kind: "album" | "artist") =>
+    visible.flatMap((item) =>
+      (item.kind === "album" || item.kind === "artist") && item.kind === kind && item.review
+        ? [item.ratingId]
+        : [],
+    );
+
+  // Loves and nahs and replies, for the items that made the cut, and which
+  // matchups the viewer has picked in themselves.
+  const [albumReactions, artistReactions, pickReactions, viewerPicks, albumReplies, artistReplies] =
+    await Promise.all([
+      getReactions(
+        "album",
+        visible.flatMap((item) => (item.kind === "album" ? [item.ratingId] : [])),
+      ),
+      getReactions(
+        "artist",
+        visible.flatMap((item) => (item.kind === "artist" ? [item.ratingId] : [])),
+      ),
+      getReactions(
+        "pick",
+        pickItems.map((item) => item.ratingId),
+      ),
+      viewerId && pickMatchups.length > 0
+        ? supabase
+            .from("versus_votes")
+            .select("matchup_id")
+            .eq("user_id", viewerId)
+            .in("matchup_id", pickMatchups)
+        : Promise.resolve({ data: [] }),
+      getReplyCounts("album", written("album")),
+      getReplyCounts("artist", written("artist")),
+    ]);
 
   const pickedIn = new Set(
     ((viewerPicks.data ?? []) as { matchup_id: number }[]).map((row) => row.matchup_id),
@@ -205,10 +219,18 @@ async function loadFeed(
 
   return visible.map((item) => {
     if (item.kind === "album") {
-      return { ...item, reaction: albumReactions[item.ratingId] ?? NO_REACTIONS };
+      return {
+        ...item,
+        reaction: albumReactions[item.ratingId] ?? NO_REACTIONS,
+        replies: albumReplies[item.ratingId] ?? 0,
+      };
     }
     if (item.kind === "artist") {
-      return { ...item, reaction: artistReactions[item.ratingId] ?? NO_REACTIONS };
+      return {
+        ...item,
+        reaction: artistReactions[item.ratingId] ?? NO_REACTIONS,
+        replies: artistReplies[item.ratingId] ?? 0,
+      };
     }
     if (item.kind === "pick") {
       return {

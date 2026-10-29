@@ -17,3 +17,11 @@ export function logQueryError(area: string, error: QueryError, migration?: strin
   }
   console.error(`[${area}] query failed:`, error.code ?? "", error.message);
 }
+
+/**
+ * PostgREST's code, and Postgres's, for a table that doesn't exist: a
+ * migration that hasn't run yet.
+ */
+export function isMissingTable(error: { code?: string; message?: string } | null): boolean {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
