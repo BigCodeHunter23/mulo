@@ -10,6 +10,8 @@ const RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 /** Expo takes at most 100 pushes, and 1000 receipt ids, per request. */
 const SEND_BATCH = 100;
 const RECEIPT_BATCH = 1000;
+/** Long enough for Expo, short enough that a hung request can't eat the whole run. */
+const TIMEOUT_MS = 15_000;
 
 export type ExpoMessage = {
   to: string;
@@ -42,18 +44,25 @@ export async function postToExpo(messages: ExpoMessage[]): Promise<(Ticket | und
   const tickets: (Ticket | undefined)[] = [];
   for (let i = 0; i < messages.length; i += SEND_BATCH) {
     const batch = messages.slice(i, i + SEND_BATCH);
-    const response = await fetch(SEND_URL, {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify(batch),
-    });
-    if (!response.ok) {
-      console.error("[push] Expo refused a batch:", response.status);
+    try {
+      const response = await fetch(SEND_URL, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(batch),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        console.error("[push] Expo refused a batch:", response.status);
+        tickets.push(...batch.map(() => undefined));
+        continue;
+      }
+      const { data } = (await response.json()) as { data?: Ticket[] };
+      tickets.push(...batch.map((_, j) => data?.[j]));
+    } catch (error) {
+      // A dropped connection or a bad body loses this batch only.
+      console.error("[push] Sending a batch to Expo failed:", error);
       tickets.push(...batch.map(() => undefined));
-      continue;
     }
-    const { data } = (await response.json()) as { data?: Ticket[] };
-    tickets.push(...batch.map((_, j) => data?.[j]));
   }
   return tickets;
 }
@@ -62,17 +71,22 @@ export async function postToExpo(messages: ExpoMessage[]): Promise<(Ticket | und
 export async function fetchReceipts(ids: string[]): Promise<Record<string, Receipt>> {
   const receipts: Record<string, Receipt> = {};
   for (let i = 0; i < ids.length; i += RECEIPT_BATCH) {
-    const response = await fetch(RECEIPTS_URL, {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ ids: ids.slice(i, i + RECEIPT_BATCH) }),
-    });
-    if (!response.ok) {
-      console.error("[push] Expo refused a receipts request:", response.status);
-      continue;
+    try {
+      const response = await fetch(RECEIPTS_URL, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ ids: ids.slice(i, i + RECEIPT_BATCH) }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        console.error("[push] Expo refused a receipts request:", response.status);
+        continue;
+      }
+      const { data } = (await response.json()) as { data?: Record<string, Receipt> };
+      Object.assign(receipts, data ?? {});
+    } catch (error) {
+      console.error("[push] Reading receipts from Expo failed:", error);
     }
-    const { data } = (await response.json()) as { data?: Record<string, Receipt> };
-    Object.assign(receipts, data ?? {});
   }
   return receipts;
 }
