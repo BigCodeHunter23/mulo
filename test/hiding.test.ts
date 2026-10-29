@@ -44,6 +44,11 @@ vi.mock("@/lib/reply-notifications", () => ({
   // Read through row-level security, which leaves hidden people out itself.
   latestReplyActivityAt: vi.fn(async () => null),
 }));
+// A finished import is only ever your own, so a block never touches it.
+vi.mock("@/lib/diary/notifications", () => ({
+  diaryImportNotifications: vi.fn(async () => []),
+  latestDiaryImportAt: vi.fn(async () => null),
+}));
 vi.mock("@/lib/social", () => ({ getFollowingIds: vi.fn(async () => []) }));
 vi.mock("@/lib/versus", () => ({
   getLatestVersusAt: vi.fn(async () => null),

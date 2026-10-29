@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { Notification, Person } from "@/lib/notifications";
 import { leader, peopleList, shares, SIDES, type VersusResult } from "@/lib/versus-shared";
+import { SOURCE_NAME } from "@/lib/diary-shared";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
+import RecordDisc from "@/components/RecordDisc";
 import VersusFaces from "@/components/VersusFaces";
 import { buttonClass } from "@/components/ui";
 
@@ -58,8 +60,14 @@ function Icon({ item }: { item: Notification }) {
   if (item.kind === "versus-result") {
     return <VersusFaces matchup={item.result.matchup} winner={leader(item.result.tally)} />;
   }
-  // Nothing sends an import's line yet; it gets its own look when the imports do.
-  if (item.kind === "diary-import") return null;
+  // An import is nobody else's doing: a plain record, opening the diary.
+  if (item.kind === "diary-import") {
+    return (
+      <Link href="/diary" className="shrink-0" aria-label="Your diary">
+        <RecordDisc cover={null} className="h-10 w-10" />
+      </Link>
+    );
+  }
 
   return (
     <Link href={`/u/${item.person.username}`} className="shrink-0">
@@ -162,7 +170,14 @@ function Text({ item }: { item: Notification }) {
     case "versus-result":
       return <VersusResultText result={item.result} />;
     case "diary-import":
-      return null;
+      return (
+        <p>
+          <Link href="/diary" className={strong}>
+            Your {SOURCE_NAME[item.source]} history is in:
+          </Link>{" "}
+          {item.count.toLocaleString("en")} {item.count === 1 ? "album" : "albums"} to rate.
+        </p>
+      );
   }
 }
 

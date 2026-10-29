@@ -1,6 +1,7 @@
 import "server-only";
 import { hiddenPeople } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
+import { diaryImportNotifications, latestDiaryImportAt } from "@/lib/diary/notifications";
 import { getReplyNotifications, latestReplyActivityAt } from "@/lib/reply-notifications";
 import { getFollowingIds } from "@/lib/social";
 import {
@@ -99,8 +100,9 @@ async function alsoRated(
 
 /**
  * What's happened to somebody lately: new followers, loves and nahs on their
- * ratings, replies and mentions, and the Daily Versus. Worked out from those tables on request, like
- * the feed, so there's nothing extra to store or keep in step.
+ * ratings, replies and mentions, the Daily Versus, and a diary import
+ * finishing. Worked out from those tables on request, like the feed, so
+ * there's nothing extra to store or keep in step.
  */
 export async function getNotifications(userId: string, limit = 50): Promise<Notification[]> {
   const supabase = await createClient();
@@ -117,6 +119,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     results,
     shared,
     replies,
+    imports,
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -166,6 +169,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     getRecentResults(userId),
     alsoRated(supabase, userId, limit),
     getReplyNotifications(userId, limit),
+    diaryImportNotifications(userId),
   ]);
 
   // Follows point at accounts rather than profiles, so their names come separately.
@@ -185,6 +189,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
   const notifications: Notification[] = [
     ...shared,
     ...replies,
+    ...imports,
     ...followRows.flatMap((row): Notification[] => {
       const person = people.get(row.follower_id);
       return person
@@ -293,46 +298,55 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
   const [supabase, hidden] = await Promise.all([createClient(), hiddenPeople()]);
   const newest = { ascending: false } as const;
 
-  const [follow, albumReaction, artistReaction, pickReaction, takeReaction, versus, reply] =
-    await Promise.all([
-      supabase
-        .from("follows")
-        .select("follower_id, created_at")
-        .eq("following_id", userId)
-        .order("created_at", newest)
-        .limit(LATEST_LOOK),
-      supabase
-        .from("reactions")
-        .select("user_id, created_at, ratings!inner ( user_id )")
-        .eq("ratings.user_id", userId)
-        .neq("user_id", userId)
-        .order("created_at", newest)
-        .limit(LATEST_LOOK),
-      supabase
-        .from("reactions")
-        .select("user_id, created_at, artist_ratings!inner ( user_id )")
-        .eq("artist_ratings.user_id", userId)
-        .neq("user_id", userId)
-        .order("created_at", newest)
-        .limit(LATEST_LOOK),
-      supabase
-        .from("reactions")
-        .select("user_id, created_at, versus_votes!inner ( user_id )")
-        .eq("versus_votes.user_id", userId)
-        .neq("user_id", userId)
-        .order("created_at", newest)
-        .limit(LATEST_LOOK),
-      supabase
-        .from("reactions")
-        .select("user_id, created_at, versus_takes!inner ( user_id )")
-        .eq("versus_takes.user_id", userId)
-        .neq("user_id", userId)
-        .order("created_at", newest)
-        .limit(LATEST_LOOK),
-      getLatestVersusAt(userId),
-      // Times only; row-level security already leaves out anybody hidden.
-      latestReplyActivityAt(userId),
-    ]);
+  const [
+    follow,
+    albumReaction,
+    artistReaction,
+    pickReaction,
+    takeReaction,
+    versus,
+    reply,
+    diaryImport,
+  ] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("follower_id, created_at")
+      .eq("following_id", userId)
+      .order("created_at", newest)
+      .limit(LATEST_LOOK),
+    supabase
+      .from("reactions")
+      .select("user_id, created_at, ratings!inner ( user_id )")
+      .eq("ratings.user_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", newest)
+      .limit(LATEST_LOOK),
+    supabase
+      .from("reactions")
+      .select("user_id, created_at, artist_ratings!inner ( user_id )")
+      .eq("artist_ratings.user_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", newest)
+      .limit(LATEST_LOOK),
+    supabase
+      .from("reactions")
+      .select("user_id, created_at, versus_votes!inner ( user_id )")
+      .eq("versus_votes.user_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", newest)
+      .limit(LATEST_LOOK),
+    supabase
+      .from("reactions")
+      .select("user_id, created_at, versus_takes!inner ( user_id )")
+      .eq("versus_takes.user_id", userId)
+      .neq("user_id", userId)
+      .order("created_at", newest)
+      .limit(LATEST_LOOK),
+    getLatestVersusAt(userId),
+    // Times only; row-level security already leaves out anybody hidden.
+    latestReplyActivityAt(userId),
+    latestDiaryImportAt(userId),
+  ]);
 
   const times = [
     follow.data,
@@ -348,6 +362,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     .map((row) => row.created_at)
     .concat(versus ? [versus] : [])
     .concat(reply ? [reply] : [])
+    .concat(diaryImport ? [diaryImport] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));
 
   return times[0] ?? null;
