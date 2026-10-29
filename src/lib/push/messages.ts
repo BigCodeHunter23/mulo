@@ -29,12 +29,13 @@ const TITLE_MAX = 80;
  * Names and titles come from people (or MusicBrainz), so before they go on a
  * lock screen: no control or format characters (a newline, or a bidi
  * override that makes the push read backwards), one space between words,
- * and no longer than `max`, ending in "…" when cut.
+ * and no longer than `max`, ending in "…" when cut. The zero-width joiner
+ * and non-joiner stay: emoji families and some scripts' names need them.
  */
 export function clean(text: string, max: number): string {
   const tidy = text
     .replace(/\s+/gu, " ")
-    .replace(/[\p{Cc}\p{Cf}]/gu, "")
+    .replace(/(?![‌‍])[\p{Cc}\p{Cf}]/gu, "")
     .replace(/ {2,}/g, " ")
     .trim();
   const chars = Array.from(tidy);

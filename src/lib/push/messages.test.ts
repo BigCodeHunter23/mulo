@@ -47,6 +47,14 @@ describe("push wording", () => {
     expect(clean("\u2066\u2069", 40)).toBe("");
   });
 
+  it("keeps the joiners that hold emoji families and some names together", () => {
+    const family = "\u{1F469}\u200d\u{1F467}";
+    expect(clean(`Sam ${family}`, 40)).toBe(`Sam ${family}`);
+    expect(clean("\u0645\u06cc\u200c\u062e\u0648\u0627\u0645", 40)).toBe(
+      "\u0645\u06cc\u200c\u062e\u0648\u0627\u0645",
+    );
+  });
+
   it("cuts a long name or title with an ellipsis", () => {
     expect(clean("a".repeat(40), 40)).toBe("a".repeat(40));
     expect(clean("a".repeat(41), 40)).toBe(`${"a".repeat(39)}…`);
