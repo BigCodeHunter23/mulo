@@ -190,7 +190,9 @@ that needs: `personal_settings` (each person's switches, time zone and when
 they were last here), `push_devices` (the phones) and `push_log` (every push
 sent, with Expo's ticket). They're private on purpose: `profiles` can be read
 by anyone, and a time zone or a last visit must not be. Only the service role
-reaches them, through `src/lib/push/store.ts`.
+reaches them, through `src/lib/push/store.ts`. A person's copy of their data
+(`src/lib/export.ts`) includes their settings and phones, never a phone's
+token.
 
 A push starts one of two ways. A follow or a love fires one straight away:
 the action saves, then `later()` runs `events.ts` after the response, so
@@ -204,26 +206,39 @@ too (`src/lib/streak.ts`); badges stay on Sydney time. Nobody is sent timed
 pushes after 30 days away.
 
 Each push claims a row in `push_log` before it's sent, keyed by person, kind
-and day, so a repeated run or a retry can't send it twice.
+and a key that says how often that kind may go: a follow once a day per
+follower, a love once an hour per rating or take, Versus and streaks once per
+local day, the Drop once a week. A repeated run or a retry can't send it
+twice. Nobody gets more than ten follow and love pushes in an hour; past that
+they still show in the bell. The clock claims and sends up to 100 phones at a
+time and starts no batch (of pushes or receipts) after its 40-second budget,
+so what it leaves was never claimed and goes on the next run.
 
 ```
 src/lib/push/
-  zones.ts       time zones: validate, fall back to Sydney, local day and minutes
+  zones.ts       time zones: validate and spell canonically, fall back to Sydney, local day and minutes
   who.ts         pure rules: slots, away for 30 days, switches, log keys
-  messages.ts    the wording of every push
-  expo.ts        the only code that talks to Expo (send, receipts)
+  messages.ts    the wording of every push, with names and titles cleaned and cut
+  expo.ts        the only code that talks to Expo (send, receipts), checking its answers
+  batches.ts     batches of 100 pushes or 1000 receipts, and the clock's deadline
   store.ts       every database read and write for pushes
   send.ts        filters by switches, claims in the log, sends, records tickets
   receipts.ts    checks Expo's receipts and drops phones that are gone
-  events.ts      notifyFollow, notifyLove
+  events.ts      notifyFollow, notifyLove, and the cap of ten an hour
   later.ts       runs a task after the response
   tick.ts        the clock's run: Versus, Drop, streak, receipts, pruning
   tick-auth.ts   checks the clock's secret
 ```
 
 The endpoints are `push/devices` (register or remove a phone),
-`me/notifications` (read and change the switches) and `push/tick`, all under
-`/api/app/v1`. Setting up the clock is in `docs/supabase-setup.md`.
+`push/devices/forget`, `me/notifications` (read and change the switches) and
+`push/tick`, all under `/api/app/v1`. `push/devices/forget` takes a phone's
+token and forgets it whatever account it's on, with no sign-in, since the app
+calls it whenever an account leaves the phone (a log-out, an ended session, a
+deleted account), by when there may be no session. It's limited per address
+and always answers `{ ok: true }`. Knowing a token only lets you stop pushes
+to that phone, which registering it again already could. Setting up the clock
+is in `docs/supabase-setup.md`.
 
 ## The database schema
 

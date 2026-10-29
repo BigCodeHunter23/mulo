@@ -194,10 +194,16 @@ before and nothing is sent. Do the steps in this order.
    the website every 15 minutes. Running it again just replaces the
    schedule.
 6. In Vercel → your project → **Settings → Environment Variables**, add
-   `PUSH_TICK_SECRET` with the same secret, for Production. If push security
-   is switched on in the Expo project (Expo dashboard → the project →
-   **Credentials / Access tokens**), also add `EXPO_ACCESS_TOKEN` with an
-   access token made there. Redeploy so the site picks them up.
+   `PUSH_TICK_SECRET` with the same secret, for **Production only**. Leave
+   Preview and Development unticked: a preview deployment must never be
+   able to run the clock.
+7. Turn on Expo's push security, so only MULO can send pushes to MULO's
+   phones. In the order given, or pushes fail in between: on expo.dev, go
+   to the account's **Settings → Access tokens** and make a token; in Vercel
+   add it as `EXPO_ACCESS_TOKEN`, for Production, and redeploy so the site
+   picks up both variables; then, back on **Access tokens**, switch on
+   **Enhanced security for push notifications**. From then on Expo refuses
+   any push sent without the token.
 
 Check: in the SQL Editor, run
 `select status_code, created from net._http_response order by created desc limit 3;`
@@ -205,3 +211,9 @@ a quarter of an hour later. The newest rows should say `200`. A `401` means
 the secret in the Vault and the one in Vercel differ; save the right one in
 both places (to replace the Vault's, run
 `select vault.update_secret(id, 'THE-SECRET') from vault.secrets where name = 'push_tick_secret';`).
+
+To change the secret (if it may have leaked, say), make a new one as in step
+3, then change it in both places: Vercel's `PUSH_TICK_SECRET` (then redeploy)
+and the Vault, with the `vault.update_secret` line above. Between the two,
+the clock's calls get a `401` and nothing is sent; the next run after both
+match catches up.

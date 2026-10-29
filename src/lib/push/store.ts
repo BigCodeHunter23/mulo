@@ -102,6 +102,36 @@ export async function saveSettings(
   if (error) throw error;
 }
 
+/** What somebody's copy of their data says about pushes. */
+export type PushCopy = {
+  settings: (SettingsRow & { time_zone: string | null; last_seen_at: string | null }) | null;
+  phones: { platform: string; created_at: string; last_seen_at: string }[];
+};
+
+/**
+ * Somebody's push settings (switches, time zone, last visit) and their
+ * phones, for their copy of their data. Never a phone's token: it's only an
+ * address for pushes, and of no use to them.
+ */
+export async function pushCopyOf(userId: string): Promise<PushCopy> {
+  const client = db();
+  const [settings, phones] = await Promise.all([
+    client
+      .from("personal_settings")
+      .select(`time_zone, last_seen_at, ${SETTINGS}`)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    client
+      .from("push_devices")
+      .select("platform, created_at, last_seen_at")
+      .eq("user_id", userId)
+      .order("created_at"),
+  ]);
+  if (settings.error) throw settings.error;
+  if (phones.error) throw phones.error;
+  return { settings: settings.data ?? null, phones: phones.data ?? [] };
+}
+
 export async function readSwitches(userIds: string[]): Promise<Map<string, NotificationSettings>> {
   if (userIds.length === 0) return new Map();
   const rows = await inChunks(userIds, async (chunk) => {

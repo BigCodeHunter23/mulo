@@ -17,6 +17,7 @@ import {
   markChecked,
   peoplePushesSince,
   personOf,
+  pushCopyOf,
   readTimeZone,
   tickCandidates,
   toColumns,
@@ -197,6 +198,52 @@ describe("uncheckedTickets", () => {
       { userId: "b", kind: "love", key: "l", tickets: [] },
     ]);
     expect(calls).toContainEqual(["order", ["sent_at"]]);
+  });
+});
+
+describe("pushCopyOf", () => {
+  it("answers the settings and the phones, without their tokens", async () => {
+    const calls: Record<string, [string, unknown[]][]> = {
+      personal_settings: [],
+      push_devices: [],
+    };
+    const settings = {
+      time_zone: "Europe/London",
+      last_seen_at: "2026-10-29T08:00:00Z",
+      notify_follows: true,
+      notify_loves: false,
+      notify_replies: true,
+      notify_versus: true,
+      notify_drop: true,
+      notify_streak: false,
+    };
+    const phones = [
+      { platform: "ios", created_at: "2026-10-01T00:00:00Z", last_seen_at: "2026-10-29T08:00:00Z" },
+    ];
+    client.current = {
+      from: (table: string) =>
+        query(
+          { data: table === "push_devices" ? phones : settings, error: null },
+          calls[table] ?? [],
+        ),
+    };
+    expect(await pushCopyOf("u")).toEqual({ settings, phones });
+    const selected = calls.push_devices?.find(([name]) => name === "select")?.[1][0];
+    expect(selected).toBe("platform, created_at, last_seen_at");
+    expect(String(selected)).not.toContain("token");
+    expect(calls.push_devices).toContainEqual(["eq", ["user_id", "u"]]);
+    expect(calls.personal_settings).toContainEqual(["eq", ["user_id", "u"]]);
+  });
+
+  it("answers no settings for somebody who never changed any", async () => {
+    client.current = { from: () => query({ data: null, error: null }) };
+    expect(await pushCopyOf("u")).toEqual({ settings: null, phones: [] });
+  });
+
+  it("throws a failed read", async () => {
+    const failure = new Error("down");
+    client.current = { from: () => query({ data: null, error: failure }) };
+    await expect(pushCopyOf("u")).rejects.toBe(failure);
   });
 });
 

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient, type CurrentUser } from "@/lib/supabase/server";
 import { logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
+import { pushCopyOf, type PushCopy } from "@/lib/push/store";
 
 /**
  * Everything one person has put into MULO, as a file they can keep, for the
@@ -15,6 +16,12 @@ import { readAll } from "@/lib/supabase/read-all";
  */
 export async function exportFor(user: CurrentUser): Promise<{ body: string; filename: string }> {
   const supabase = await createClient();
+  // Closed to their own session, so read with the service role (src/lib/push/store.ts).
+  // Before migration 0023 runs there's nothing to read, and the rest still comes.
+  const push = pushCopyOf(user.id).catch((error: unknown): PushCopy => {
+    console.error("[account export] push settings couldn't be read:", error);
+    return { settings: null, phones: [] };
+  });
 
   const [profile, albums, artists, songs, lists, following, followers, picks] = await Promise.all([
     supabase
@@ -95,6 +102,8 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
     if (result.error) logQueryError("account export", result.error);
   }
 
+  const pushCopy = await push;
+
   const body = {
     exported_at: new Date().toISOString(),
     account: { id: user.id, email: user.email ?? null },
@@ -109,6 +118,8 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
     goat: picks.data ?? [],
     following: following.data,
     followers: followers.data,
+    push_settings: pushCopy.settings,
+    push_phones: pushCopy.phones,
   };
 
   const day = new Date().toISOString().slice(0, 10);
