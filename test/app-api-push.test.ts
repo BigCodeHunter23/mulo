@@ -189,4 +189,43 @@ describe("push/tick", () => {
       diaryTick.runDiaryTick.mock.invocationCallOrder[0]!,
     );
   });
+
+  it("moves the diary on even when the pushes fail", async () => {
+    vi.stubEnv("PUSH_TICK_SECRET", "s".repeat(40));
+    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
+    tick.runTick.mockRejectedValueOnce(new Error("Expo down"));
+    const res = await clock.POST(req("POST", {}, { authorization: `Bearer ${"s".repeat(40)}` }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      pushes: "failed",
+      diary: { matched: 2, missed: 0, lastfmPeople: 1, errors: 0 },
+    });
+  });
+
+  it("gives the diary a slice of time however long the pushes took", async () => {
+    vi.stubEnv("PUSH_TICK_SECRET", "s".repeat(40));
+    const diaryDeadline = () =>
+      (diaryTick.runDiaryTick.mock.calls[0] as unknown[] | undefined)?.[1];
+    const started = Date.now();
+    const now = vi.spyOn(Date, "now");
+    // The pushes take 50 seconds.
+    now.mockReturnValueOnce(started).mockReturnValue(started + 50_000);
+    await clock.POST(req("POST", {}, { authorization: `Bearer ${"s".repeat(40)}` }));
+    now.mockRestore();
+    expect(diaryDeadline()).toBe(started + 55_000);
+
+    vi.clearAllMocks();
+    const quick = vi.spyOn(Date, "now");
+    quick.mockReturnValueOnce(started).mockReturnValue(started + 1_000);
+    await clock.POST(req("POST", {}, { authorization: `Bearer ${"s".repeat(40)}` }));
+    quick.mockRestore();
+    expect(diaryDeadline()).toBe(started + 45_000);
+
+    vi.clearAllMocks();
+    const slow = vi.spyOn(Date, "now");
+    slow.mockReturnValueOnce(started).mockReturnValue(started + 40_000);
+    await clock.POST(req("POST", {}, { authorization: `Bearer ${"s".repeat(40)}` }));
+    slow.mockRestore();
+    expect(diaryDeadline()).toBe(started + 52_000);
+  });
 });

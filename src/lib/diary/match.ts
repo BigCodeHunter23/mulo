@@ -25,6 +25,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * gave, and its page fetches the rest on its first visit. Nothing found
  * counts a try, waiting an hour, then six; after three it's "no match" and
  * its owners can say which album it is. A service failing counts nothing.
+ *
+ * Names are taken in turns between the diaries that brought them in, a few
+ * each a run, so one huge upload can't keep everybody else's waiting.
  */
 
 export type Pending = {
@@ -33,6 +36,8 @@ export type Pending = {
   album_name: string;
   song_hint: string | null;
   tries: number;
+  /** Whose diary brought the name in; null once their account has gone. */
+  added_by: string | null;
 };
 
 export type Found = Group & { artistMbid?: string | null };
@@ -49,8 +54,14 @@ export type MatchDeps = {
   failed: (key: string, nextTry: Date) => Promise<void>;
 };
 
-/** Names taken per run, the longest waiting first. */
+/** Names due read per run, the longest waiting first, to take turns from. */
+const POOL = 500;
+/** Names taken per run… */
 const BATCH = 100;
+/** …and from any one person's diary. */
+const PER_PERSON = 10;
+/** Names asked of ListenBrainz per run: one lookup, and one ask for their albums. */
+const LISTENBRAINZ_MAX = 50;
 const RETRY_AFTER_FAILURE_MS = 15 * 60_000;
 /** The wait after each try that found nothing: an hour, then six. */
 const WAITS_MS = [3_600_000, 6 * 3_600_000];
@@ -62,7 +73,7 @@ const real = (): MatchDeps => {
     pending: async (at, limit) => {
       const { data, error } = await db()
         .from("album_matches")
-        .select("album_key, artist_name, album_name, song_hint, tries")
+        .select("album_key, artist_name, album_name, song_hint, tries, added_by")
         .is("release_mbid", null)
         .lt("tries", 3)
         .lte("next_try_at", at.toISOString())
@@ -157,6 +168,29 @@ export type MatchReport = { matched: number; missed: number; errors: number };
 const reason = (error: unknown) => (error instanceof Error ? error.message : error);
 
 /**
+ * Names taken in turns, one from each person's diary in the order they came
+ * up, then round again: at most `perPerson` each and `limit` in all. Names
+ * whose diary has gone count as one more person.
+ */
+export function fairTurns(names: readonly Pending[], perPerson: number, limit: number): Pending[] {
+  const queues = new Map<string | null, Pending[]>();
+  for (const name of names) {
+    const queue = queues.get(name.added_by);
+    if (queue) queue.push(name);
+    else queues.set(name.added_by, [name]);
+  }
+  const taken: Pending[] = [];
+  for (let round = 0; round < perPerson; round++) {
+    for (const queue of queues.values()) {
+      const name = queue[round];
+      if (name) taken.push(name);
+      if (taken.length >= limit) return taken;
+    }
+  }
+  return taken;
+}
+
+/**
  * One run of matching, until `deadline`. Whatever's left waits for the next
  * run, already due.
  */
@@ -167,8 +201,9 @@ export async function runMatcher(
 ): Promise<MatchReport> {
   const report: MatchReport = { matched: 0, missed: 0, errors: 0 };
   if (Date.now() >= deadline) return report;
-  const names = await deps.pending(at, BATCH);
+  const names = fairTurns(await deps.pending(at, POOL), PER_PERSON, BATCH);
   const left = new Map(names.map((n) => [n.album_key, n]));
+  const late = () => Date.now() >= deadline;
 
   const settle = async (name: Pending, found: Found, by: "listenbrainz" | "musicbrainz") => {
     await deps.saveAlbum(found);
@@ -177,9 +212,10 @@ export async function runMatcher(
     report.matched += 1;
   };
 
-  // 1. ListenBrainz, for names with a song to look up by. Anything it can't
-  // place goes on to MusicBrainz.
-  const bySong = names.filter((n) => n.song_hint);
+  // 1. ListenBrainz, for names with a song to look up by, until the
+  // deadline. Anything it can't place, or has no time for, goes on to
+  // MusicBrainz, or waits for the next run.
+  const bySong = names.filter((n) => n.song_hint).slice(0, LISTENBRAINZ_MAX);
   if (deps.token && bySong.length > 0) {
     try {
       const hits = await deps.lookup(
@@ -191,8 +227,9 @@ export async function runMatcher(
       );
       const recordings = hits.flatMap((hit) => (hit ? [hit.recording] : []));
       const groups =
-        recordings.length > 0 ? await deps.groups(recordings) : new Map<string, Group>();
+        recordings.length > 0 && !late() ? await deps.groups(recordings) : new Map<string, Group>();
       for (const [index, name] of bySong.entries()) {
+        if (late()) break;
         const hit = hits[index];
         const group = hit ? groups.get(hit.recording) : undefined;
         // A song's release can be a compilation; only the album itself will do.
@@ -212,7 +249,7 @@ export async function runMatcher(
 
   // 2. MusicBrainz for the rest, one a second, until the deadline.
   for (const name of [...left.values()]) {
-    if (Date.now() >= deadline) break;
+    if (late()) break;
     try {
       let found: Found | null = null;
       try {

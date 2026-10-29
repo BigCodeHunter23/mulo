@@ -2,14 +2,15 @@
 -- filled by hand, from Last.fm, and from Spotify's extended streaming history.
 --
 -- Only the website writes here, with the service role, after its own checks
--- (the rate limit, the size limit, the listen rule). People read diaries
+-- (the rate limit, the listen rule); diary_merge keeps the size limit itself.
+-- People read diaries
 -- through their own session: a public diary to anyone, signed out too, except
 -- across a block; a private one to its owner only.
 --
 -- album_matches is shared by everybody: a cleaned "artist|album" key and the
 -- album it was matched to, so each name is looked up once. diary_sources holds
--- each person's imports (a Last.fm session key among them). Neither is
--- readable outside the website.
+-- each person's imports (their Last.fm name among them, never a session key).
+-- Neither is readable outside the website, and nor is an entry's song_hint.
 --
 -- Safe to run more than once.
 
@@ -55,11 +56,15 @@ create table if not exists public.album_matches (
   matched_by text check (matched_by in ('listenbrainz', 'musicbrainz')),
   tries smallint not null default 0 check (tries between 0 and 3),
   next_try_at timestamptz not null default now(),
-  tried_at timestamptz
+  tried_at timestamptz,
+  -- Whose diary brought the name in, so matching takes turns between people.
+  added_by uuid references auth.users (id) on delete set null
 );
 
 create index if not exists album_matches_due_idx
   on public.album_matches (next_try_at) where release_mbid is null and tries < 3;
+create index if not exists album_matches_matched_idx
+  on public.album_matches (tried_at) where release_mbid is not null;
 
 create table if not exists public.diary_sources (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -67,7 +72,9 @@ create table if not exists public.diary_sources (
   state text not null default 'idle'
     check (state in ('idle', 'importing', 'syncing', 'needs_reconnect')),
   lastfm_user text check (lastfm_user is null or char_length(lastfm_user) <= 64),
-  lastfm_session text check (lastfm_session is null or char_length(lastfm_session) <= 64),
+  -- The listener's time zone when they connected: a Last.fm import and its
+  -- syncs read days on this clock throughout, wherever they travel.
+  time_zone text check (time_zone is null or char_length(time_zone) <= 64),
   -- A Last.fm import reads pages up to import_to, newest first.
   import_to timestamptz,
   import_page integer check (import_page is null or import_page >= 1),
@@ -79,10 +86,12 @@ create table if not exists public.diary_sources (
   worked_at timestamptz,
   last_import_at timestamptz,
   last_count integer,
-  -- A connect in progress: the hash of its single-use state, and where to go back to.
+  -- A connect in progress: the hash of its single-use state, where to go back
+  -- to, and the time zone it started in, which a new import takes.
   pending_hash text,
   pending_until timestamptz,
   pending_to text check (pending_to is null or pending_to in ('web', 'app')),
+  pending_zone text check (pending_zone is null or char_length(pending_zone) <= 64),
   primary key (user_id, source)
 );
 
@@ -93,7 +102,12 @@ alter table public.diary_entries enable row level security;
 alter table public.album_matches enable row level security;
 alter table public.diary_sources enable row level security;
 
-revoke insert, update, delete, truncate on public.diary_entries from anon, authenticated;
+-- Readers get every column but song_hint, which is only for matching.
+revoke all on public.diary_entries from anon, authenticated;
+grant select (
+  id, user_id, day, album_key, artist_name, album_name, release_mbid, fixed,
+  sources, songs, minutes, plays, created_at
+) on public.diary_entries to anon, authenticated;
 revoke all on public.album_matches from anon, authenticated;
 revoke all on public.diary_sources from anon, authenticated;
 
@@ -130,23 +144,40 @@ create policy "Diaries are read as their owners allow"
 /**
  * Saves album-days for one person from one source. The same day and album
  * from another source merges in: the larger counts are kept and the sources
- * listed. New names go into album_matches to be matched, unless the album was
- * chosen (`mbid`, a listen logged by hand); a name already matched gives its
- * album at once. Answers how many entries were added and how many merged.
+ * listed. A new entry takes its album from, in turn: the one chosen (`mbid`,
+ * a listen logged by hand); the one its owner chose for those names before
+ * ("Which album is this?"), which it keeps as chosen; or a match already
+ * made. New names go into album_matches to be matched, noting whose diary
+ * brought them, unless the album was chosen.
+ *
+ * A diary holds 50,000 entries: new ones past that are skipped, oldest days
+ * first in, while merges into entries already there always apply. Answers
+ * how many entries were added, merged and skipped.
  */
-create or replace function public.diary_merge(p_user uuid, p_source text, p_entries jsonb)
-returns table (added integer, merged integer)
+drop function if exists public.diary_merge(uuid, text, jsonb);
+create function public.diary_merge(p_user uuid, p_source text, p_entries jsonb)
+returns table (added integer, merged integer, skipped integer)
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  diary_max constant integer := 50000;
+  room integer;
 begin
-  insert into public.album_matches (album_key, artist_name, album_name, song_hint)
-  select distinct on (e->>'key') e->>'key', e->>'artist', e->>'album', nullif(e->>'songHint', '')
+  -- One merge at a time for each person, so two can't both take the last room.
+  perform pg_advisory_xact_lock(hashtextextended('diary_merge:' || p_user::text, 0));
+
+  insert into public.album_matches (album_key, artist_name, album_name, song_hint, added_by)
+  select distinct on (e->>'key')
+    e->>'key', e->>'artist', e->>'album', nullif(e->>'songHint', ''), p_user
   from jsonb_array_elements(p_entries) e
   where nullif(e->>'mbid', '') is null
   order by e->>'key'
   on conflict (album_key) do nothing;
+
+  select greatest(0, diary_max - count(*))::int into room
+  from public.diary_entries where user_id = p_user;
 
   return query
   with incoming as (
@@ -163,17 +194,39 @@ begin
     from jsonb_array_elements(p_entries) e
     order by (e->>'day')::date, e->>'key', coalesce((e->>'songs')::int, 0) desc
   ),
+  ranked as (
+    select i.*,
+      exists (
+        select 1 from public.diary_entries d
+        where d.user_id = p_user and d.day = i.day and d.album_key = i.album_key
+      ) as known
+    from incoming i
+  ),
+  kept as (
+    select r.* from (
+      select r.*, row_number() over (partition by r.known order by r.day, r.album_key) as n
+      from ranked r
+    ) r
+    where r.known or r.n <= room
+  ),
   saved as (
     insert into public.diary_entries as d (
       user_id, day, album_key, artist_name, album_name, song_hint,
       release_mbid, fixed, sources, songs, minutes, plays
     )
     select
-      p_user, i.day, i.album_key, i.artist_name, i.album_name, i.song_hint,
-      coalesce(i.chosen, m.release_mbid), i.chosen is not null, array[p_source],
-      i.songs, i.minutes, i.plays
-    from incoming i
-    left join public.album_matches m on m.album_key = i.album_key
+      p_user, k.day, k.album_key, k.artist_name, k.album_name, k.song_hint,
+      coalesce(k.chosen, f.release_mbid, m.release_mbid),
+      k.chosen is not null or f.release_mbid is not null,
+      array[p_source], k.songs, k.minutes, k.plays
+    from kept k
+    left join public.album_matches m on m.album_key = k.album_key
+    left join lateral (
+      select o.release_mbid from public.diary_entries o
+      where o.user_id = p_user and o.album_key = k.album_key
+        and o.fixed and o.release_mbid is not null
+      limit 1
+    ) f on true
     on conflict (user_id, day, album_key) do update set
       songs = greatest(d.songs, excluded.songs),
       minutes = greatest(d.minutes, excluded.minutes),
@@ -187,7 +240,8 @@ begin
   )
   select
     (count(*) filter (where inserted))::int,
-    (count(*) filter (where not inserted))::int
+    (count(*) filter (where not inserted))::int,
+    ((select count(*) from ranked) - (select count(*) from kept))::int
   from saved;
 end;
 $$;
@@ -196,8 +250,32 @@ revoke execute on function public.diary_merge(uuid, text, jsonb) from public, an
 grant execute on function public.diary_merge(uuid, text, jsonb) to service_role;
 
 /**
- * Takes one source off somebody's entries, deleting those it alone sent.
- * Answers how many entries were deleted.
+ * Forgets names nobody's diary is waiting on any more: not matched yet, and
+ * with no unmatched entry left. Run after entries are deleted, so matching
+ * never works for a diary that's gone.
+ */
+create or replace function public.diary_forget_names(p_keys text[])
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from public.album_matches m
+  where m.album_key = any (p_keys)
+    and m.release_mbid is null
+    and not exists (
+      select 1 from public.diary_entries d
+      where d.album_key = m.album_key and d.release_mbid is null
+    )
+$$;
+
+revoke execute on function public.diary_forget_names(text[]) from public, anon, authenticated;
+grant execute on function public.diary_forget_names(text[]) to service_role;
+
+/**
+ * Takes one source off somebody's entries, deleting those it alone sent, and
+ * forgets the names only those were waiting on. Answers how many entries
+ * were deleted.
  */
 create or replace function public.diary_remove_source(p_user uuid, p_source text)
 returns integer
@@ -207,19 +285,64 @@ set search_path = ''
 as $$
 declare
   gone integer;
+  keys text[];
 begin
   update public.diary_entries
      set sources = array_remove(sources, p_source)
    where user_id = p_user and p_source = any (sources) and cardinality(sources) > 1;
-  delete from public.diary_entries
-   where user_id = p_user and sources = array[p_source];
-  get diagnostics gone = row_count;
+  with deleted as (
+    delete from public.diary_entries
+     where user_id = p_user and sources = array[p_source]
+    returning album_key, release_mbid
+  )
+  select
+    count(*)::int,
+    coalesce(array_agg(distinct album_key) filter (where release_mbid is null), '{}')
+    into gone, keys
+  from deleted;
+  perform public.diary_forget_names(keys);
   return gone;
 end;
 $$;
 
 revoke execute on function public.diary_remove_source(uuid, text) from public, anon, authenticated;
 grant execute on function public.diary_remove_source(uuid, text) to service_role;
+
+/**
+ * Gives entries the album their names were matched to after they were
+ * saved: a merge can read a name a moment before matching writes its album.
+ * Looks at matches from the last two days, at most 5,000 entries a run, and
+ * answers how many it gave an album.
+ */
+create or replace function public.diary_sweep()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  swept integer;
+begin
+  update public.diary_entries d
+     set release_mbid = w.release_mbid
+    from (
+      select e.id, m.release_mbid
+      from public.album_matches m
+      join public.diary_entries e on e.album_key = m.album_key
+      where m.release_mbid is not null
+        and m.tried_at > now() - interval '2 days'
+        and e.release_mbid is null
+        and not e.fixed
+      limit 5000
+    ) w
+   where d.id = w.id;
+  get diagnostics swept = row_count;
+  return swept;
+end;
+$$;
+
+revoke execute on function public.diary_sweep() from public, anon, authenticated;
+grant execute on function public.diary_sweep() to service_role;
 
 /**
  * Albums in the signed-in person's diary they haven't rated, most played

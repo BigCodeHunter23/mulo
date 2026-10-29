@@ -964,8 +964,8 @@ describe("0025 listening diary", () => {
   }
 
   const merge = (user: string, source: string, entries: object[]) =>
-    db.query<{ added: number; merged: number }>(
-      "select added, merged from public.diary_merge($1, $2, $3::jsonb)",
+    db.query<{ added: number; merged: number; skipped: number }>(
+      "select added, merged, skipped from public.diary_merge($1, $2, $3::jsonb)",
       [user, source, JSON.stringify(entries)],
     );
 
@@ -1004,10 +1004,14 @@ describe("0025 listening diary", () => {
   });
 
   it("adds an album-day, and merges the same one from another source", async () => {
-    expect((await merge(U(1), "spotify", [day()])).rows[0]).toEqual({ added: 1, merged: 0 });
+    expect((await merge(U(1), "spotify", [day()])).rows[0]).toEqual({
+      added: 1,
+      merged: 0,
+      skipped: 0,
+    });
     expect(
       (await merge(U(1), "lastfm", [day({ songs: 7, minutes: 10, plays: 3 })])).rows[0],
-    ).toEqual({ added: 0, merged: 1 });
+    ).toEqual({ added: 0, merged: 1, skipped: 0 });
     expect(await entries(U(1))).toEqual([
       expect.objectContaining({
         day: "2026-10-12",
@@ -1156,6 +1160,138 @@ describe("0025 listening diary", () => {
     await db.exec(
       `insert into public.personal_settings (user_id, notify_diary) values ('${U(2)}', false)`,
     );
+  });
+
+  it("notes whose diary brought a name in", async () => {
+    await merge(U(2), "spotify", [
+      day({ key: "mf doom|mm food", artist: "MF DOOM", album: "Mm..Food" }),
+    ]);
+    const row = await db.query(
+      "select added_by from public.album_matches where album_key = 'mf doom|mm food'",
+    );
+    expect(row.rows).toEqual([{ added_by: U(2) }]);
+  });
+
+  it("gives a new entry the album its owner chose for those names before", async () => {
+    await merge(U(2), "spotify", [day({ key: "nas|lost tapes", album: "The Lost Tapes" })]);
+    await db.exec(
+      `update public.diary_entries set release_mbid = '${OTHER}', fixed = true
+       where user_id = '${U(2)}' and album_key = 'nas|lost tapes'`,
+    );
+    await merge(U(2), "lastfm", [
+      day({ day: "2026-10-20", key: "nas|lost tapes", album: "The Lost Tapes" }),
+    ]);
+    expect((await entries(U(2))).find((r) => r.day === "2026-10-20")).toEqual(
+      expect.objectContaining({ release_mbid: OTHER, fixed: true }),
+    );
+    // Somebody else's choice is theirs alone.
+    await merge(U(4), "spotify", [day({ key: "nas|lost tapes", album: "The Lost Tapes" })]);
+    expect((await entries(U(4))).find((r) => r.album_key === "nas|lost tapes")).toEqual(
+      expect.objectContaining({ release_mbid: null, fixed: false }),
+    );
+  });
+
+  it("keeps a diary to 50,000 entries, merging into those it has", async () => {
+    await db.exec(`
+      insert into auth.users (id) values ('${U(5)}');
+      insert into public.profiles (id, username) values ('${U(5)}', 'full');
+      insert into public.diary_entries (user_id, day, album_key, artist_name, album_name, sources)
+      select '${U(5)}', date '1950-01-01' + n, 'a|' || n, 'A', 'B', array['spotify']
+      from generate_series(1, 49999) n;
+    `);
+    const result = await merge(U(5), "lastfm", [
+      day({ day: "2026-10-01", key: "x|one" }),
+      day({ day: "2026-10-02", key: "x|two" }),
+      day({ day: "2026-10-03", key: "x|three" }),
+      day({ day: "1950-01-02", key: "a|1", songs: 40 }),
+    ]);
+    expect(result.rows[0]).toEqual({ added: 1, merged: 1, skipped: 2 });
+    const kept = await db.query<{ album_key: string; songs: number }>(
+      `select album_key, songs from public.diary_entries
+       where user_id = '${U(5)}' and (album_key like 'x|%' or album_key = 'a|1')`,
+    );
+    expect(kept.rows).toEqual(
+      expect.arrayContaining([
+        { album_key: "x|one", songs: 5 },
+        { album_key: "a|1", songs: 40 },
+      ]),
+    );
+    expect(kept.rows).toHaveLength(2);
+    expect(
+      (await merge(U(5), "lastfm", [day({ day: "2026-10-04", key: "x|four" })])).rows[0],
+    ).toEqual({ added: 0, merged: 0, skipped: 1 });
+  });
+
+  it("gives entries an album matched after they were saved, unless their owner chose one", async () => {
+    await merge(U(2), "spotify", [day({ key: "nas|stillmatic", album: "Stillmatic" })]);
+    await merge(U(4), "spotify", [day({ key: "nas|stillmatic", album: "Stillmatic" })]);
+    await db.exec(
+      `update public.diary_entries set release_mbid = '${OTHER}', fixed = true
+       where user_id = '${U(4)}' and album_key = 'nas|stillmatic';
+       update public.album_matches set release_mbid = '${ALBUM}', matched_by = 'musicbrainz', tried_at = now()
+       where album_key = 'nas|stillmatic'`,
+    );
+    const swept = await db.query<{ n: number }>("select public.diary_sweep() as n");
+    expect(swept.rows[0]?.n).toBe(1);
+    expect((await entries(U(2))).find((r) => r.album_key === "nas|stillmatic")?.release_mbid).toBe(
+      ALBUM,
+    );
+    expect((await entries(U(4))).find((r) => r.album_key === "nas|stillmatic")?.release_mbid).toBe(
+      OTHER,
+    );
+    await expect(as(U(2), "select public.diary_sweep()")).rejects.toThrow();
+  });
+
+  it("forgets names nobody is waiting on once their entries go", async () => {
+    await merge(U(2), "apple", [day({ key: "nas|kings disease", album: "King's Disease" })]);
+    await merge(U(4), "apple", [day({ key: "nas|kings disease", album: "King's Disease" })]);
+    const named = async () =>
+      (await db.query("select 1 from public.album_matches where album_key = 'nas|kings disease'"))
+        .rows.length;
+    await db.query(`select public.diary_remove_source('${U(2)}', 'apple')`);
+    expect(await named()).toBe(1);
+    await db.query(`select public.diary_remove_source('${U(4)}', 'apple')`);
+    expect(await named()).toBe(0);
+
+    await merge(U(2), "apple", [day({ key: "nas|magic", album: "Magic" })]);
+    await db.exec(`delete from public.diary_entries where album_key = 'nas|magic'`);
+    await db.query("select public.diary_forget_names(array['nas|magic', 'nas|illmatic'])");
+    const left = await db.query(
+      "select album_key from public.album_matches where album_key in ('nas|magic', 'nas|illmatic')",
+    );
+    // Illmatic is matched, so it stays for everybody.
+    expect(left.rows).toEqual([{ album_key: "nas|illmatic" }]);
+    await expect(
+      as(U(2), "select public.diary_forget_names(array['nas|illmatic'])"),
+    ).rejects.toThrow();
+  });
+
+  it("never shows the song a name was matched by", async () => {
+    await expect(
+      as(null, `select song_hint from public.diary_entries where user_id = '${U(1)}'`),
+    ).rejects.toThrow();
+    await expect(
+      as(U(1), `select song_hint from public.diary_entries where user_id = '${U(1)}'`),
+    ).rejects.toThrow();
+    expect(
+      (
+        await as(
+          U(2),
+          `select id, user_id, day, album_key, artist_name, album_name, release_mbid, fixed,
+                  sources, songs, minutes, plays, created_at
+           from public.diary_entries where user_id = '${U(1)}'`,
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps each import's time zone, and no Last.fm session key", async () => {
+    const columns = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+       where table_schema = 'public' and table_name = 'diary_sources'
+         and column_name in ('time_zone', 'lastfm_session')`,
+    );
+    expect(columns.rows).toEqual([{ column_name: "time_zone" }]);
   });
 
   it("goes with the account, and lets go of an album that leaves", async () => {

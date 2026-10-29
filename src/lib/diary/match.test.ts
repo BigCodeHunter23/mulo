@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MbNotFoundError } from "@/lib/musicbrainz";
-import { runMatcher, type MatchDeps, type Pending } from "./match";
+import { fairTurns, runMatcher, type MatchDeps, type Pending } from "./match";
 
 const at = new Date("2026-10-30T12:00:00Z");
 const pending = (overrides: Partial<Pending> = {}): Pending => ({
@@ -9,8 +9,15 @@ const pending = (overrides: Partial<Pending> = {}): Pending => ({
   album_name: "Blonde",
   song_hint: "Nikes",
   tries: 0,
+  added_by: "u1",
   ...overrides,
 });
+/** `count` names from one person's diary, a song each. */
+const namesOf = (person: string, count: number) =>
+  Array.from({ length: count }, (_, i) =>
+    pending({ album_key: `${person}|${i}`, album_name: `${person} ${i}`, added_by: person }),
+  );
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const frank = [{ name: "Frank Ocean", artist: { id: "a1", name: "Frank Ocean" } }];
 
 function deps(overrides: Partial<MatchDeps> = {}): MatchDeps {
@@ -30,7 +37,85 @@ function deps(overrides: Partial<MatchDeps> = {}): MatchDeps {
   };
 }
 
+describe("fairTurns", () => {
+  it("takes turns between people, a few names each, up to the batch", () => {
+    const names = [...namesOf("a", 30), ...namesOf("b", 3), ...namesOf("c", 2)];
+    const taken = fairTurns(names, 10, 12);
+    expect(taken.map((n) => n.album_key)).toEqual([
+      "a|0",
+      "b|0",
+      "c|0",
+      "a|1",
+      "b|1",
+      "c|1",
+      "a|2",
+      "b|2",
+      "a|3",
+      "a|4",
+      "a|5",
+      "a|6",
+    ]);
+    expect(fairTurns(namesOf("a", 30), 10, 100)).toHaveLength(10);
+  });
+
+  it("counts names whose diary has gone as one more person", () => {
+    const names = [...namesOf("a", 3), pending({ album_key: "x|1", added_by: null })];
+    expect(fairTurns(names, 1, 10).map((n) => n.album_key)).toEqual(["a|0", "x|1"]);
+  });
+});
+
 describe("runMatcher", () => {
+  it("reads a wide pool of names and takes turns between the diaries they came from", async () => {
+    const d = deps({
+      token: null,
+      pending: vi.fn(async () => [...namesOf("a", 30), ...namesOf("b", 2)]),
+    });
+    await runMatcher(at, Date.now() + 10_000, d);
+    expect(d.pending).toHaveBeenCalledWith(at, 500);
+    const searched = vi.mocked(d.search).mock.calls.map(([, album]) => album);
+    expect(searched.slice(0, 4)).toEqual(["a 0", "b 0", "a 1", "b 1"]);
+    expect(searched.filter((album) => album.startsWith("a "))).toHaveLength(10);
+  });
+
+  it("asks ListenBrainz about 50 names a run at most", async () => {
+    const people = ["a", "b", "c", "d", "e", "f"];
+    const d = deps({
+      pending: vi.fn(async () => people.flatMap((p) => namesOf(p, 10))),
+      lookup: vi.fn(async (items: unknown[]) => items.map(() => null)),
+    });
+    await runMatcher(at, Date.now() + 10_000, d);
+    expect(vi.mocked(d.lookup).mock.calls[0]?.[0]).toHaveLength(50);
+  });
+
+  it("stops ListenBrainz's matches at the deadline, leaving them for the next run", async () => {
+    const d = deps({
+      lookup: vi.fn(async () => {
+        await pause(80);
+        return [{ recording: "r1", releaseName: "Blonde" }];
+      }),
+    });
+    await runMatcher(at, Date.now() + 40, d);
+    expect(d.lookup).toHaveBeenCalled();
+    expect(d.groups).not.toHaveBeenCalled();
+    expect(d.matched).not.toHaveBeenCalled();
+    expect(d.search).not.toHaveBeenCalled();
+  });
+
+  it("settles no more ListenBrainz matches once the deadline passes", async () => {
+    const d = deps({
+      pending: vi.fn(async () => [pending(), pending({ album_key: "frank ocean|blonde 2" })]),
+      lookup: vi.fn(async () => [
+        { recording: "r1", releaseName: "Blonde" },
+        { recording: "r1", releaseName: "Blonde" },
+      ]),
+      saveAlbum: vi.fn(async () => {
+        await pause(80);
+      }),
+    });
+    await runMatcher(at, Date.now() + 40, d);
+    expect(d.matched).toHaveBeenCalledTimes(1);
+  });
+
   it("matches through ListenBrainz first", async () => {
     const d = deps();
     const report = await runMatcher(at, Date.now() + 10_000, d);

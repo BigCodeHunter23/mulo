@@ -84,8 +84,11 @@ export function sameAlbum(a: string, b: string): boolean {
   return foldName(withoutEdition(a)) === foldName(withoutEdition(b));
 }
 
-/** Control and format characters out, single spaces, cut to `NAME_MAX`. */
-function tidy(text: string): string {
+/**
+ * Control and format characters out, single spaces, cut to `NAME_MAX`. The
+ * website tidies names again when they arrive, whoever worked them out.
+ */
+export function tidy(text: string): string {
   return Array.from(
     text
       .replace(/(?![\u200C\u200D])[\p{Cc}\p{Cf}]/gu, " ")
@@ -155,54 +158,103 @@ type Tally = {
   plays: number;
 };
 
-/**
- * Plays grouped into album-days, keeping only those that count: at least
- * `MIN_SONGS` different songs from the album that day, or `MIN_MINUTES` of
- * it. Skips (under `SKIP_MS`) and plays without an artist, album or song are
- * left out. Days are the listener's own, in `timeZone`.
- */
-export function albumDays(plays: readonly Play[], timeZone: string): AlbumDay[] {
-  const tallies = new Map<string, Tally>();
-  for (const play of plays) {
-    if (play.ms !== null && play.ms < SKIP_MS) continue;
-    const artist = tidy(play.artist);
-    const album = tidy(play.album);
-    const song = tidy(play.song);
-    if (!artist || !album || !song) continue;
-    const key = albumKey(artist, album);
-    if (key.startsWith("|") || key.endsWith("|")) continue;
-    const day = localDay(play.at, timeZone);
-    const id = `${day} ${key}`;
-    let tally = tallies.get(id);
-    if (!tally) {
-      tally = { day, key, artist, album, songs: new Map(), ms: 0, plays: 0 };
-      tallies.set(id, tally);
-    }
-    const songKey = foldName(song);
-    const seen = tally.songs.get(songKey);
-    if (seen) seen.count += 1;
-    else tally.songs.set(songKey, { name: song, count: 1 });
-    tally.ms += play.ms ?? SCROBBLE_MS;
-    tally.plays += 1;
-  }
+/** One album as a history spells it, tidied and keyed; null when it can't be kept. */
+type Named = { key: string; artist: string; album: string } | null;
 
-  const counted: AlbumDay[] = [];
-  for (const tally of tallies.values()) {
-    if (tally.songs.size < MIN_SONGS && tally.ms < MIN_MINUTES * 60_000) continue;
-    let hint: { name: string; count: number } | null = null;
-    for (const song of tally.songs.values()) if (!hint || song.count > hint.count) hint = song;
-    counted.push({
-      day: tally.day,
-      key: tally.key,
-      artist: tally.artist,
-      album: tally.album,
-      songHint: hint?.name ?? null,
-      songs: tally.songs.size,
-      minutes: Math.min(1440, Math.round(tally.ms / 60_000)),
-      plays: tally.plays,
-    });
-  }
-  return counted;
+/** A running count of album-days, fed one play at a time. */
+export type AlbumTally = {
+  add: (play: Play) => void;
+  /** The album-days that count so far. */
+  days: () => AlbumDay[];
+};
+
+/**
+ * Album-days counted as plays come in, so a long history can be read a file
+ * at a time without holding every play. Keeps only days that count: at
+ * least `MIN_SONGS` different songs from the album that day, or
+ * `MIN_MINUTES` of it. Skips (under `SKIP_MS`) and plays without an
+ * artist, album or song are left out. Days are the listener's own, in
+ * `timeZone`. A history names the same albums and songs over and over, so
+ * each spelling is tidied and folded once.
+ */
+export function createAlbumTally(timeZone: string): AlbumTally {
+  const tallies = new Map<string, Tally>();
+  const albums = new Map<string, Named>();
+  const songs = new Map<string, { name: string; key: string } | null>();
+
+  const albumOf = (rawArtist: string, rawAlbum: string): Named => {
+    // The length first, so no two pairs of names can run together the same.
+    const id = `${rawArtist.length}:${rawArtist}${rawAlbum}`;
+    let named = albums.get(id);
+    if (named === undefined) {
+      const artist = tidy(rawArtist);
+      const album = tidy(rawAlbum);
+      const key = albumKey(artist, album);
+      named =
+        artist && album && !key.startsWith("|") && !key.endsWith("|")
+          ? { key, artist, album }
+          : null;
+      albums.set(id, named);
+    }
+    return named;
+  };
+
+  const songOf = (raw: string) => {
+    let song = songs.get(raw);
+    if (song === undefined) {
+      const name = tidy(raw);
+      song = name ? { name, key: foldName(name) } : null;
+      songs.set(raw, song);
+    }
+    return song;
+  };
+
+  return {
+    add(play) {
+      if (play.ms !== null && play.ms < SKIP_MS) return;
+      const named = albumOf(play.artist, play.album);
+      const song = songOf(play.song);
+      if (!named || !song) return;
+      const day = localDay(play.at, timeZone);
+      const id = `${day} ${named.key}`;
+      let tally = tallies.get(id);
+      if (!tally) {
+        tally = { day, ...named, songs: new Map(), ms: 0, plays: 0 };
+        tallies.set(id, tally);
+      }
+      const seen = tally.songs.get(song.key);
+      if (seen) seen.count += 1;
+      else tally.songs.set(song.key, { name: song.name, count: 1 });
+      tally.ms += play.ms ?? SCROBBLE_MS;
+      tally.plays += 1;
+    },
+    days() {
+      const counted: AlbumDay[] = [];
+      for (const tally of tallies.values()) {
+        if (tally.songs.size < MIN_SONGS && tally.ms < MIN_MINUTES * 60_000) continue;
+        let hint: { name: string; count: number } | null = null;
+        for (const song of tally.songs.values()) if (!hint || song.count > hint.count) hint = song;
+        counted.push({
+          day: tally.day,
+          key: tally.key,
+          artist: tally.artist,
+          album: tally.album,
+          songHint: hint?.name ?? null,
+          songs: tally.songs.size,
+          minutes: Math.min(1440, Math.round(tally.ms / 60_000)),
+          plays: tally.plays,
+        });
+      }
+      return counted;
+    },
+  };
+}
+
+/** Plays grouped into album-days, by the rules of `createAlbumTally`. */
+export function albumDays(plays: readonly Play[], timeZone: string): AlbumDay[] {
+  const tally = createAlbumTally(timeZone);
+  for (const play of plays) tally.add(play);
+  return tally.days();
 }
 
 type SpotifyRow = {
@@ -217,7 +269,8 @@ type SpotifyRow = {
  * Plays from one of Spotify's extended streaming history files
  * (`Streaming_History_Audio_*.json`), or null when the file isn't one: the
  * quicker Account data file has no album names. Podcasts, audiobooks and
- * Spotify's blank rows have no track name and are skipped.
+ * Spotify's blank rows have no track name and are skipped, as are rows that
+ * don't say how long they played, which can't be told from a skip.
  */
 export function spotifyPlays(json: unknown): Play[] | null {
   if (!Array.isArray(json)) return null;
@@ -236,13 +289,9 @@ export function spotifyPlays(json: unknown): Play[] | null {
       continue;
     const at = typeof row.ts === "string" ? Date.parse(row.ts) : Number.NaN;
     if (!Number.isFinite(at)) continue;
-    plays.push({
-      at,
-      artist,
-      album,
-      song,
-      ms: typeof row.ms_played === "number" ? row.ms_played : null,
-    });
+    const ms = row.ms_played;
+    if (typeof ms !== "number" || !Number.isFinite(ms)) continue;
+    plays.push({ at, artist, album, song, ms });
   }
   return plays;
 }

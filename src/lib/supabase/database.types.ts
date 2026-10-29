@@ -17,6 +17,7 @@ export type Database = {
     Tables: {
       album_matches: {
         Row: {
+          added_by: string | null
           album_key: string
           album_name: string
           artist_name: string
@@ -28,6 +29,7 @@ export type Database = {
           tries: number
         }
         Insert: {
+          added_by?: string | null
           album_key: string
           album_name: string
           artist_name: string
@@ -39,6 +41,7 @@ export type Database = {
           tries?: number
         }
         Update: {
+          added_by?: string | null
           album_key?: string
           album_name?: string
           artist_name?: string
@@ -277,15 +280,16 @@ export type Database = {
           import_to: string | null
           last_count: number | null
           last_import_at: string | null
-          lastfm_session: string | null
           lastfm_user: string | null
           pending_hash: string | null
           pending_to: string | null
           pending_until: string | null
+          pending_zone: string | null
           reached_back: string | null
           source: string
           state: string
           synced_to: string | null
+          time_zone: string | null
           user_id: string
           worked_at: string | null
         }
@@ -296,15 +300,16 @@ export type Database = {
           import_to?: string | null
           last_count?: number | null
           last_import_at?: string | null
-          lastfm_session?: string | null
           lastfm_user?: string | null
           pending_hash?: string | null
           pending_to?: string | null
           pending_until?: string | null
+          pending_zone?: string | null
           reached_back?: string | null
           source: string
           state?: string
           synced_to?: string | null
+          time_zone?: string | null
           user_id: string
           worked_at?: string | null
         }
@@ -315,15 +320,16 @@ export type Database = {
           import_to?: string | null
           last_count?: number | null
           last_import_at?: string | null
-          lastfm_session?: string | null
           lastfm_user?: string | null
           pending_hash?: string | null
           pending_to?: string | null
           pending_until?: string | null
+          pending_zone?: string | null
           reached_back?: string | null
           source?: string
           state?: string
           synced_to?: string | null
+          time_zone?: string | null
           user_id?: string
           worked_at?: string | null
         }
@@ -1422,6 +1428,12 @@ export type Database = {
           votes: number | null
         }[]
       }
+      diary_forget_names: {
+        Args: {
+          p_keys: string[]
+        }
+        Returns: undefined
+      }
       diary_merge: {
         Args: {
           p_user: string
@@ -1431,6 +1443,7 @@ export type Database = {
         Returns: {
           added: number | null
           merged: number | null
+          skipped: number | null
         }[]
       }
       diary_months: {
@@ -1450,6 +1463,10 @@ export type Database = {
           p_user: string
           p_source: string
         }
+        Returns: number
+      }
+      diary_sweep: {
+        Args: never
         Returns: number
       }
       diary_to_rate: {

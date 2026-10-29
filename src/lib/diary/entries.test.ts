@@ -60,14 +60,27 @@ describe("cleanDays", () => {
       ),
     ).toEqual([day({ key: "frank ocean|blonde" })]);
   });
+
+  it("tidies the names as the browser does, dropping days whose names tidy to nothing", () => {
+    const now = Date.parse("2026-10-30T00:00:00Z");
+    expect(
+      cleanDays(
+        [
+          day({ artist: "  Frank\u0000  Ocean ", album: "Blonde‮", songHint: "​" }),
+          day({ album: "\u0007\u0007" }),
+          day({ artist: " " }),
+        ],
+        now,
+      ),
+    ).toEqual([day({ key: "frank ocean|blonde", songHint: null })]);
+  });
 });
 
 describe("saveAlbumDays", () => {
   it("merges the days through the database and says what happened", async () => {
-    db.fake.answer("diary_entries", { count: 10, error: null });
-    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0 }], error: null });
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0, skipped: 0 }], error: null });
     const result = await saveAlbumDays("u1", "spotify", [day({ key: "frank ocean|blonde" })]);
-    expect(result).toEqual({ ok: true, added: 1, merged: 0 });
+    expect(result).toEqual({ ok: true, added: 1, merged: 0, skipped: 0 });
     expect(db.fake.callsOn("rpc:diary_merge")[0]?.args).toEqual([
       "diary_merge",
       {
@@ -83,26 +96,29 @@ describe("saveAlbumDays", () => {
       ok: true,
       added: 0,
       merged: 0,
+      skipped: 0,
     });
     expect(db.fake.calls).toEqual([]);
   });
 
-  it("sends only what still fits", async () => {
-    db.fake.answer("diary_entries", { count: 49_999, error: null });
-    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0 }], error: null });
-    await saveAlbumDays("u1", "spotify", [day(), day({ day: "2026-10-13" })]);
-    const sent = db.fake.callsOn("rpc:diary_merge")[0]?.args[1] as { p_entries: unknown[] };
-    expect(sent.p_entries).toHaveLength(1);
+  it("leaves the size limit to the database, keeping what fitted", async () => {
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 2, skipped: 3 }], error: null });
+    expect(await saveAlbumDays("u1", "spotify", [day(), day({ day: "2026-10-13" })])).toEqual({
+      ok: true,
+      added: 1,
+      merged: 2,
+      skipped: 3,
+    });
+    expect(db.fake.callsOn("diary_entries")).toEqual([]);
   });
 
-  it("refuses once the diary is full", async () => {
-    db.fake.answer("diary_entries", { count: 50_000, error: null });
+  it("says the diary is full when nothing new could go in", async () => {
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 0, merged: 1, skipped: 1 }], error: null });
     expect(await saveAlbumDays("u1", "spotify", [day()])).toEqual({ ok: false, error: DIARY_FULL });
-    expect(db.fake.callsOn("rpc:diary_merge")).toEqual([]);
   });
 
   it("says the diary isn't available before migration 0025", async () => {
-    db.fake.answer("diary_entries", { count: null, error: { code: "42P01", message: "missing" } });
+    db.fake.answer("rpc:diary_merge", { data: null, error: { code: "PGRST202", message: "" } });
     expect(await saveAlbumDays("u1", "spotify", [day()])).toEqual({
       ok: false,
       error: "The diary isn't available yet.",
@@ -111,7 +127,6 @@ describe("saveAlbumDays", () => {
 
   it("says so plainly when the merge fails", async () => {
     vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
-    db.fake.answer("diary_entries", { count: 0, error: null });
     db.fake.answer("rpc:diary_merge", { data: null, error: { code: "57014", message: "slow" } });
     expect(await saveAlbumDays("u1", "spotify", [day()])).toEqual({
       ok: false,
@@ -152,9 +167,23 @@ describe("finishImport", () => {
     expect(sendPushes).not.toHaveBeenCalled();
     await finishImport("u1", "lastfm", 3);
     expect(sendPushes).toHaveBeenCalledTimes(1);
+  });
+
+  it("only updates Last.fm's row, so a disconnect meanwhile isn't undone", async () => {
+    await finishImport("u1", "lastfm", 3, new Date("2026-10-30T10:00:00Z"));
+    const calls = db.fake.callsOn("diary_sources");
+    expect(calls.map((c) => c.method)).not.toContain("upsert");
     // Last.fm's own state (syncing from here on) is the clock's to set.
-    const upsert = db.fake.callsOn("diary_sources").filter((c) => c.method === "upsert")[1];
-    expect(upsert?.args[0]).not.toHaveProperty("state");
+    expect(calls).toContainEqual({
+      table: "diary_sources",
+      method: "update",
+      args: [{ last_import_at: "2026-10-30T10:00:00.000Z", last_count: 3 }],
+    });
+    expect(calls).toContainEqual({
+      table: "diary_sources",
+      method: "eq",
+      args: ["source", "lastfm"],
+    });
   });
 
   it("stays quiet when nothing came in", async () => {
@@ -165,7 +194,11 @@ describe("finishImport", () => {
 
 describe("deleteEntry and removeSource", () => {
   it("deletes only your own entry, and says when there was none", async () => {
-    db.fake.answer("diary_entries", { data: [{ id: 4 }], error: null }, { data: [], error: null });
+    db.fake.answer(
+      "diary_entries",
+      { data: [{ album_key: "k|k", release_mbid: MBID }], error: null },
+      { data: [], error: null },
+    );
     expect(await deleteEntry("u1", 4)).toEqual({ ok: true });
     expect(db.fake.callsOn("diary_entries")).toContainEqual({
       table: "diary_entries",
@@ -173,16 +206,39 @@ describe("deleteEntry and removeSource", () => {
       args: ["user_id", "u1"],
     });
     expect(await deleteEntry("u1", 5)).toEqual({ ok: false, error: "Couldn't delete that entry." });
+    // A matched entry leaves its name for everybody else.
+    expect(db.fake.callsOn("rpc:diary_forget_names")).toEqual([]);
   });
 
-  it("removes a source's entries, then forgets the source", async () => {
+  it("forgets an unmatched name nobody else is waiting on", async () => {
+    db.fake.answer("diary_entries", {
+      data: [{ album_key: "k|k", release_mbid: null }],
+      error: null,
+    });
+    expect(await deleteEntry("u1", 4)).toEqual({ ok: true });
+    expect(db.fake.callsOn("rpc:diary_forget_names")[0]?.args[1]).toEqual({ p_keys: ["k|k"] });
+  });
+
+  it("forgets the source first, so the clock can't add to it, then removes its entries", async () => {
     db.fake.answer("rpc:diary_remove_source", { data: 12, error: null });
     expect(await removeSource("u1", "lastfm")).toEqual({ ok: true });
     expect(db.fake.callsOn("rpc:diary_remove_source")[0]?.args[1]).toEqual({
       p_user: "u1",
       p_source: "lastfm",
     });
-    expect(db.fake.callsOn("diary_sources").map((c) => c.method)).toContain("delete");
+    const order = db.fake.calls.filter(
+      (c) => c.method === "delete" || c.table === "rpc:diary_remove_source",
+    );
+    expect(order.map((c) => c.table)).toEqual(["diary_sources", "rpc:diary_remove_source"]);
+  });
+
+  it("keeps the entries when the source can't be forgotten", async () => {
+    db.fake.answer("diary_sources", { error: { code: "57014", message: "slow" } });
+    expect(await removeSource("u1", "spotify")).toEqual({
+      ok: false,
+      error: "Couldn't save that. Please try again.",
+    });
+    expect(db.fake.callsOn("rpc:diary_remove_source")).toEqual([]);
   });
 
   it("can keep the entries, and says so before migration 0025", async () => {
@@ -228,6 +284,22 @@ describe("fixAlbum", () => {
     });
     expect((await fixAlbum("u1", 4, "not-an-id")).ok).toBe(false);
   });
+
+  it("says try again when a read fails, rather than that something's gone", async () => {
+    db.fake.answer("diary_entries", { data: null, error: { code: "57014", message: "slow" } });
+    db.fake.answer("releases", { data: { mbid: MBID }, error: null });
+    expect(await fixAlbum("u1", 4, MBID)).toEqual({
+      ok: false,
+      error: "Couldn't save that. Please try again.",
+    });
+    db.fake.answer("diary_entries", { data: { album_key: "k|k" }, error: null });
+    db.fake.answer("releases", { data: null, error: { code: "57014", message: "slow" } });
+    expect(await fixAlbum("u1", 4, MBID)).toEqual({
+      ok: false,
+      error: "Couldn't save that. Please try again.",
+    });
+    expect(db.fake.callsOn("diary_entries").map((c) => c.method)).not.toContain("update");
+  });
 });
 
 describe("setDiaryPublic", () => {
@@ -247,9 +319,8 @@ describe("logListen", () => {
   const release = { mbid: MBID, title: "Blonde", artist_credit: "Frank Ocean", artists: null };
 
   it("saves an album on a day by hand, already matched", async () => {
-    db.fake.answer("releases", { data: release, error: null });
-    db.fake.answer("diary_entries", { count: 0, error: null });
-    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0 }], error: null });
+    db.fake.answer("releases", { data: { ...release, title: "Blonde\u0000 " }, error: null });
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0, skipped: 0 }], error: null });
     expect(await logListen("u1", { mbid: MBID, day: "2026-10-12" })).toEqual({ ok: true });
     expect(rate).not.toHaveBeenCalled();
     expect(db.fake.callsOn("rpc:diary_merge")[0]?.args[1]).toEqual({
@@ -267,13 +338,12 @@ describe("logListen", () => {
     });
   });
 
-  it("saves the score as an ordinary rating first", async () => {
+  it("saves the score as an ordinary rating once the listen is in", async () => {
     db.fake.answer("releases", {
       data: { ...release, artists: { name: "Frank Ocean" } },
       error: null,
     });
-    db.fake.answer("diary_entries", { count: 0, error: null });
-    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0 }], error: null });
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0, skipped: 0 }], error: null });
     rate.mockResolvedValueOnce({ ok: true });
     expect(await logListen("u1", { mbid: MBID, day: "2026-10-12", score: 8 })).toEqual({
       ok: true,
@@ -281,12 +351,37 @@ describe("logListen", () => {
     expect(rate).toHaveBeenCalledWith("album", MBID, 8);
   });
 
-  it("stops when the score won't save", async () => {
+  it("leaves the score alone when the diary can't take the listen", async () => {
     db.fake.answer("releases", { data: release, error: null });
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 0, merged: 0, skipped: 1 }], error: null });
+    expect(await logListen("u1", { mbid: MBID, day: "2026-10-12", score: 8 })).toEqual({
+      ok: false,
+      error: DIARY_FULL,
+    });
+    db.fake.answer("releases", { data: release, error: null });
+    db.fake.answer("rpc:diary_merge", { data: null, error: { code: "PGRST202", message: "" } });
+    expect(await logListen("u1", { mbid: MBID, day: "2026-10-12", score: 8 })).toEqual({
+      ok: false,
+      error: DIARY_NOT_YET,
+    });
+    expect(rate).not.toHaveBeenCalled();
+  });
+
+  it("says so when the score won't save", async () => {
+    db.fake.answer("releases", { data: release, error: null });
+    db.fake.answer("rpc:diary_merge", { data: [{ added: 1, merged: 0, skipped: 0 }], error: null });
     rate.mockResolvedValueOnce({ ok: false, error: "Scores run from 1 to 10." });
     expect(await logListen("u1", { mbid: MBID, day: "2026-10-12", score: 11 })).toEqual({
       ok: false,
       error: "Scores run from 1 to 10.",
+    });
+  });
+
+  it("says try again when the album can't be read, rather than that it isn't there", async () => {
+    db.fake.answer("releases", { data: null, error: { code: "57014", message: "slow" } });
+    expect(await logListen("u1", { mbid: MBID, day: "2026-10-12" })).toEqual({
+      ok: false,
+      error: "Couldn't save that. Please try again.",
     });
     expect(db.fake.callsOn("rpc:diary_merge")).toEqual([]);
   });

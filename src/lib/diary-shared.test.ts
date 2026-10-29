@@ -3,6 +3,7 @@ import {
   albumDays,
   albumKey,
   batches,
+  createAlbumTally,
   foldName,
   isDiaryDay,
   isSpotifyHistoryFile,
@@ -10,6 +11,7 @@ import {
   monthLine,
   sameAlbum,
   spotifyPlays,
+  tidy,
   withoutEdition,
   type Play,
 } from "./diary-shared";
@@ -126,6 +128,47 @@ describe("the listen rule", () => {
   });
 });
 
+describe("the tally", () => {
+  const songs = (names: string[], extra: Partial<Play> = {}) =>
+    names.map((song, i) => play({ song, at: at("2026-10-12T10:00:00Z") + i * 60_000, ...extra }));
+
+  it("takes plays a few at a time and comes to the same days", () => {
+    const plays = [
+      ...songs(["A", "B", "C", "D"], { ms: 60_000 }),
+      ...songs(["A", "B"], { ms: 60_000, album: "Blonde (Deluxe)" }),
+      ...songs(["A", "B", "C", "D"], { ms: 60_000, at: at("2026-10-13T10:00:00Z") }),
+    ];
+    const tally = createAlbumTally("UTC");
+    for (const play of plays.slice(0, 3)) tally.add(play);
+    for (const play of plays.slice(3)) tally.add(play);
+    expect(tally.days()).toEqual(albumDays(plays, "UTC"));
+    expect(tally.days()).toEqual([
+      expect.objectContaining({ day: "2026-10-12", album: "Blonde", songs: 4, plays: 6 }),
+      expect.objectContaining({ day: "2026-10-13", songs: 4 }),
+    ]);
+  });
+
+  it("tidies names, and keeps them apart however they're spelled", () => {
+    const tally = createAlbumTally("UTC");
+    for (const song of ["A", "B", "C", "D"]) {
+      tally.add(play({ song, artist: "Frank\u0000 Ocean", ms: 60_000 }));
+      tally.add(play({ song, artist: "Frank", album: " OceanBlonde", ms: 60_000 }));
+    }
+    expect(tally.days().map((d) => [d.artist, d.album])).toEqual([
+      ["Frank Ocean", "Blonde"],
+      ["Frank", "OceanBlonde"],
+    ]);
+  });
+});
+
+describe("tidy", () => {
+  it("takes out control and format characters, and runs of spaces", () => {
+    expect(tidy("  Frank\u0000​  Ocean\n")).toBe("Frank Ocean");
+    expect(tidy("Zwi‍sch")).toBe("Zwi‍sch");
+    expect(Array.from(tidy("x".repeat(400)))).toHaveLength(300);
+  });
+});
+
 describe("Spotify's files", () => {
   const row = (overrides: object = {}) => ({
     ts: "2026-10-12T10:00:00Z",
@@ -152,6 +195,13 @@ describe("Spotify's files", () => {
     expect(spotifyPlays([row({ master_metadata_track_name: null }), row({ ts: "nope" })])).toEqual(
       [],
     );
+  });
+
+  it("skips a row that doesn't say how long it played, rather than count a whole song", () => {
+    expect(spotifyPlays([row({ ms_played: null }), row({ ms_played: "200000" })])).toEqual([]);
+    const without: Record<string, unknown> = { ...row() };
+    delete without.ms_played;
+    expect(spotifyPlays([without])).toEqual([]);
   });
 
   it("says when a file isn't the extended history", () => {

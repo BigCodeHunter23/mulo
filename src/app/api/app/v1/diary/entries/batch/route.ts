@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { DiaryBatchResult } from "@/lib/app-api";
 import { appJson, appRoute, readBody, signedInCaller } from "@/lib/app-route";
 import { BATCH_MAX } from "@/lib/diary-shared";
-import { albumDaySchema, finishImport, saveAlbumDays } from "@/lib/diary/entries";
+import { albumDaySchema, batchResult, finishImport, saveAlbumDays } from "@/lib/diary/entries";
 import { allowUser, RateLimitedError } from "@/lib/rate-limit";
 
 /** Never Last.fm: the website reads that itself, on the clock. */
@@ -17,6 +17,7 @@ const batch = z.object({
 /**
  * Album-days worked out on the phone from a Spotify file or the Apple Music
  * library, up to 500 at a time. The last batch says it's done, for the bell.
+ * A full diary says so once none of a batch's new albums fit.
  */
 export const POST = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
@@ -27,5 +28,5 @@ export const POST = appRoute(async (request: NextRequest) => {
 
   const saved = await saveAlbumDays(user.id, body.source, body.days);
   if (saved.ok && body.done) await finishImport(user.id, body.source, body.done.total);
-  return appJson<DiaryBatchResult>(saved);
+  return appJson<DiaryBatchResult>(batchResult(saved));
 });

@@ -325,57 +325,82 @@ songs, or twenty minutes of it, were played that day (`albumDays` in
   which sources it came from. Read through the visitor's own session:
   `diary_visible` lets anyone, signed out too, read a public diary except
   across a block, and only the owner read a private one
-  (`profiles.diary_public`, Show my diary).
+  (`profiles.diary_public`, Show my diary). Readers are granted every
+  column but `song_hint`, the most played song, which is only for matching.
 - `album_matches`: shared by everybody, one row per album name, with the
-  album it was matched to, so each name is looked up once.
-- `diary_sources`: each person's imports and their state, the Last.fm
-  session key among them. Only the service role reads it; the owner sees
-  its state, never the key.
+  album it was matched to, so each name is looked up once, and whose diary
+  brought it in (`added_by`).
+- `diary_sources`: each person's imports and their state, with the Last.fm
+  name and the time zone it connected in, never a Last.fm session key. Only
+  the service role reads it; the owner sees its state.
 
 Only the website writes, with the service role, after its own checks (signed
-in, zod, the rate limit, 50,000 entries at most, the listen rule), through
-one database function, `diary_merge`: the same album on the same day from
+in, zod, the rate limit, names tidied, the listen rule), through one
+database function, `diary_merge`: the same album on the same day from
 another source merges into the entry already there, keeping the larger counts
-and adding the source. `diary_remove_source` takes one source off every
-entry and deletes the entries it alone added. `src/lib/diary/entries.ts`
+and adding the source. A new entry takes the album its owner chose for those
+names before (Which album is this), ahead of the shared match. The merge
+keeps a diary to 50,000 entries itself, one merge at a time per person: new
+entries past that are skipped (and counted), merges always apply, and an
+upload none of whose new albums fit says the diary is full.
+`diary_remove_source` takes one source off every entry and deletes the
+entries it alone added; deleting entries forgets the names nobody is
+waiting on any more (`diary_forget_names`). `src/lib/diary/entries.ts`
 holds the writes, `read.ts` the reads.
 
 The clock (`push/tick`, every 15 minutes) moves the diary on after the
 pushes, in `src/lib/diary/tick.ts`:
 
 1. **Matching** (`match.ts`): names waiting in `album_matches`, the longest
-   waiting first, are looked up in ListenBrainz in bulk, by one of the
+   waiting first, taken in turns between the diaries that brought them in
+   (ten each a run at most, so one big upload can't hold everybody else
+   up), are looked up in ListenBrainz in bulk (50 a run), by one of the
    album's songs, then in MusicBrainz's search, one a second. A found album
    goes into the catalogue with what the lookup gave; its page fetches the
    rest on its first visit. A name nothing finds waits an hour, then six,
    and after three tries is "no match", which its owners can fix with Which
-   album is this (`/diary/fix/<id>`).
+   album is this (`/diary/fix/<id>`). Then `diary_sweep` gives the album to
+   any entry saved just as its name was matched.
 2. **Last.fm** (`lastfm-jobs.ts`): an import reads somebody's history newest
    first, a page at a time, holding the oldest day of each page back until
    the next page has finished it, so a day split across pages counts whole.
    Once it reaches the start, the account is synced every hour by reading
    back 26 hours, so today is always counted whole; merging keeps the larger
    counts, so reading a day again never lowers it. Last.fm plays have no
-   length, so each counts as three and a half minutes.
+   length, so each counts as three and a half minutes. Days are read on the
+   clock kept with the account (`diary_sources.time_zone`, the zone it
+   connected in; without one, the person's own zone, or UTC, kept from
+   then on), so a traveller's re-read files nothing on another day. A page
+   that doesn't say how many pages there are is tried again next run.
 
 Connecting Last.fm (`lastfm.ts`) sends people to Last.fm's approval page and
 back to `/diary/lastfm/callback` with a single-use state that lasts ten
-minutes and says who they are and whether they came from the website or the
-app, so no cookie is needed. The callback address is built from
-`callbackOrigin()`, so `NEXT_PUBLIC_SITE_URL` decides where Last.fm returns.
+minutes and says who they are, whether they came from the website or the
+app, and their time zone. One started on the website also sets a ten-minute
+HttpOnly cookie (path `/diary/lastfm`) holding a hash of the state, and the
+callback finishes it only with that cookie, so a link can't connect
+somebody else's Last.fm to the sender's MULO; the app's browser sheet has
+no cookies, so its connects rely on the single-use state. The session
+Last.fm gives back only proves whose account it is and isn't kept: plays
+are read by name. The callback address, and the website's redirects after
+it, are built from `callbackOrigin()`, so `NEXT_PUBLIC_SITE_URL` decides
+where Last.fm returns.
 
 Spotify's extended streaming history is read where it's picked: in the
 browser on `/diary/import` (`src/lib/diary/read-spotify.ts`, with `fflate`
-for the zip) or on the phone. Only album-days are sent, 500 at a time; the
-last call says the import is done, for the bell line and the push. Apple
-Music's library is read by the iPhone app.
+for the zip) or on the phone. A history can run to a hundred megabytes, so
+it's read a file at a time into a running tally (`createAlbumTally`), and
+files that can't be read are counted and mentioned. Only album-days are
+sent, 500 at a time; a batch held by the rate limit waits a minute and goes
+again; the last call says the import is done, for the bell line and the
+push. Apple Music's library is read by the iPhone app.
 
 Your data copy (`src/lib/export.ts`) has the diary's entries and sources,
-never the Last.fm session. The app API: `GET diary/{username}?before=`,
+never a connect's state. The app API: `GET diary/{username}?before=`,
 `POST diary/entries` (log a listen), `POST diary/entries/batch`, `DELETE
 diary/entries/{id}`, `POST diary/entries/{id}/album` (Which album is this),
-`DELETE diary/sources/{source}`, `POST diary/lastfm/start`, and `GET/PATCH
-me/diary` (Show my diary).
+`DELETE diary/sources/{source}`, `POST diary/lastfm/start` (with an
+optional `{ timeZone }`), and `GET/PATCH me/diary` (Show my diary).
 
 ## The database schema
 
