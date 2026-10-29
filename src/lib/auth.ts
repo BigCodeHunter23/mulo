@@ -16,17 +16,25 @@ export async function requireUser(returnTo: string): Promise<CurrentUser> {
 }
 
 /**
- * The address links in Supabase's emails come back to.
+ * This website's own address, for anything that comes back to it from
+ * outside: Supabase's emails, Last.fm's approval.
  *
  * Built from Vercel's own settings, never from the request: a Host header can
- * be forged, and this address ends up in somebody's inbox. Preview
- * deployments use their own branch address, so sign-up and password reset can
- * be tested there; Supabase must list both in its allowed Redirect URLs.
+ * be forged, and this address ends up in somebody's inbox or another site's
+ * redirect. Preview deployments use their own branch address, so sign-up,
+ * password reset and connecting Last.fm can be tested there.
  */
-export function authCallbackUrl(next: string): string {
+export function callbackOrigin(): string {
   const preview =
     process.env.VERCEL_ENV === "preview" &&
     (process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL);
-  const origin = preview ? `https://${preview}` : siteUrl();
-  return `${origin}/auth/confirm?next=${encodeURIComponent(next)}`;
+  return preview ? `https://${preview}` : siteUrl();
+}
+
+/**
+ * The address links in Supabase's emails come back to. Supabase must list
+ * both the live and the preview addresses in its allowed Redirect URLs.
+ */
+export function authCallbackUrl(next: string): string {
+  return `${callbackOrigin()}/auth/confirm?next=${encodeURIComponent(next)}`;
 }

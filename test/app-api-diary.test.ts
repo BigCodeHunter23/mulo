@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 /** The app API's diary endpoints. The diary's lib and Last.fm are stand-ins. */
@@ -94,7 +94,13 @@ beforeEach(() => {
   caller.user = { id: "me", email: null };
   caller.limited = new Set();
   caller.profile = null;
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://getmulo.com");
+  vi.stubEnv("VERCEL_ENV", "production");
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("GET diary/{username}", () => {
@@ -273,19 +279,30 @@ describe("DELETE diary/sources/{source}", () => {
 
 describe("POST diary/lastfm/start", () => {
   it("answers Last.fm's approval page, coming back to the website with the state", async () => {
-    const res = await lastfmStart.POST(req("POST", {}));
+    const res = await lastfmStart.POST();
     const body = await res.json();
     expect(body.ok).toBe(true);
     const url = new URL(body.url);
     expect(url.origin + url.pathname).toBe("https://www.last.fm/api/auth/");
     expect(url.searchParams.get("api_key")).toBe("KEY");
-    expect(url.searchParams.get("cb")).toBe("https://mulo.test/diary/lastfm/callback?state=STATE");
+    expect(url.searchParams.get("cb")).toBe(
+      "https://getmulo.com/diary/lastfm/callback?state=STATE&to=app",
+    );
     expect(lib.createConnectState).toHaveBeenCalledWith("me", "app");
+  });
+
+  it("comes back to a preview deployment's own address", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_BRANCH_URL", "mulo-git-diary.vercel.app");
+    const url = new URL((await (await lastfmStart.POST()).json()).url);
+    expect(url.searchParams.get("cb")).toBe(
+      "https://mulo-git-diary.vercel.app/diary/lastfm/callback?state=STATE&to=app",
+    );
   });
 
   it("says so when Last.fm isn't set up", async () => {
     lib.lastfmKeys.mockReturnValueOnce(null);
-    const res = await lastfmStart.POST(req("POST", {}));
+    const res = await lastfmStart.POST();
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ ok: false, error: "Last.fm isn't set up yet." });
     expect(lib.createConnectState).not.toHaveBeenCalled();
@@ -294,7 +311,7 @@ describe("POST diary/lastfm/start", () => {
   it("needs somebody signed in", async () => {
     caller.token = null;
     caller.user = null;
-    expect((await lastfmStart.POST(req("POST", {}))).status).toBe(401);
+    expect((await lastfmStart.POST()).status).toBe(401);
   });
 });
 

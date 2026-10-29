@@ -79,6 +79,31 @@ describe("GET /diary/lastfm/callback", () => {
     expect(lastfm.saveConnection).not.toHaveBeenCalled();
   });
 
+  it("sends a failure back to the app when the app's state can't be read", async () => {
+    lastfm.takeConnectState.mockResolvedValueOnce(null);
+    expect(where(await back(`state=${STATE}&token=T&to=app`))).toBe("mulo://diary/lastfm?error=1");
+    expect(where(await back(`state=${STATE}&to=app`))).toBe("mulo://diary/lastfm?error=1");
+    lastfm.keys = null;
+    expect(where(await back(`state=${STATE}&token=T&to=app`))).toBe("mulo://diary/lastfm?error=1");
+    expect(lastfm.saveConnection).not.toHaveBeenCalled();
+  });
+
+  it("leaves success and whose account it is to the state, whatever the address says", async () => {
+    expect(where(await back(`state=${STATE}&token=T&to=app`))).toBe(
+      "https://mulo.test/diary?lastfm=connected",
+    );
+    expect(lastfm.saveConnection).toHaveBeenCalledWith("me", { user: "fran", key: "SESSION" });
+
+    lastfm.takeConnectState.mockResolvedValueOnce({ userId: "me", to: "app" });
+    expect(where(await back(`state=${STATE}&token=T`))).toBe("mulo://diary/lastfm?ok=1");
+
+    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
+    lastfm.sessionFor.mockRejectedValueOnce(new Error("Invalid token"));
+    expect(where(await back(`state=${STATE}&token=T&to=app`))).toBe(
+      "https://mulo.test/diary?lastfm=failed",
+    );
+  });
+
   it("never saves when Last.fm won't give a session", async () => {
     vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
     lastfm.sessionFor.mockRejectedValueOnce(new Error("Invalid token"));

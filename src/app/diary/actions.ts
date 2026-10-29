@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { DiaryBatch, DiaryBatchResult, SaveResult } from "@/lib/app-api";
-import { requireUser } from "@/lib/auth";
+import { callbackOrigin, requireUser } from "@/lib/auth";
 import { BATCH_MAX, IMPORT_SOURCES, type ImportSource } from "@/lib/diary-shared";
 import {
   albumDaySchema,
@@ -32,28 +31,14 @@ const TRY_AGAIN = "Couldn't save that. Please try again.";
 const SIGN_IN_FIRST = "Log in first.";
 const DIARY_PAGE = "/u/[username]/diary";
 
-/** An address on this computer or its network, which a development server answers over http. */
-const LOCAL_HOST = /^(localhost|127\.|10\.|192\.168\.|\[::1\])/;
-
-/**
- * This website's own address, for Last.fm to come back to. A forged host
- * would only send the person who forged it somewhere else.
- */
-async function origin(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "getmulo.com";
-  const protocol = h.get("x-forwarded-proto") ?? (LOCAL_HOST.test(host) ? "http" : "https");
-  return `${protocol}://${host}`;
-}
-
-/** Connect Last.fm: off to Last.fm's approval page. */
+/** Connect Last.fm: off to Last.fm's approval page, coming back to this website. */
 export async function startLastfm(): Promise<{ error: string }> {
   const user = await requireUser("/diary/import");
   const keys = lastfmKeys();
   if (!keys) return { error: LASTFM_OFF };
   if (!(await allowUser("write", user.id))) return { error: TOO_MANY };
   const state = await createConnectState(user.id, "web");
-  redirect(approvalUrl(keys, `${await origin()}/diary/lastfm/callback?state=${state}`));
+  redirect(approvalUrl(keys, `${callbackOrigin()}/diary/lastfm/callback?state=${state}`));
 }
 
 /** Never Last.fm: the website reads that itself, on the clock. */

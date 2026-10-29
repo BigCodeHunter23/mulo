@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The diary's website actions. The diary's lib and Last.fm are stand-ins. */
 
@@ -9,7 +9,6 @@ type Fn = (...args: unknown[]) => Promise<unknown>;
 const state = vi.hoisted(() => ({
   user: null as { id: string; email: string | null } | null,
   limited: new Set<string>(),
-  host: "getmulo.com",
   keys: { key: "KEY", secret: "SECRET" } as { key: string; secret: string } | null,
 }));
 
@@ -33,9 +32,6 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`redirect:${to}`);
   }),
-}));
-vi.mock("next/headers", () => ({
-  headers: vi.fn(async () => new Headers({ host: state.host })),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/diary/entries", async (original) => ({
@@ -72,9 +68,14 @@ const day = {
 beforeEach(() => {
   state.user = { id: "me", email: null };
   state.limited = new Set();
-  state.host = "getmulo.com";
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://getmulo.com");
+  vi.stubEnv("VERCEL_ENV", "production");
   state.keys = { key: "KEY", secret: "SECRET" };
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("startLastfm", () => {
@@ -105,12 +106,12 @@ describe("startLastfm", () => {
     expect(lib.createConnectState).toHaveBeenCalledWith("me", "web");
   });
 
-  it("comes back to a website running on this computer over http", async () => {
-    state.host = "localhost:3000";
+  it("comes back to a website running on this computer at its own address", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://192.168.1.7:3000");
     const error = (await startLastfm().catch((thrown: Error) => thrown)) as Error;
     const to = new URL(error.message.replace("redirect:", ""));
     expect(to.searchParams.get("cb")).toBe(
-      "http://localhost:3000/diary/lastfm/callback?state=STATE",
+      "http://192.168.1.7:3000/diary/lastfm/callback?state=STATE",
     );
   });
 });
