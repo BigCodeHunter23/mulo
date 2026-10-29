@@ -6,6 +6,12 @@
 -- visitors can't read replies at all. Replies can't be edited; delete and
 -- post again.
 --
+-- Only the website writes replies, with the service role, after its own
+-- checks: the rate limit, the word filter, a block either way, the
+-- pick-first lock on an open take, and who a reply names. People signed in
+-- can read and delete through their own session, but not insert, so none of
+-- those checks can be skipped by writing to the table directly.
+--
 -- The table is shaped like reactions (no unique pair of person and review),
 -- so PostgREST never takes it for a link table between profiles and ratings,
 -- and existing `profiles!inner` joins stay unambiguous. Keep it that way.
@@ -26,7 +32,11 @@ create table if not exists public.replies (
   -- on replies ambiguous, and the reply goes with the review or take anyway.
   thread_owner_id uuid,
   constraint replies_one_target
-    check (num_nonnulls(rating_id, artist_rating_id, versus_take_id) = 1)
+    check (num_nonnulls(rating_id, artist_rating_id, versus_take_id) = 1),
+  -- Only a written review or a take has an owner, so a reply to a bare score
+  -- (or a review cleared a moment ago) is refused, whoever writes it. A check
+  -- rather than "not null", so the generated types leave it to the trigger.
+  constraint replies_thread_has_owner check (thread_owner_id is not null)
 );
 
 create index if not exists replies_rating_idx
@@ -64,13 +74,14 @@ as $$
   )
 $$;
 
--- Only signed-in people (and the server) may call it, as with hidden_profiles().
-revoke execute on function public.reply_thread_owner(bigint, bigint, bigint) from public, anon;
-grant execute on function public.reply_thread_owner(bigint, bigint, bigint) to authenticated, service_role;
+-- Only the server writes replies, so only it needs this.
+revoke execute on function public.reply_thread_owner(bigint, bigint, bigint)
+  from public, anon, authenticated;
+grant execute on function public.reply_thread_owner(bigint, bigint, bigint) to service_role;
 
 /**
  * Fills in thread_owner_id, whatever the writer sent. Runs before the
- * insert's row-level checks, so they see the owner it sets.
+ * row's checks, so they see the owner it sets.
  */
 create or replace function public.set_reply_thread_owner()
 returns trigger
@@ -95,9 +106,10 @@ create trigger replies_thread_owner
 
 alter table public.replies enable row level security;
 
--- Signed out, nothing at all; and nobody edits a reply.
+-- Signed out, nothing at all. Signed in, read and delete only: replies are
+-- written by the website (see the top), and nobody edits one.
 revoke all on public.replies from anon;
-revoke update on public.replies from authenticated;
+revoke insert, update, truncate, trigger, references on public.replies from authenticated;
 
 drop policy if exists "Signed-in people read replies, except hidden people's" on public.replies;
 create policy "Signed-in people read replies, except hidden people's"
@@ -109,19 +121,8 @@ create policy "Signed-in people read replies, except hidden people's"
     )
   );
 
+-- No insert policy: the website checks a block either way before it writes.
 drop policy if exists "People reply as themselves, not across a block" on public.replies;
-create policy "People reply as themselves, not across a block"
-  on public.replies for insert to authenticated
-  with check (
-    (select auth.uid()) = replies.user_id
-    and public.reply_thread_owner(
-          replies.rating_id, replies.artist_rating_id, replies.versus_take_id) is not null
-    and not exists (
-      select 1 from public.hidden_profiles((select auth.uid())) h
-      where h.id = public.reply_thread_owner(
-              replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
-    )
-  );
 
 drop policy if exists "People delete their own replies, and any on their own review" on public.replies;
 create policy "People delete their own replies, and any on their own review"

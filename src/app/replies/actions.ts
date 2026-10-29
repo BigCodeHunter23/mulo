@@ -8,6 +8,7 @@ import { later } from "@/lib/push/later";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { mentionedIn, NOT_YET, PICK_FIRST, REPLY_COLUMNS, replyable } from "@/lib/replies";
 import { REPLY_LIMIT, THREAD_GONE, type ThreadKind } from "@/lib/replies-shared";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { TablesInsert } from "@/lib/supabase/database.types";
 import { isMissingTable } from "@/lib/supabase/errors";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
@@ -21,28 +22,37 @@ const target = z.object({
 const TRY_AGAIN = "Couldn't save that. Please try again.";
 const TOO_LONG = `Keep it to ${REPLY_LIMIT.toLocaleString("en")} characters.`;
 
+/** The most replies one person may post in one thread. */
+const PER_THREAD_MAX = 50;
+
 type DbError = { code?: string; message?: string; details?: string | null };
 
 /** What the database's refusal means, in plain words. */
 function refusal(error: DbError | null): string {
   if (isMissingTable(error)) return NOT_YET;
-  if (
-    error?.code === "23503" &&
-    `${error.details ?? ""} ${error.message ?? ""}`.includes("profiles")
-  ) {
+  const said = `${error?.details ?? ""} ${error?.message ?? ""}`;
+  if (error?.code === "23503" && said.includes("profiles")) {
     return "Pick a username first, then come back.";
   }
-  // Turned away by the rules: a block either way, or the review lost its
-  // words (or went) a moment ago. A block isn't admitted to.
-  if (error?.code === "42501" || error?.code === "23503") return THREAD_GONE;
-  if (error?.code === "23514") return TOO_LONG;
+  // The review lost its words, or the review or take went, a moment ago.
+  if (error?.code === "23503") return THREAD_GONE;
+  if (error?.code === "23514") {
+    return said.includes("replies_thread_has_owner") ? THREAD_GONE : TOO_LONG;
+  }
   return TRY_AGAIN;
 }
 
 /**
- * Answers a written review or a take. The thread pages are read fresh on
- * every visit (they depend on who's looking), so there's nothing to
- * revalidate; the website's box refreshes its page itself.
+ * Answers a written review or a take. Every check is made here, then the
+ * reply is written with the service role, as the signed-in person: nobody
+ * may write to `replies` themselves (migration 0024), so the rate limit, the
+ * word filter, a block either way and the pick-first lock always apply.
+ * `replyable` reads the thread through the visitor's own session and calls
+ * it gone when its writer is hidden either way, which is the block check.
+ *
+ * The thread pages are read fresh on every visit (they depend on who's
+ * looking), so there's nothing to revalidate; the website's box refreshes
+ * its page itself.
  */
 export async function postReply(
   kind: ThreadKind,
@@ -64,11 +74,23 @@ export async function postReply(
   const state = await replyable(kind, targetId);
   if (state !== "open") return { ok: false, error: state === "locked" ? PICK_FIRST : THREAD_GONE };
 
-  const row: TablesInsert<"replies"> = { user_id: user.id, body: text };
-  row[REPLY_COLUMNS[kind]] = targetId;
+  const column = REPLY_COLUMNS[kind];
+  const server = createAdminClient();
+  const { count, error: countError } = await server
+    .from("replies")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq(column, targetId);
+  if (countError) return { ok: false, error: refusal(countError) };
+  if ((count ?? 0) >= PER_THREAD_MAX) {
+    return { ok: false, error: "That's the most replies you can post here." };
+  }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // The owner of the thread is filled in by the database (replies_thread_owner).
+  const row: TablesInsert<"replies"> = { user_id: user.id, body: text };
+  row[column] = targetId;
+
+  const { data, error } = await server
     .from("replies")
     .insert(row)
     .select("id, body, created_at, profiles!inner ( id, username, display_name, avatar_url )")

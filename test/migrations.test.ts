@@ -438,9 +438,19 @@ describe("0024 replies", () => {
     }
   }
 
+  /** One statement as the website's server, which writes replies with the service role. */
+  async function asServer<T>(sql: string): Promise<T[]> {
+    await db.exec("set role service_role");
+    try {
+      return (await db.query<T>(sql)).rows;
+    } finally {
+      await db.exec("reset role");
+    }
+  }
+
+  /** A reply by `user`, posted the only way there is: through the website. */
   const replyAs = (user: string, column: string, target: number, body = "Agreed.") =>
-    as<{ id: number }>(
-      user,
+    asServer<{ id: number }>(
       `insert into public.replies (user_id, ${column}, body)
        values ('${user}', ${target}, '${body}') returning id::int as id`,
     );
@@ -479,7 +489,7 @@ describe("0024 replies", () => {
     await db.exec("delete from public.replies");
   });
 
-  it("lets somebody signed in reply as themselves, and others read it", async () => {
+  it("lets the website reply for somebody signed in, and others read it", async () => {
     await replyAs(U(2), "rating_id", review);
     await replyAs(U(2), "artist_rating_id", artistReview);
     await replyAs(U(2), "versus_take_id", take);
@@ -494,16 +504,38 @@ describe("0024 replies", () => {
     await expect(as(null, "select * from public.replies")).rejects.toThrow();
   });
 
-  it("won't take a reply as somebody else, to a score with no words, or across a block", async () => {
+  it("takes replies only from the website, never straight from somebody signed in", async () => {
+    // Not even as themselves: the website's rate limit, word filter, block
+    // check and pick-first lock would all be skipped.
+    for (const user of [U(2), U(4)]) {
+      await expect(
+        as(
+          U(2),
+          `insert into public.replies (user_id, rating_id, body) values ('${user}', ${review}, 'Hi.')`,
+        ),
+      ).rejects.toThrow();
+    }
     await expect(
       as(
-        U(2),
-        `insert into public.replies (user_id, rating_id, body) values ('${U(4)}', ${review}, 'Hi.')`,
+        null,
+        `insert into public.replies (user_id, rating_id, body) values ('${U(2)}', ${review}, 'Hi.')`,
       ),
     ).rejects.toThrow();
+    expect(await count("body = 'Hi.'")).toBe(0);
+  });
+
+  it("keeps the public roles from writing, emptying or hanging triggers on replies", async () => {
+    const checks = ["anon", "authenticated"].flatMap((role) =>
+      ["insert", "update", "truncate", "trigger", "references"].map(
+        (what) => `has_table_privilege('${role}', 'public.replies', '${what}') as ${role}_${what}`,
+      ),
+    );
+    const { rows } = await db.query<Record<string, boolean>>(`select ${checks.join(", ")}`);
+    expect(Object.values(rows[0] ?? {})).toEqual(Array(10).fill(false));
+  });
+
+  it("won't take a reply to a score with no words", async () => {
     await expect(replyAs(U(2), "rating_id", bareScore)).rejects.toThrow();
-    // U(3) blocked U(2), so U(2) can't answer U(3)'s review.
-    await expect(replyAs(U(2), "rating_id", blockerReview)).rejects.toThrow();
   });
 
   it("hides replies by, or to, people hidden from the reader", async () => {
@@ -569,17 +601,17 @@ describe("0024 replies", () => {
     expect(await count(`versus_take_id = ${take}`)).toBe(0);
   });
 
-  it("keeps reply_thread_owner from signed-out visitors", async () => {
-    const { rows } = await db.query<{ anon: boolean; signed_in: boolean }>(
+  it("keeps reply_thread_owner for the server", async () => {
+    const { rows } = await db.query<{ anon: boolean; signed_in: boolean; server: boolean }>(
       `select has_function_privilege('anon', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as anon,
-              has_function_privilege('authenticated', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as signed_in`,
+              has_function_privilege('authenticated', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as signed_in,
+              has_function_privilege('service_role', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as server`,
     );
-    expect(rows[0]).toEqual({ anon: false, signed_in: true });
+    expect(rows[0]).toEqual({ anon: false, signed_in: false, server: true });
   });
 
   it("records whose thread a reply is in, whatever the writer sends", async () => {
-    const [reply] = await as<{ id: number }>(
-      U(4),
+    const [reply] = await asServer<{ id: number }>(
       `insert into public.replies (user_id, artist_rating_id, thread_owner_id, body)
        values ('${U(4)}', ${artistReview}, '${U(4)}', 'Mine now?') returning id::int as id`,
     );

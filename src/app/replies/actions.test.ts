@@ -7,7 +7,10 @@ const KIM = "33333333-3333-4333-8333-333333333333";
 const LEE = "44444444-4444-4444-8444-444444444444";
 
 const db = vi.hoisted(() => ({
+  /** The visitor's own client. */
   fake: null as unknown as FakeSupabase,
+  /** The service role's, which alone writes replies. */
+  admin: null as unknown as FakeSupabase,
   user: null as { id: string; email: string | null } | null,
   limited: false,
   state: "open" as "open" | "locked" | "gone",
@@ -17,6 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => db.fake.client,
   getCurrentUser: async () => db.user,
 }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.admin.client }));
 vi.mock("@/lib/rate-limit", () => ({
   allowUser: vi.fn(async () => !db.limited),
   TOO_MANY: "You're doing that a lot. Please wait a minute and try again.",
@@ -69,8 +73,21 @@ const saved = {
   profiles: { id: ME, username: "me", display_name: null, avatar_url: null },
 };
 
+/**
+ * The server's answers to posting: how many replies you already have in the
+ * thread, then each insert's answer.
+ */
+function answersPosting(...inserts: unknown[]) {
+  for (const insert of inserts) db.admin.answer("replies", { count: 0, error: null }, insert);
+}
+
+const saves = () => answersPosting({ data: saved, error: null });
+
+const inserted = () => db.admin.callsOn("replies").filter((call) => call.method === "insert");
+
 beforeEach(() => {
   db.fake = fakeSupabase();
+  db.admin = fakeSupabase();
   db.user = { id: ME, email: null };
   db.limited = false;
   db.state = "open";
@@ -79,7 +96,7 @@ beforeEach(() => {
 
 describe("postReply", () => {
   it("saves the trimmed reply as you, then pushes", async () => {
-    db.fake.answer("replies", { data: saved, error: null });
+    saves();
     const result = await postReply("album", 7, "  @kim fair.  ");
     expect(result).toEqual({
       ok: true,
@@ -93,7 +110,7 @@ describe("postReply", () => {
         canDelete: true,
       },
     });
-    expect(db.fake.callsOn("replies")).toContainEqual({
+    expect(inserted()).toContainEqual({
       table: "replies",
       method: "insert",
       args: [{ user_id: ME, body: "@kim fair.", rating_id: 7 }],
@@ -116,7 +133,7 @@ describe("postReply", () => {
     vi.mocked(store.blockedEitherWay).mockImplementation(
       async (a, b) => [a, b].includes(LEE) && [a, b].includes(ME),
     );
-    db.fake.answer("replies", { data: saved, error: null });
+    saves();
     expect(await postReply("album", 7, "@kim @lee fair.")).toMatchObject({ ok: true });
     expect(store.replyTarget).toHaveBeenCalledWith("album", 7);
     expect(store.saveMentions).toHaveBeenCalledWith(41, [KIM]);
@@ -128,7 +145,7 @@ describe("postReply", () => {
       { id: KIM, username: "kim", display_name: null },
     ]);
     vi.mocked(store.saveMentions).mockRejectedValueOnce(new Error("down"));
-    db.fake.answer("replies", { data: saved, error: null });
+    saves();
     expect(await postReply("album", 7, "@kim fair.")).toMatchObject({
       ok: true,
       reply: { id: 41, mentions: ["Kim"] },
@@ -152,9 +169,9 @@ describe("postReply", () => {
   it("trims all whitespace, and measures the limit after trimming", async () => {
     const pad = " \u00a0\u3000\n\t";
     expect(await postReply("album", 7, pad)).toEqual({ ok: false, error: "Say something first." });
-    db.fake.answer("replies", { data: saved, error: null });
+    saves();
     await postReply("album", 7, pad + "x".repeat(1000) + pad);
-    expect(db.fake.callsOn("replies")).toContainEqual({
+    expect(inserted()).toContainEqual({
       table: "replies",
       method: "insert",
       args: [{ user_id: ME, body: "x".repeat(1000), rating_id: 7 }],
@@ -168,18 +185,44 @@ describe("postReply", () => {
       error: "Pick a side first, then join in.",
     });
     expect(replyable).toHaveBeenCalledWith("take", 9);
-    expect(db.fake.callsOn("replies")).toEqual([]);
+    expect(inserted()).toEqual([]);
     expect(notifyReply).not.toHaveBeenCalled();
   });
 
   it("lets you reply on a take once it's open for you", async () => {
-    db.fake.answer("replies", { data: saved, error: null });
+    saves();
     expect(await postReply("take", 9, "Fair.")).toMatchObject({ ok: true });
-    expect(db.fake.callsOn("replies")).toContainEqual({
+    expect(inserted()).toContainEqual({
       table: "replies",
       method: "insert",
       args: [{ user_id: ME, body: "Fair.", versus_take_id: 9 }],
     });
+  });
+
+  it("writes with the server's client, as you, never through your own session", async () => {
+    saves();
+    await postReply("album", 7, "Fair.");
+    expect(inserted()).toEqual([
+      { table: "replies", method: "insert", args: [{ user_id: ME, body: "Fair.", rating_id: 7 }] },
+    ]);
+    expect(db.fake.callsOn("replies")).toEqual([]);
+  });
+
+  it("stops you at 50 replies in one thread", async () => {
+    db.admin.answer("replies", { count: 50, error: null });
+    expect(await postReply("artist", 8, "Again.")).toEqual({
+      ok: false,
+      error: "That's the most replies you can post here.",
+    });
+    expect(db.admin.callsOn("replies")).toEqual(
+      expect.arrayContaining([
+        { table: "replies", method: "eq", args: ["user_id", ME] },
+        { table: "replies", method: "eq", args: ["artist_rating_id", 8] },
+      ]),
+    );
+    expect(inserted()).toEqual([]);
+    db.admin.answer("replies", { count: 49, error: null }, { data: saved, error: null });
+    expect(await postReply("artist", 8, "Again.")).toMatchObject({ ok: true });
   });
 
   it("refuses a kind or id it doesn't know", async () => {
@@ -209,13 +252,19 @@ describe("postReply", () => {
       ok: false,
       error: "Pick a side first, then join in.",
     });
-    expect(db.fake.callsOn("replies")).toEqual([]);
+    expect(inserted()).toEqual([]);
   });
 
   it("turns the database's refusals into plain words, and doesn't push", async () => {
-    db.fake.answer(
-      "replies",
-      { data: null, error: { code: "42501", message: "row-level security" } },
+    answersPosting(
+      {
+        data: null,
+        error: {
+          code: "23514",
+          message:
+            'new row for relation "replies" violates check constraint "replies_thread_has_owner"',
+        },
+      },
       { data: null, error: { code: "PGRST205", message: "no table" } },
       {
         data: null,
