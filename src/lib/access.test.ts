@@ -10,6 +10,7 @@ describe("needsSignIn", () => {
     "/profile",
     "/profile/raised-on",
     "/welcome",
+    "/diary",
     "/lists",
     "/lists/new",
     "/lists/12",
@@ -43,6 +44,8 @@ describe("needsSignIn", () => {
     "/login",
     "/auth/reset",
     "/admin/reports",
+    "/diary/lastfm/callback",
+    "/u/alex/diary",
     // Similar names that aren't the guarded pages.
     "/stacks",
     "/peoplex",
