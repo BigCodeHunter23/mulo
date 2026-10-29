@@ -113,6 +113,41 @@ function Text({ item }: { item: Notification }) {
         </p>
       );
     }
+    case "reply":
+      return (
+        <p>
+          <Name person={item.person} />
+          {item.others > 0
+            ? ` and ${item.others} ${item.others === 1 ? "other" : "others"}`
+            : ""}{" "}
+          replied to your {item.on === "take" ? "take on " : "review of "}
+          <Link href={item.subject.href} className={strong}>
+            {item.subject.title}
+          </Link>
+        </p>
+      );
+    case "mention":
+      return (
+        <p>
+          <Name person={item.person} /> mentioned you on {item.owner}&rsquo;s{" "}
+          {item.on === "take" ? "take on " : "review of "}
+          <Link href={item.subject.href} className={strong}>
+            {item.subject.title}
+          </Link>
+        </p>
+      );
+    case "thread":
+      return (
+        <p>
+          <Link href={item.subject.href} className={strong}>
+            {item.count} new {item.count === 1 ? "reply" : "replies"}
+          </Link>{" "}
+          on {item.owner}&rsquo;s {item.on === "take" ? "take on " : "review of "}
+          <Link href={item.subject.href} className={strong}>
+            {item.subject.title}
+          </Link>
+        </p>
+      );
     case "versus-live":
       return (
         <p>

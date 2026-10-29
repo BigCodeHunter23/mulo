@@ -26,7 +26,7 @@ export default async function NotificationsPage() {
       {notifications.length === 0 ? (
         <EmptyState
           title="Nothing yet"
-          body="When people follow you, or love or disagree with your ratings, it shows up here."
+          body="When people follow you, react to your ratings or reply to your reviews, it shows up here."
           action={<ButtonLink href="/people">Find people to follow</ButtonLink>}
         />
       ) : (

@@ -1220,6 +1220,40 @@ export type Notification =
       yours: number;
       theirs: number;
     }
+  /** Replies on the viewer's own review or take, one line per thread; `person` wrote the newest. */
+  | {
+      kind: "reply";
+      key: string;
+      at: string;
+      person: Person;
+      /** How many other people replied too. */
+      others: number;
+      on: "review" | "take";
+      /** The record's or matchup's title, and the thread's address. */
+      subject: { title: string; href: string };
+    }
+  /** Somebody named the viewer in a reply on somebody else's review or take. */
+  | {
+      kind: "mention";
+      key: string;
+      at: string;
+      person: Person;
+      /** Whose review or take it is, by name. */
+      owner: string;
+      on: "review" | "take";
+      subject: { title: string; href: string };
+    }
+  /** Newer replies in a thread the viewer replied in; `person` wrote the newest. */
+  | {
+      kind: "thread";
+      key: string;
+      at: string;
+      person: Person;
+      count: number;
+      owner: string;
+      on: "review" | "take";
+      subject: { title: string; href: string };
+    }
   /** Today's Daily Versus is up and they haven't picked yet. */
   | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
   /** A Versus they picked in has closed. */
