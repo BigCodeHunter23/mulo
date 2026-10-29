@@ -312,6 +312,42 @@ export type Database = {
           },
         ]
       }
+      personal_settings: {
+        Row: {
+          last_seen_at: string | null
+          notify_drop: boolean
+          notify_follows: boolean
+          notify_loves: boolean
+          notify_replies: boolean
+          notify_streak: boolean
+          notify_versus: boolean
+          time_zone: string | null
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string | null
+          notify_drop?: boolean
+          notify_follows?: boolean
+          notify_loves?: boolean
+          notify_replies?: boolean
+          notify_streak?: boolean
+          notify_versus?: boolean
+          time_zone?: string | null
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string | null
+          notify_drop?: boolean
+          notify_follows?: boolean
+          notify_loves?: boolean
+          notify_replies?: boolean
+          notify_streak?: boolean
+          notify_versus?: boolean
+          time_zone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -358,6 +394,57 @@ export type Database = {
             referencedColumns: ["mbid"]
           },
         ]
+      }
+      push_devices: {
+        Row: {
+          created_at: string
+          last_seen_at: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_seen_at?: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_seen_at?: string
+          platform?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_log: {
+        Row: {
+          key: string
+          kind: string
+          receipts_checked: boolean
+          sent_at: string
+          tickets: Json
+          user_id: string
+        }
+        Insert: {
+          key: string
+          kind: string
+          receipts_checked?: boolean
+          sent_at?: string
+          tickets?: Json
+          user_id: string
+        }
+        Update: {
+          key?: string
+          kind?: string
+          receipts_checked?: boolean
+          sent_at?: string
+          tickets?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       rate_limits: {
         Row: {

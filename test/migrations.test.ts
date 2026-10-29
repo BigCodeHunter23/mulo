@@ -290,3 +290,82 @@ describe("running a migration twice", () => {
     await expect(db.exec(migrationSql(name))).resolves.toBeDefined();
   });
 });
+
+describe("0023 push notifications", () => {
+  let db: PGlite;
+
+  beforeAll(async () => {
+    db = await localDatabase();
+    await db.exec(`insert into auth.users (id) values ('${U(1)}'), ('${U(2)}');`);
+  });
+  afterAll(() => db?.close());
+
+  it("runs twice without complaint", async () => {
+    await db.exec(migrationSql("0023_push_notifications.sql"));
+  });
+
+  it("keeps one row per phone, moving a phone to whoever registered it last", async () => {
+    await db.exec(`
+      insert into public.push_devices (token, user_id, platform) values ('ExponentPushToken[a]', '${U(1)}', 'ios');
+      insert into public.push_devices (token, user_id, platform) values ('ExponentPushToken[a]', '${U(2)}', 'ios')
+        on conflict (token) do update set user_id = excluded.user_id;
+    `);
+    const { rows } = await db.query<{ user_id: string }>(
+      "select user_id from public.push_devices where token = 'ExponentPushToken[a]'",
+    );
+    expect(rows).toEqual([{ user_id: U(2) }]);
+  });
+
+  it("refuses an unknown platform and an unknown kind of push", async () => {
+    await refuses(
+      db,
+      `insert into public.push_devices (token, user_id, platform) values ('ExponentPushToken[b]', '${U(1)}', 'windows')`,
+    );
+    await refuses(
+      db,
+      `insert into public.push_log (user_id, kind, key) values ('${U(1)}', 'poke', 'x')`,
+    );
+  });
+
+  it("logs each push once", async () => {
+    await db.exec(
+      `insert into public.push_log (user_id, kind, key) values ('${U(1)}', 'versus', '2026-10-29')`,
+    );
+    await refuses(
+      db,
+      `insert into public.push_log (user_id, kind, key) values ('${U(1)}', 'versus', '2026-10-29')`,
+    );
+  });
+
+  it("starts everyone with every switch on", async () => {
+    await db.exec(`insert into public.personal_settings (user_id) values ('${U(1)}')`);
+    const { rows } = await db.query(
+      `select notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak
+       from public.personal_settings where user_id = '${U(1)}'`,
+    );
+    expect(rows[0]).toEqual({
+      notify_follows: true,
+      notify_loves: true,
+      notify_replies: true,
+      notify_versus: true,
+      notify_drop: true,
+      notify_streak: true,
+    });
+  });
+
+  it("keeps all three tables from the public roles", async () => {
+    for (const table of ["personal_settings", "push_devices", "push_log"]) {
+      await refuses(db, `set role authenticated; select * from public.${table}; reset role;`);
+      await db.exec("reset role");
+    }
+  });
+
+  it("forgets a deleted account's phones, switches and log", async () => {
+    await db.exec(`delete from auth.users where id = '${U(1)}'`);
+    const { rows } = await db.query(
+      `select (select count(*) from public.personal_settings where user_id = '${U(1)}')::int as s,
+              (select count(*) from public.push_log where user_id = '${U(1)}')::int as l`,
+    );
+    expect(rows[0]).toEqual({ s: 0, l: 0 });
+  });
+});
