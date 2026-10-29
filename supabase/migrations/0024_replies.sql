@@ -18,7 +18,7 @@ create table if not exists public.replies (
   rating_id bigint references public.ratings (id) on delete cascade,
   artist_rating_id bigint references public.artist_ratings (id) on delete cascade,
   versus_take_id bigint references public.versus_takes (id) on delete cascade,
-  body text not null check (char_length(btrim(body)) between 1 and 1000),
+  body text not null check (char_length(btrim(body, E' \t\r\n')) between 1 and 1000),
   created_at timestamptz not null default now(),
   constraint replies_one_target
     check (num_nonnulls(rating_id, artist_rating_id, versus_take_id) = 1)
@@ -57,6 +57,10 @@ as $$
   )
 $$;
 
+-- Only signed-in people (and the server) may call it, as with hidden_profiles().
+revoke execute on function public.reply_thread_owner(bigint, bigint, bigint) from public, anon;
+grant execute on function public.reply_thread_owner(bigint, bigint, bigint) to authenticated, service_role;
+
 alter table public.replies enable row level security;
 
 -- Signed out, nothing at all; and nobody edits a reply.
@@ -68,7 +72,7 @@ create policy "Signed-in people read replies, except hidden people's"
   on public.replies for select to authenticated
   using (
     not exists (
-      select 1 from public.hidden_profiles(auth.uid()) h
+      select 1 from public.hidden_profiles((select auth.uid())) h
       where h.id = replies.user_id
          or h.id = public.reply_thread_owner(
               replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
@@ -79,11 +83,11 @@ drop policy if exists "People reply as themselves, not across a block" on public
 create policy "People reply as themselves, not across a block"
   on public.replies for insert to authenticated
   with check (
-    auth.uid() = replies.user_id
+    (select auth.uid()) = replies.user_id
     and public.reply_thread_owner(
           replies.rating_id, replies.artist_rating_id, replies.versus_take_id) is not null
     and not exists (
-      select 1 from public.hidden_profiles(auth.uid()) h
+      select 1 from public.hidden_profiles((select auth.uid())) h
       where h.id = public.reply_thread_owner(
               replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
     )
@@ -93,8 +97,8 @@ drop policy if exists "People delete their own replies, and any on their own rev
 create policy "People delete their own replies, and any on their own review"
   on public.replies for delete to authenticated
   using (
-    auth.uid() = replies.user_id
-    or auth.uid() = public.reply_thread_owner(
+    (select auth.uid()) = replies.user_id
+    or (select auth.uid()) = public.reply_thread_owner(
          replies.rating_id, replies.artist_rating_id, replies.versus_take_id)
   );
 

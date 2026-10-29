@@ -385,6 +385,7 @@ describe("0024 replies", () => {
   let take = 0;
   let blockerReview = 0;
   let bareScore = 0;
+  let bareArtistRating = 0;
 
   beforeAll(async () => {
     db = await localDatabase();
@@ -406,14 +407,22 @@ describe("0024 replies", () => {
       insert into public.ratings (user_id, release_mbid, score) values ('${U(4)}', '${ALBUM}', 7);
       insert into public.artist_ratings (user_id, artist_mbid, score, review)
         values ('${U(1)}', '${NAS}', 9, 'The best.');
+      insert into public.artist_ratings (user_id, artist_mbid, score)
+        values ('${U(4)}', '${NAS}', 6);
       insert into public.blocks (blocker_id, blocked_id) values ('${U(3)}', '${U(2)}');
     `);
-    const idOf = async (sql: string) =>
-      (await db.query<{ id: number }>(sql)).rows[0]?.id ?? 0;
+    const idOf = async (sql: string) => (await db.query<{ id: number }>(sql)).rows[0]?.id ?? 0;
     review = await idOf(`select id::int as id from public.ratings where user_id = '${U(1)}'`);
-    blockerReview = await idOf(`select id::int as id from public.ratings where user_id = '${U(3)}'`);
+    blockerReview = await idOf(
+      `select id::int as id from public.ratings where user_id = '${U(3)}'`,
+    );
     bareScore = await idOf(`select id::int as id from public.ratings where user_id = '${U(4)}'`);
-    artistReview = await idOf("select id::int as id from public.artist_ratings");
+    artistReview = await idOf(
+      `select id::int as id from public.artist_ratings where user_id = '${U(1)}'`,
+    );
+    bareArtistRating = await idOf(
+      `select id::int as id from public.artist_ratings where user_id = '${U(4)}'`,
+    );
     take = await idOf("select id::int as id from public.versus_takes");
   });
   afterAll(() => db?.close());
@@ -499,9 +508,7 @@ describe("0024 replies", () => {
 
   it("hides replies by, or to, people hidden from the reader", async () => {
     // U(3) blocked U(2): U(3) doesn't see U(2)'s reply on U(1)'s review.
-    expect(
-      await as(U(3), `select id from public.replies where rating_id = ${review}`),
-    ).toEqual([]);
+    expect(await as(U(3), `select id from public.replies where rating_id = ${review}`)).toEqual([]);
     // U(4)'s reply on U(3)'s review is hidden from U(2), whom U(3) blocked.
     await replyAs(U(4), "rating_id", blockerReview, "Fair.");
     expect(
@@ -515,14 +522,59 @@ describe("0024 replies", () => {
   it("lets you delete your own reply, and any on your own review, and nothing else", async () => {
     const [mine] = await replyAs(U(4), "rating_id", review, "Mine.");
     // U(4) can't delete U(2)'s reply: nothing happens.
-    await as(U(4), `delete from public.replies where user_id = '${U(2)}' and rating_id = ${review}`);
+    await as(
+      U(4),
+      `delete from public.replies where user_id = '${U(2)}' and rating_id = ${review}`,
+    );
     expect(await count(`user_id = '${U(2)}' and rating_id = ${review}`)).toBe(1);
     // U(1) wrote the review, so U(1) can.
-    await as(U(1), `delete from public.replies where user_id = '${U(2)}' and rating_id = ${review}`);
+    await as(
+      U(1),
+      `delete from public.replies where user_id = '${U(2)}' and rating_id = ${review}`,
+    );
     expect(await count(`user_id = '${U(2)}' and rating_id = ${review}`)).toBe(0);
     // U(4) deletes their own.
     await as(U(4), `delete from public.replies where id = ${mine?.id ?? 0}`);
     expect(await count(`id = ${mine?.id ?? 0}`)).toBe(0);
+  });
+
+  it("refuses a reply of only new lines or tabs", async () => {
+    await refuses(
+      db,
+      `insert into public.replies (user_id, rating_id, body)
+       values ('${U(2)}', ${review}, E'\n\t \r\n')`,
+    );
+  });
+
+  it("refuses a reply to an artist rating with no words, or to a cleared review", async () => {
+    await expect(replyAs(U(2), "artist_rating_id", bareArtistRating)).rejects.toThrow();
+    await db.exec(`insert into public.ratings (user_id, release_mbid, score, review)
+      values ('${U(2)}', '${ALBUM}', 5, 'Meh.')`);
+    const cleared =
+      (
+        await db.query<{ id: number }>(
+          `select id::int as id from public.ratings where user_id = '${U(2)}'`,
+        )
+      ).rows[0]?.id ?? 0;
+    await db.exec(`update public.ratings set review = null where id = ${cleared}`);
+    await expect(replyAs(U(4), "rating_id", cleared)).rejects.toThrow();
+  });
+
+  it("lets a take's author delete a reply on it", async () => {
+    await db.exec(`delete from public.replies where versus_take_id = ${take}`);
+    await replyAs(U(2), "versus_take_id", take, "Disagree.");
+    await as(U(4), `delete from public.replies where versus_take_id = ${take}`);
+    expect(await count(`versus_take_id = ${take}`)).toBe(1);
+    await as(U(1), `delete from public.replies where versus_take_id = ${take}`);
+    expect(await count(`versus_take_id = ${take}`)).toBe(0);
+  });
+
+  it("keeps reply_thread_owner from signed-out visitors", async () => {
+    const { rows } = await db.query<{ anon: boolean; signed_in: boolean }>(
+      `select has_function_privilege('anon', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as anon,
+              has_function_privilege('authenticated', 'public.reply_thread_owner(bigint,bigint,bigint)', 'execute') as signed_in`,
+    );
+    expect(rows[0]).toEqual({ anon: false, signed_in: true });
   });
 
   it("can't be edited", async () => {
