@@ -183,6 +183,48 @@ visitors to log in and brings them back afterwards.
 in report-only mode while it's checked against real traffic.
 `e2e/headers.spec.ts` checks the headers are actually sent.
 
+## Push notifications
+
+The phone app gets pushes through Expo's push service. Three tables hold what
+that needs: `personal_settings` (each person's switches, time zone and when
+they were last here), `push_devices` (the phones) and `push_log` (every push
+sent, with Expo's ticket). They're private on purpose: `profiles` can be read
+by anyone, and a time zone or a last visit must not be. Only the service role
+reaches them, through `src/lib/push/store.ts`.
+
+A push starts one of two ways. A follow or a love fires one straight away:
+the action saves, then `later()` runs `events.ts` after the response, so
+nobody waits on it. Everything timed (today's Versus, the week's Drop, a
+streak about to end) comes from the clock: Supabase's `pg_cron` calls
+`/api/app/v1/push/tick` every 15 minutes with a shared secret, and `tick.ts`
+works out who is due. "Due" is judged on each person's own clock: their time
+zone comes from the app when it registers and from the browser
+(`ClockReporter`), and falls back to Sydney. Streaks are counted in that zone
+too (`src/lib/streak.ts`); badges stay on Sydney time. Nobody is sent timed
+pushes after 30 days away.
+
+Each push claims a row in `push_log` before it's sent, keyed by person, kind
+and day, so a repeated run or a retry can't send it twice.
+
+```
+src/lib/push/
+  zones.ts       time zones: validate, fall back to Sydney, local day and minutes
+  who.ts         pure rules: slots, away for 30 days, switches, log keys
+  messages.ts    the wording of every push
+  expo.ts        the only code that talks to Expo (send, receipts)
+  store.ts       every database read and write for pushes
+  send.ts        filters by switches, claims in the log, sends, records tickets
+  receipts.ts    checks Expo's receipts and drops phones that are gone
+  events.ts      notifyFollow, notifyLove
+  later.ts       runs a task after the response
+  tick.ts        the clock's run: Versus, Drop, streak, receipts, pruning
+  tick-auth.ts   checks the clock's secret
+```
+
+The endpoints are `push/devices` (register or remove a phone),
+`me/notifications` (read and change the switches) and `push/tick`, all under
+`/api/app/v1`. Setting up the clock is in `docs/supabase-setup.md`.
+
 ## The database schema
 
 - `supabase/migrations/` holds numbered SQL files. The owner runs each one
@@ -220,6 +262,7 @@ src/
 supabase/
   migrations/   numbered SQL, run by hand in order
   checks/       read-only queries to run before a risky migration
+  setup/        one-off SQL for the project itself (the push clock)
 scripts/        maintenance scripts (seeding, covers) and the type generator
 test/           unit tests that span modules
 e2e/            Playwright browser tests

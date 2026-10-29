@@ -170,3 +170,38 @@ account is deleted, as Apple requires) are explained in `.env.example`.
 Check: on the live site's log-in page, Continue with Google and Continue with
 Apple should each come back signed in. In the app, the same with Continue
 with Google.
+
+## 7. Push notifications
+
+Turns on pushes for the phone app: new followers, loves, today's Versus, the
+week's Drop and a streak about to end. Until you do this the app works as
+before and nothing is sent. Do the steps in this order.
+
+1. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0023_push_notifications.sql` and run it. Safe to run
+   twice. It makes the three private tables the pushes use.
+2. Dashboard → **Database → Extensions**. Search for `pg_cron` and turn it
+   on, then do the same for `pg_net`.
+3. Make a secret: a random text of 32 or more characters. For example, in a
+   terminal:
+   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   Keep it somewhere safe; you need it twice more.
+4. Back in the **SQL Editor**, save the secret in the Vault. Replace
+   `PASTE-THE-SECRET-HERE` with your secret and run:
+   `select vault.create_secret('PASTE-THE-SECRET-HERE', 'push_tick_secret');`
+5. Still in the **SQL Editor**, paste the contents of
+   `supabase/setup/push-clock.sql` and run it. This is the clock: it calls
+   the website every 15 minutes. Running it again just replaces the
+   schedule.
+6. In Vercel → your project → **Settings → Environment Variables**, add
+   `PUSH_TICK_SECRET` with the same secret, for Production. If push security
+   is switched on in the Expo project (Expo dashboard → the project →
+   **Credentials / Access tokens**), also add `EXPO_ACCESS_TOKEN` with an
+   access token made there. Redeploy so the site picks them up.
+
+Check: in the SQL Editor, run
+`select status_code, created from net._http_response order by created desc limit 3;`
+a quarter of an hour later. The newest rows should say `200`. A `401` means
+the secret in the Vault and the one in Vercel differ; save the right one in
+both places (to replace the Vault's, run
+`select vault.update_secret(id, 'THE-SECRET') from vault.secrets where name = 'push_tick_secret';`).
