@@ -11,6 +11,7 @@ describe("needsSignIn", () => {
     "/profile/raised-on",
     "/welcome",
     "/diary",
+    "/diary/fix/12",
     "/lists",
     "/lists/new",
     "/lists/12",

@@ -86,6 +86,7 @@ const lib = vi.hoisted(() => ({
   getGuessGame: vi.fn(),
   // collection
   getTopPicks: vi.fn(),
+  recentListening: vi.fn(),
   getTasteMatch: vi.fn(),
   // social and account
   getUserLists: vi.fn(),
@@ -196,6 +197,7 @@ vi.mock("@/lib/drop", () => ({
 }));
 vi.mock("@/lib/guess", () => ({ getGuessGame: lib.getGuessGame }));
 vi.mock("@/lib/top-picks", () => ({ getTopPicks: lib.getTopPicks }));
+vi.mock("@/lib/diary/read", () => ({ recentListening: lib.recentListening }));
 vi.mock("@/lib/taste", () => ({ getTasteMatch: lib.getTasteMatch }));
 vi.mock("@/lib/lists", () => ({
   getUserLists: lib.getUserLists,
@@ -1259,9 +1261,25 @@ describe("GET users/[username]", () => {
     lib.getTasteMatch.mockResolvedValue(null);
     lib.getUserLists.mockResolvedValue([]);
     lib.getRaisedOn.mockResolvedValue(null);
+    lib.recentListening.mockResolvedValue([]);
   });
 
   const PICK = { mbid: MBID, title: "Kid A", subtitle: "Radiohead", image: null };
+
+  it("answers their latest listening, as their diary lets the viewer see it", async () => {
+    lib.recentListening.mockResolvedValue([{ id: 1, day: "2026-10-12" }]);
+    const body = await (await profile()).json();
+    expect(body.diary).toEqual([{ id: 1, day: "2026-10-12" }]);
+    expect(lib.recentListening).toHaveBeenCalledWith(OTHER);
+  });
+
+  it("shows no Listening, rather than no profile, when the diary can't be read", async () => {
+    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
+    lib.recentListening.mockRejectedValue(new Error("down"));
+    const response = await profile();
+    expect(response.status).toBe(200);
+    expect((await response.json()).diary).toEqual([]);
+  });
   const MATCH = { percent: 81, shared: 12, clash: null };
   const SOMEONE = { id: "a3d0a1c4-0000-4000-8000-000000000001", email: null };
 

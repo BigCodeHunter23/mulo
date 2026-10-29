@@ -26,6 +26,8 @@ import BlockButton from "@/components/BlockButton";
 import InviteButton from "@/components/InviteButton";
 import ShareButton from "@/components/ShareButton";
 import TopPicks from "@/components/TopPicks";
+import ListeningSection from "@/components/diary/ListeningSection";
+import { diaryHref } from "@/lib/diary-shared";
 import { SkeletonRows } from "@/components/Skeleton";
 import { buttonClass, ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
 
@@ -283,6 +285,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
             <ButtonLink href="/ratings" variant="secondary" size="sm">
               My ratings
             </ButtonLink>
+            <ButtonLink href={diaryHref(profile.username)} variant="secondary" size="sm">
+              Your diary
+            </ButtonLink>
             <ButtonLink href="/lists" variant="secondary" size="sm">
               Your lists
             </ButtonLink>
@@ -315,6 +320,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
           username={profile.username}
           signedIn={followState.signedIn}
         />
+      </Suspense>
+
+      {/* Their diary decides who sees it: a public one shows to anyone. */}
+      <Suspense fallback={null}>
+        <ListeningSection userId={profile.id} username={profile.username} />
       </Suspense>
 
       <SectionHeading

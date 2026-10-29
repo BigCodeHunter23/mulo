@@ -19,9 +19,11 @@ const SIGNED_IN_ONLY: RegExp[] = [
   /^\/notifications$/,
   /^\/profile(\/.*)?$/,
   /^\/welcome$/,
-  // Your own diary. Last.fm's way back (/diary/lastfm/callback) stays open:
-  // the app's browser sheet comes back there without a session.
+  // Your own diary, and fixing its albums. Last.fm's way back
+  // (/diary/lastfm/callback) stays open: the app's browser sheet comes back
+  // there without a session.
   /^\/diary$/,
+  /^\/diary\/fix\/[^/]+$/,
   /^\/lists(\/.*)?$/,
   /^\/badges$/,
   /^\/people$/,
