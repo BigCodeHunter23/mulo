@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { preconnect } from "react-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ClockReporter from "@/components/ClockReporter";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Header />
         {children}
         <Footer />
+        <ClockReporter />
         {/* Room for the phone tab bar, so it never covers the end of a page. */}
         <div
           aria-hidden="true"
