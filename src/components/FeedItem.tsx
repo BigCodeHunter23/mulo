@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
+import ReplyCount from "@/components/ReplyCount";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
 import type { FeedItem as Item } from "@/lib/feed";
+import { threadHref } from "@/lib/replies-shared";
 import { SIDES } from "@/lib/versus-shared";
 import { buttonClass } from "@/components/ui";
 
@@ -263,6 +265,20 @@ export default function FeedItem({
   // to love or disagree with; a pick you can't see yet can't be judged.
   const reactable = item.kind !== "songs" && (item.kind !== "pick" || item.revealed);
   const hasReactions = reactable && (item.reaction.love > 0 || item.reaction.dislike > 0);
+  // A written review has a thread; a score with no words doesn't.
+  const thread =
+    item.kind === "album" && item.review
+      ? {
+          href: threadHref({ kind: "album", mbid: item.release.mbid, id: item.ratingId }),
+          count: item.replies,
+        }
+      : item.kind === "artist" && item.review
+        ? {
+            href: threadHref({ kind: "artist", mbid: item.artist.mbid, id: item.ratingId }),
+            count: item.replies,
+          }
+        : null;
+  const showReactions = reactable && (!readOnly || hasReactions);
 
   return (
     <li className="group rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong">
@@ -317,15 +333,18 @@ export default function FeedItem({
         </div>
       </div>
 
-      {reactable && (!readOnly || hasReactions) && (
-        <div className="mt-3.5">
-          <Reactions
-            kind={item.kind}
-            ratingId={item.ratingId}
-            summary={item.reaction}
-            signedIn={signedIn}
-            readOnly={readOnly}
-          />
+      {(showReactions || thread) && (
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          {showReactions && (
+            <Reactions
+              kind={item.kind}
+              ratingId={item.ratingId}
+              summary={item.reaction}
+              signedIn={signedIn}
+              readOnly={readOnly}
+            />
+          )}
+          {thread && <ReplyCount href={thread.href} count={thread.count} signedIn={signedIn} />}
         </div>
       )}
     </li>

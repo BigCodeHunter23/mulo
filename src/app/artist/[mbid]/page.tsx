@@ -235,6 +235,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
                 <ReviewList
                   reviews={reviews}
                   kind="artist"
+                  mbid={mbid}
                   signedIn={signedIn}
                   reactions={reactions}
                 />

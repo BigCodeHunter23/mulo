@@ -215,6 +215,7 @@ export default async function DropPage() {
             <ReviewList
               reviews={takes}
               kind="album"
+              mbid={mbid}
               signedIn={Boolean(user)}
               reactions={reactions}
             />

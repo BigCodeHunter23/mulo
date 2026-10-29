@@ -2,18 +2,23 @@ import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import ReportButton from "@/components/ReportButton";
 import Reactions from "@/components/Reactions";
+import ReplyCount from "@/components/ReplyCount";
 import type { Review } from "@/lib/reviews";
 import { NO_REACTIONS, type ReactionSummary } from "@/lib/reactions";
+import { threadHref } from "@/lib/replies-shared";
 
 /** Written reviews with their scores, on album and artist pages. */
 export default function ReviewList({
   reviews,
   kind,
+  mbid,
   signedIn,
   reactions,
 }: {
   reviews: Review[];
   kind: "album" | "artist";
+  /** The album or artist the reviews are on, for each thread's address. */
+  mbid: string;
   signedIn: boolean;
   reactions: Record<number, ReactionSummary>;
 }) {
@@ -47,12 +52,22 @@ export default function ReviewList({
           )}
 
           <div className="mt-3.5 flex items-center justify-between gap-3">
-            <Reactions
-              kind={kind}
-              ratingId={review.id}
-              summary={reactions[review.id] ?? NO_REACTIONS}
-              signedIn={signedIn}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Reactions
+                kind={kind}
+                ratingId={review.id}
+                summary={reactions[review.id] ?? NO_REACTIONS}
+                signedIn={signedIn}
+              />
+              {/* A score with no words has no thread. */}
+              {review.review && (
+                <ReplyCount
+                  href={threadHref({ kind, mbid, id: review.id })}
+                  count={review.replies}
+                  signedIn={signedIn}
+                />
+              )}
+            </div>
             <ReportButton
               {...(kind === "album" ? { ratingId: review.id } : { artistRatingId: review.id })}
               author={{

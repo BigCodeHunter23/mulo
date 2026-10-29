@@ -3,6 +3,7 @@ import { getTakes } from "@/lib/versus-takes";
 import type { VersusMatchup, VersusSideKey } from "@/lib/versus-shared";
 import Avatar from "@/components/Avatar";
 import Reactions from "@/components/Reactions";
+import ReplyCount from "@/components/ReplyCount";
 import ReportButton from "@/components/ReportButton";
 import LoginLink from "@/components/LoginLink";
 import { buttonClass, SectionHeading } from "@/components/ui";
@@ -122,6 +123,11 @@ export default async function Takes({
                         summary={take.reactions}
                         signedIn={signedIn}
                         readOnly={take.mine}
+                      />
+                      <ReplyCount
+                        href={`/versus/${matchup.day}/takes/${take.id}`}
+                        count={take.replies}
+                        signedIn={signedIn}
                       />
                       {take.mine ? (
                         <DeleteTake takeId={take.id} />

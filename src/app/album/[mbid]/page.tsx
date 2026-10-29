@@ -214,6 +214,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
               <ReviewList
                 reviews={reviews}
                 kind="album"
+                mbid={mbid}
                 signedIn={signedIn}
                 reactions={reactions}
               />
