@@ -1,10 +1,11 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { MATCHUP_SELECT, toMatchup, type MatchupRow } from "@/lib/versus";
+import { MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
 import type { NotificationSettings, PushPlatform } from "@/lib/app-api";
-import type { LoveSubject, Person } from "@/lib/push/messages";
+import type { LoveSubject, Person, ReplySubject } from "@/lib/push/messages";
 import { ALL_ON, type PushKind } from "@/lib/push/who";
 import { readAll } from "@/lib/supabase/read-all";
+import { USERNAME_PATTERN } from "@/lib/validation";
 
 /**
  * Everything push notifications keep in the database (migration 0023). The
@@ -293,7 +294,7 @@ export async function loggedAlready(
 }
 
 /**
- * How many follow and love pushes somebody has been sent since `since`, so a
+ * How many follow, love and reply pushes somebody has been sent since `since`, so a
  * crowd can't flood one phone (each push is once per follower or rating, but
  * there can be many of those).
  */
@@ -302,7 +303,7 @@ export async function peoplePushesSince(userId: string, since: Date): Promise<nu
     .from("push_log")
     .select("user_id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .in("kind", ["follow", "love"])
+    .in("kind", ["follow", "love", "reply"])
     .gt("sent_at", since.toISOString());
   if (error) throw error;
   return count ?? 0;
@@ -539,4 +540,93 @@ export async function loveTarget(
     ownerId: data.user_id,
     subject: { kind: "take", day: matchup.day, title: matchup.title },
   };
+}
+
+/** Whose review or take was replied to, what it's called, and whether its matchup is open. */
+export type ReplyTarget = {
+  ownerId: string;
+  owner: Person;
+  subject: ReplySubject;
+  /** A take on today's Versus: its matchup, since only people who picked may read it yet. */
+  openMatchup: number | null;
+};
+
+export async function replyTarget(
+  kind: "album" | "artist" | "take",
+  id: number,
+): Promise<ReplyTarget | null> {
+  const client = db();
+  if (kind === "album") {
+    const data = found(
+      await client
+        .from("ratings")
+        .select(
+          "user_id, release_mbid, review, profiles!inner ( username, display_name ), releases!inner ( title )",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+    );
+    if (!data?.review?.trim()) return null;
+    return {
+      ownerId: data.user_id,
+      owner: data.profiles,
+      subject: { kind: "album", mbid: data.release_mbid, id, title: data.releases.title },
+      openMatchup: null,
+    };
+  }
+  if (kind === "artist") {
+    const data = found(
+      await client
+        .from("artist_ratings")
+        .select(
+          "user_id, artist_mbid, review, profiles!inner ( username, display_name ), artists!inner ( name )",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+    );
+    if (!data?.review?.trim()) return null;
+    return {
+      ownerId: data.user_id,
+      owner: data.profiles,
+      subject: { kind: "artist", mbid: data.artist_mbid, id, name: data.artists.name },
+      openMatchup: null,
+    };
+  }
+  const data = found(
+    await client
+      .from("versus_takes")
+      .select(
+        `user_id, profiles!inner ( username, display_name ), versus_matchups!inner ( ${MATCHUP_SELECT} )`,
+      )
+      .eq("id", id)
+      .maybeSingle(),
+  );
+  if (!data) return null;
+  const matchup = toMatchup(data.versus_matchups as unknown as MatchupRow);
+  return {
+    ownerId: data.user_id,
+    owner: data.profiles,
+    subject: { kind: "take", day: matchup.day, id, title: matchup.title },
+    openMatchup: matchup.day >= sydneyDay() ? matchup.id : null,
+  };
+}
+
+/**
+ * The people with these usernames, whatever the case, for @names. `ilike`
+ * reads "_" as any one character, so only exact names are kept.
+ */
+export async function peopleNamed(
+  usernames: string[],
+): Promise<{ id: string; username: string; display_name: string | null }[]> {
+  const wanted = new Set(
+    usernames.map((name) => name.toLowerCase()).filter((name) => USERNAME_PATTERN.test(name)),
+  );
+  if (wanted.size === 0) return [];
+  const { data, error } = await db()
+    .from("profiles")
+    .select("id, username, display_name")
+    .or([...wanted].map((name) => `username.ilike.${name}`).join(","))
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []).filter((row) => wanted.has(row.username.toLowerCase()));
 }

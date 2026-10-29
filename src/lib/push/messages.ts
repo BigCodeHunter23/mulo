@@ -1,3 +1,4 @@
+import { threadHref } from "@/lib/replies-shared";
 import type { PushKind } from "@/lib/push/who";
 
 /**
@@ -106,4 +107,65 @@ export function dropMessage(): PushContent {
 
 export function streakMessage(days: number): PushContent {
   return { title: `Your ${days}-day streak ends at midnight.`, url: "/stack" };
+}
+
+/** What a reply was on. `id` is the review's or take's own id. */
+export type ReplySubject =
+  | { kind: "album"; mbid: string; id: number; title: string }
+  | { kind: "artist"; mbid: string; id: number; name: string }
+  | { kind: "take"; day: string; id: number; title: string };
+
+/** The longest a reply's first line runs in a push. */
+const LINE_MAX = 100;
+
+/** A reply's first line with words in it, cleaned and cut, for a push's body. */
+export function firstLine(body: string): string {
+  const line = body.split(/\r?\n/).find((text) => text.trim() !== "") ?? "";
+  return clean(line, LINE_MAX);
+}
+
+/** "review of Blonde" or "take on Under Pressure", and the thread it opens. */
+function described(subject: ReplySubject): { what: string; url: string } {
+  switch (subject.kind) {
+    case "album":
+      return {
+        what: `review of ${title(subject.title)}`,
+        url: threadHref({ kind: "album", mbid: subject.mbid, id: subject.id }),
+      };
+    case "artist":
+      return {
+        what: `review of ${title(subject.name)}`,
+        url: threadHref({ kind: "artist", mbid: subject.mbid, id: subject.id }),
+      };
+    case "take":
+      return {
+        what: `take on ${title(subject.title)}`,
+        url: threadHref({ kind: "take", day: subject.day, id: subject.id }),
+      };
+  }
+}
+
+function withLine(content: { title: string; url: string }, body: string): PushContent {
+  const line = firstLine(body);
+  return line ? { ...content, body: line } : content;
+}
+
+/** "Jo replied to your review of Blonde", with the reply's first line. */
+export function replyMessage(replier: Person, subject: ReplySubject, body: string): PushContent {
+  const { what, url } = described(subject);
+  return withLine({ title: `${nameOf(replier)} replied to your ${what}`, url }, body);
+}
+
+/** "Jo mentioned you on Sam's review of Blonde", with the reply's first line. */
+export function mentionMessage(
+  replier: Person,
+  owner: Person,
+  subject: ReplySubject,
+  body: string,
+): PushContent {
+  const { what, url } = described(subject);
+  return withLine(
+    { title: `${nameOf(replier)} mentioned you on ${nameOf(owner)}'s ${what}`, url },
+    body,
+  );
 }

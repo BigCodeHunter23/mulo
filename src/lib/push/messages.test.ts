@@ -8,6 +8,9 @@ import {
   split,
   streakMessage,
   versusMessage,
+  firstLine,
+  mentionMessage,
+  replyMessage,
 } from "@/lib/push/messages";
 
 const sam = { username: "sam", display_name: "Sam" };
@@ -121,5 +124,50 @@ describe("push wording", () => {
       title: "Your 12-day streak ends at midnight.",
       url: "/stack",
     });
+  });
+});
+
+describe("reply pushes", () => {
+  const joe = { username: "joe", display_name: "Jo" };
+  const blonde = { kind: "album" as const, mbid: "m1", id: 7, title: "Blonde" };
+  const pressure = { kind: "take" as const, day: "2026-10-29", id: 9, title: "Under Pressure" };
+
+  it("tells the author, with the reply's first line, opening the thread", () => {
+    expect(replyMessage(joe, blonde, "\n  So good.\nSecond line")).toEqual({
+      title: "Jo replied to your review of Blonde",
+      body: "So good.",
+      url: "/album/m1/reviews/7",
+    });
+    expect(replyMessage(joe, pressure, "Nah.")).toEqual({
+      title: "Jo replied to your take on Under Pressure",
+      body: "Nah.",
+      url: "/versus/2026-10-29/takes/9",
+    });
+    expect(
+      replyMessage(joe, { kind: "artist", mbid: "a1", id: 8, name: "Frank Ocean" }, "Yes."),
+    ).toEqual({
+      title: "Jo replied to your review of Frank Ocean",
+      body: "Yes.",
+      url: "/artist/a1/reviews/8",
+    });
+  });
+
+  it("tells somebody named whose thread it is", () => {
+    expect(mentionMessage(joe, sam, blonde, "@kim hear this")).toEqual({
+      title: "Jo mentioned you on Sam's review of Blonde",
+      body: "@kim hear this",
+      url: "/album/m1/reviews/7",
+    });
+    expect(mentionMessage(joe, sam, pressure, "@kim").title).toBe(
+      "Jo mentioned you on Sam's take on Under Pressure",
+    );
+  });
+
+  it("cleans the first line and cuts it at 100 characters", () => {
+    const long = firstLine("a".repeat(150));
+    expect(Array.from(long)).toHaveLength(100);
+    expect(long.endsWith("…")).toBe(true);
+    expect(firstLine("a\u202Eb")).toBe("ab");
+    expect(firstLine("\n \n")).toBe("");
   });
 });

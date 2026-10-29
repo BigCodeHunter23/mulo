@@ -15,10 +15,12 @@ import {
   forgetDevice,
   logKey,
   markChecked,
+  peopleNamed,
   peoplePushesSince,
   personOf,
   pushCopyOf,
   readTimeZone,
+  replyTarget,
   tickCandidates,
   toColumns,
   uncheckedTickets,
@@ -26,6 +28,7 @@ import {
   touchClock,
 } from "@/lib/push/store";
 import { ALL_ON } from "@/lib/push/who";
+import { sydneyDay } from "@/lib/versus";
 
 beforeEach(() => {
   client.current = null;
@@ -149,13 +152,13 @@ describe("forgetDevice", () => {
 });
 
 describe("peoplePushesSince", () => {
-  it("counts one person's follow and love pushes since a moment", async () => {
+  it("counts one person's follow, love and reply pushes since a moment", async () => {
     const calls: [string, unknown[]][] = [];
     client.current = { from: () => query({ count: 4, error: null }, calls) };
     expect(await peoplePushesSince("u", new Date("2026-10-29T07:00:00Z"))).toBe(4);
     expect(calls).toContainEqual(["select", ["user_id", { count: "exact", head: true }]]);
     expect(calls).toContainEqual(["eq", ["user_id", "u"]]);
-    expect(calls).toContainEqual(["in", ["kind", ["follow", "love"]]]);
+    expect(calls).toContainEqual(["in", ["kind", ["follow", "love", "reply"]]]);
     expect(calls).toContainEqual(["gt", ["sent_at", "2026-10-29T07:00:00.000Z"]]);
   });
 
@@ -331,5 +334,102 @@ describe("errors are reported, not swallowed", () => {
     await expect(personOf("u")).rejects.toBe(failure);
     client.current = { from: () => query({ data: null, error: null }) };
     expect(await personOf("u")).toBeNull();
+  });
+});
+
+describe("replyTarget", () => {
+  it("names a written album review's owner and record", async () => {
+    client.current = {
+      from: () =>
+        query({
+          data: {
+            user_id: A,
+            release_mbid: "m1",
+            review: "Good.",
+            profiles: { username: "sam", display_name: "Sam" },
+            releases: { title: "Blonde" },
+          },
+          error: null,
+        }),
+    };
+    expect(await replyTarget("album", 7)).toEqual({
+      ownerId: A,
+      owner: { username: "sam", display_name: "Sam" },
+      subject: { kind: "album", mbid: "m1", id: 7, title: "Blonde" },
+      openMatchup: null,
+    });
+  });
+
+  it("has nothing for a score with no words, or nothing at all", async () => {
+    client.current = {
+      from: () =>
+        query({
+          data: {
+            user_id: A,
+            release_mbid: "m1",
+            review: null,
+            profiles: { username: "sam", display_name: null },
+            releases: { title: "Blonde" },
+          },
+          error: null,
+        }),
+    };
+    expect(await replyTarget("album", 7)).toBeNull();
+    client.current = { from: () => query({ data: null, error: null }) };
+    expect(await replyTarget("artist", 8)).toBeNull();
+  });
+
+  it("marks a take on today's Versus as still open", async () => {
+    const side = (mbid: string, name: string) => ({ mbid, name, image_url: null });
+    client.current = {
+      from: () =>
+        query({
+          data: {
+            user_id: A,
+            profiles: { username: "sam", display_name: "Sam" },
+            versus_matchups: {
+              id: 3,
+              day: sydneyDay(),
+              left: side("11111111-1111-4111-8111-111111111111", "Nas"),
+              right: side("22222222-2222-4222-8222-222222222222", "Jay-Z"),
+            },
+          },
+          error: null,
+        }),
+    };
+    expect(await replyTarget("take", 9)).toMatchObject({
+      ownerId: A,
+      subject: { kind: "take", day: sydneyDay(), id: 9 },
+      openMatchup: 3,
+    });
+  });
+});
+
+describe("peopleNamed", () => {
+  it("finds people by name in any case, keeping exact names only", async () => {
+    const calls: [string, unknown[]][] = [];
+    client.current = {
+      from: () =>
+        query(
+          {
+            data: [
+              { id: A, username: "Sam", display_name: "Sam" },
+              { id: B, username: "j_o", display_name: null },
+            ],
+            error: null,
+          },
+          calls,
+        ),
+    };
+    expect(await peopleNamed(["sam", "jxo"])).toEqual([
+      { id: A, username: "Sam", display_name: "Sam" },
+    ]);
+    expect(calls).toContainEqual(["or", ["username.ilike.sam,username.ilike.jxo"]]);
+  });
+
+  it("asks nothing for no names, or names that can't be usernames", async () => {
+    client.current = null;
+    expect(await peopleNamed([])).toEqual([]);
+    expect(await peopleNamed(["a,b", "x"])).toEqual([]);
   });
 });
