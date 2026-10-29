@@ -15,12 +15,17 @@ const db = () => createAdminClient();
 
 /** Somebody's time zone, or null when we don't know it (or can't read it yet). */
 export async function readTimeZone(userId: string): Promise<string | null> {
-  const { data, error } = await db()
-    .from("personal_settings")
-    .select("time_zone")
-    .eq("user_id", userId)
-    .maybeSingle();
-  return error ? null : (data?.time_zone ?? null);
+  try {
+    const { data, error } = await db()
+      .from("personal_settings")
+      .select("time_zone")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return error ? null : (data?.time_zone ?? null);
+  } catch {
+    // A missing key or a dropped connection must not break a page that only wants a streak.
+    return null;
+  }
 }
 
 const SETTINGS =
@@ -115,16 +120,14 @@ export async function touchClock(
     : false;
   if (fresh && (timeZone === null || data?.time_zone === timeZone)) return;
 
-  const { error } = await client
-    .from("personal_settings")
-    .upsert(
-      {
-        user_id: userId,
-        last_seen_at: at.toISOString(),
-        ...(timeZone ? { time_zone: timeZone } : {}),
-      },
-      { onConflict: "user_id" },
-    );
+  const { error } = await client.from("personal_settings").upsert(
+    {
+      user_id: userId,
+      last_seen_at: at.toISOString(),
+      ...(timeZone ? { time_zone: timeZone } : {}),
+    },
+    { onConflict: "user_id" },
+  );
   if (error) throw error;
 }
 
