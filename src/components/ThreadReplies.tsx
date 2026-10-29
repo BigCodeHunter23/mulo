@@ -27,6 +27,14 @@ export default function ThreadReplies({
 }) {
   const router = useRouter();
   const [replies, setReplies] = useState(initial);
+  // The page is read again after every change, and other people's replies and
+  // what you may delete come with it: take the server's list whenever it's a
+  // new one. Only the list syncs, so a draft in the box stays.
+  const [seen, setSeen] = useState(initial);
+  if (initial !== seen) {
+    setSeen(initial);
+    setReplies(initial);
+  }
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   // A failed delete is said above the replies, since the box (and its error
