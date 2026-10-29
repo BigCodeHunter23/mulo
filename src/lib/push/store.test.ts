@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import {
   blockedEitherWay,
   devicesOf,
+  forgetDevice,
   logKey,
   markChecked,
   personOf,
@@ -121,6 +122,26 @@ describe("blockedEitherWay", () => {
     expect(await blockedEitherWay(A, "x),or(1=1")).toBe(true);
     expect(await blockedEitherWay("nope", B)).toBe(true);
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("forgetDevice", () => {
+  it("deletes the phone by its token alone, whoever it belongs to", async () => {
+    const calls: [string, unknown[]][] = [];
+    const from = vi.fn(() => query({ error: null }, calls));
+    client.current = { from };
+    await forgetDevice("ExponentPushToken[x]");
+    expect(from).toHaveBeenCalledWith("push_devices");
+    expect(calls).toEqual([
+      ["delete", []],
+      ["eq", ["token", "ExponentPushToken[x]"]],
+    ]);
+  });
+
+  it("throws a failed delete", async () => {
+    const failure = new Error("down");
+    client.current = { from: () => query({ error: failure }) };
+    await expect(forgetDevice("ExponentPushToken[x]")).rejects.toBe(failure);
   });
 });
 

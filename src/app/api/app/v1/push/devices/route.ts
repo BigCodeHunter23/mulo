@@ -5,20 +5,15 @@ import { appJson, appRoute, readBody, signedInCaller } from "@/lib/app-route";
 import { allowUser, RateLimitedError } from "@/lib/rate-limit";
 import { registerDevice, removeDevice, touchClock } from "@/lib/push/store";
 import { isTimeZone } from "@/lib/push/zones";
-
-/** Expo's address for a phone: ExponentPushToken[…] (or the newer ExpoPushToken[…]). */
-const expoToken = z
-  .string()
-  .max(200)
-  .regex(/^Expo(nent)?PushToken\[[^\]\s]{1,180}\]$/);
+import { expoPushToken } from "@/lib/validation";
 
 const registerBody = z.object({
-  token: expoToken,
+  token: expoPushToken,
   platform: z.enum(["ios", "android"]),
   timeZone: z.string().max(64).nullable(),
 });
 
-const removeBody = z.object({ token: expoToken });
+const removeBody = z.object({ token: expoPushToken });
 
 /**
  * This phone takes pushes for whoever's signed in, from now on. Sent on every

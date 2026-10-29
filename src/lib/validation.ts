@@ -27,6 +27,12 @@ export const rowIdText = z
   .transform(Number)
   .pipe(rowIdSchema);
 
+/** Expo's address for a phone: ExponentPushToken[…] (or the newer ExpoPushToken[…]). */
+export const expoPushToken = z
+  .string()
+  .max(200)
+  .regex(/^Expo(nent)?PushToken\[[^\]\s]{1,180}\]$/);
+
 export const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 
 export const usernameSchema = z

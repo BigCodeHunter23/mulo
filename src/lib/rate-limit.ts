@@ -36,6 +36,11 @@ export const LIMITS = {
   password: { limit: 10, windowSeconds: 15 * 60 },
   /** Per person, or per address signed out: the app's heavier reads. */
   read: { limit: 120, windowSeconds: 60 },
+  /**
+   * Per address: a phone asking to stop getting pushes, signed out. One call
+   * per log-out, so a handful of phones sharing a network fit easily.
+   */
+  pushForget: { limit: 30, windowSeconds: 5 * 60 },
 } as const;
 
 export type Bucket = keyof typeof LIMITS;

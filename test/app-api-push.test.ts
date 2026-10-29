@@ -12,6 +12,7 @@ const caller = vi.hoisted(() => ({
 const store = vi.hoisted(() => ({
   registerDevice: vi.fn(async () => {}),
   removeDevice: vi.fn(async () => {}),
+  forgetDevice: vi.fn(async () => {}),
   touchClock: vi.fn(async () => {}),
   readSettings: vi.fn(async () => ({
     follows: true,
@@ -39,6 +40,8 @@ vi.mock("@/lib/push/store", () => store);
 vi.mock("@/lib/push/tick", () => tick);
 
 import * as devices from "@/app/api/app/v1/push/devices/route";
+import * as forget from "@/app/api/app/v1/push/devices/forget/route";
+import { allowAddress } from "@/lib/rate-limit";
 import * as settings from "@/app/api/app/v1/me/notifications/route";
 import * as clock from "@/app/api/app/v1/push/tick/route";
 
@@ -94,6 +97,39 @@ describe("push/devices", () => {
     const res = await devices.DELETE(req("DELETE", { token: TOKEN }));
     expect(res.status).toBe(200);
     expect(store.removeDevice).toHaveBeenCalledWith("me", TOKEN);
+  });
+});
+
+describe("push/devices/forget", () => {
+  it("forgets this phone without anybody signed in", async () => {
+    caller.token = null;
+    caller.user = null;
+    const res = await forget.POST(req("POST", { token: TOKEN }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(store.forgetDevice).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it("forgets it even with a session that has ended", async () => {
+    caller.token = "expired";
+    caller.user = null;
+    const res = await forget.POST(req("POST", { token: TOKEN }));
+    expect(res.status).toBe(200);
+    expect(store.forgetDevice).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it("is limited per address", async () => {
+    caller.limited = true;
+    const res = await forget.POST(req("POST", { token: TOKEN }));
+    expect(res.status).toBe(429);
+    expect(allowAddress).toHaveBeenCalledWith("pushForget");
+    expect(store.forgetDevice).not.toHaveBeenCalled();
+  });
+
+  it("refuses something that isn't an Expo push address", async () => {
+    const res = await forget.POST(req("POST", { token: "hello" }));
+    expect(res.status).toBe(400);
+    expect(store.forgetDevice).not.toHaveBeenCalled();
   });
 });
 

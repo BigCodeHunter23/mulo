@@ -172,6 +172,17 @@ export async function removeDevice(userId: string, token: string): Promise<void>
   if (error) throw error;
 }
 
+/**
+ * Forgets a phone whatever account it's on, for the app when somebody leaves
+ * it (log-out, an ended session, a deleted account), even once the session is
+ * gone. Safe without a sign-in: knowing a token only lets you stop pushes to
+ * that one phone, which re-registering it under another account can already do.
+ */
+export async function forgetDevice(token: string): Promise<void> {
+  const { error } = await db().from("push_devices").delete().eq("token", token);
+  if (error) throw error;
+}
+
 export async function devicesOf(userIds: string[]): Promise<{ token: string; user_id: string }[]> {
   if (userIds.length === 0) return [];
   return inChunks(userIds, async (chunk) => {
