@@ -85,7 +85,7 @@ describe("toSettings, toColumns and logKey", () => {
   });
 
   it("keys a log entry by person, kind and key", () => {
-    expect(logKey({ userId: "u", kind: "follow", key: "k" })).toBe("u|follows|k");
+    expect(logKey({ userId: "u", kind: "follow", key: "k" })).toBe("u|follow|k");
   });
 });
 
