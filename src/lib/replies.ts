@@ -86,7 +86,7 @@ export async function getReplyCounts(
 }
 
 /** A thread's review or take and whose it is; locked for an unpicked take; null when gone. */
-type Found = { head: ThreadHead; ownerId: string } | { locked: string } | null;
+type Found = { head: ThreadHead; ownerId: string } | { locked: string; ownerId: string } | null;
 
 async function readHead(
   supabase: Supabase,
@@ -167,7 +167,7 @@ async function readHead(
   ]);
   // Like the split, takes on today's Versus wait until you've picked, so
   // nobody's talked into a side.
-  if (open && !theirs && viewerPick === null) return { locked: matchup.day };
+  if (open && !theirs && viewerPick === null) return { locked: matchup.day, ownerId: data.user_id };
 
   return {
     ownerId: data.user_id,
@@ -266,8 +266,9 @@ export async function replyable(kind: ThreadKind, id: number): Promise<"open" | 
   ]);
   const found = await readHead(supabase, kind, id, user?.id ?? null);
   if (!found) return "gone";
-  if ("locked" in found) return "locked";
-  return hidden.has(found.ownerId) ? "gone" : "open";
+  // Hidden writers are gone before anything else, so a lock never says one exists.
+  if (hidden.has(found.ownerId)) return "gone";
+  return "locked" in found ? "locked" : "open";
 }
 
 async function readThread(kind: ThreadKind, id: number): Promise<ThreadPage> {
@@ -279,8 +280,9 @@ async function readThread(kind: ThreadKind, id: number): Promise<ThreadPage> {
   const userId = user?.id ?? null;
   const found = await readHead(supabase, kind, id, userId);
   if (!found) return GONE;
-  if ("locked" in found) return { state: "locked", day: found.locked };
+  // Hidden writers are gone before anything else, so a lock never says one exists.
   if (hidden.has(found.ownerId)) return GONE;
+  if ("locked" in found) return { state: "locked", day: found.locked };
 
   const [reactions, read] = await Promise.all([
     getReactions(kind, [id]),

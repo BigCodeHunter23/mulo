@@ -260,6 +260,15 @@ describe("getThread", () => {
     });
   });
 
+  it("reads a locked take by someone hidden from you as gone", async () => {
+    db.hidden = new Set(["owner"]);
+    db.fake.answer("versus_takes", { data: takeRow, error: null }, { data: takeRow, error: null });
+    vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
+    expect(await getThread("take", 9)).toEqual({ state: "gone" });
+    vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
+    expect(await replyable("take", 9)).toBe("gone");
+  });
+
   it("never locks a take from its own author", async () => {
     db.user = { id: "owner", email: null };
     db.fake.answer("versus_takes", { data: takeRow, error: null });
