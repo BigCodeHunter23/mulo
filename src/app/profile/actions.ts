@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeRedirectPath } from "@/lib/redirects";
-import { field, firstError, textSchema, usernameSchema } from "@/lib/validation";
+import { displayNameSchema, field, firstError, textSchema, usernameSchema } from "@/lib/validation";
 import { imageTypeOf } from "@/lib/image-type";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
@@ -19,7 +19,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 /** The same limits as the form's fields, and as the database (migration 0016). */
 const profileInput = z.object({
   username: usernameSchema,
-  display_name: textSchema(50, "Keep your name to 50 characters."),
+  display_name: displayNameSchema(50, "Keep your name to 50 characters."),
   bio: textSchema(300, "Keep your bio to 300 characters."),
 });
 

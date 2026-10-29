@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withoutFormatting } from "@/lib/replies-shared";
 
 /**
  * Schemas for everything that arrives from outside: form fields, action
@@ -82,6 +83,19 @@ export const passwordSchema = z
 /** Free text from a form, trimmed, with an upper limit the database also holds. */
 export function textSchema(max: number, message = `Keep it to ${max} characters.`) {
   return z.string().trim().max(max, message);
+}
+
+/**
+ * A display name as it's saved: format characters (direction overrides,
+ * zero-width spaces) stripped by the same rule as replies, so nobody can pass
+ * as someone else or hide in a thread, then runs of whitespace made one space
+ * and the ends trimmed. Measured after, so the limit counts what's kept.
+ */
+export function displayNameSchema(max: number, message: string) {
+  return z
+    .string()
+    .transform((name) => withoutFormatting(name).replace(/\s+/g, " ").trim())
+    .pipe(z.string().max(max, message));
 }
 
 /** A form field as a string: missing or a file both read as empty. */
