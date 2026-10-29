@@ -26,6 +26,7 @@ import {
   diaryCopyOf,
   getDiaryPage,
   getOwnDiary,
+  monthEnd,
   PAGE_SIZE,
   parseCursor,
   recentListening,
@@ -168,7 +169,8 @@ describe("getDiaryPage", () => {
     expect(db.fake.callsOn("rpc:diary_months")[0]?.args[1]).toEqual({
       p_user: OWNER.id,
       p_from: "2026-10-01",
-      p_to: "2026-10-12",
+      // The whole of the newest month, so a later page's total isn't cut short.
+      p_to: "2026-10-31",
     });
     expect(db.admin.callsOn("diary_sources")).toEqual([]);
   });
@@ -370,7 +372,33 @@ describe("recentListening", () => {
   });
 });
 
+describe("monthEnd", () => {
+  it("is the last day of the day's month", () => {
+    expect(monthEnd("2026-10-12")).toBe("2026-10-31");
+    expect(monthEnd("2024-02-10")).toBe("2024-02-29");
+    expect(monthEnd("2026-02-28")).toBe("2026-02-28");
+    expect(monthEnd("2026-12-01")).toBe("2026-12-31");
+  });
+});
+
 describe("diaryCopyOf", () => {
+  it("throws rather than give a copy that's short", async () => {
+    const failure = { code: "57014", message: "slow" };
+    db.admin.answer("diary_entries", { data: null, error: failure });
+    await expect(diaryCopyOf(OWNER.id)).rejects.toBe(failure);
+
+    db.admin.answer("diary_entries", { data: [{ id: 1 }], error: null });
+    db.admin.answer("diary_sources", { data: null, error: failure });
+    await expect(diaryCopyOf(OWNER.id)).rejects.toBe(failure);
+  });
+
+  it("is empty before migration 0025", async () => {
+    const missing = { code: "42P01", message: "missing" };
+    db.admin.answer("diary_entries", { data: null, error: missing });
+    db.admin.answer("diary_sources", { data: null, error: missing });
+    expect(await diaryCopyOf(OWNER.id)).toEqual({ entries: [], sources: [] });
+  });
+
   it("copies every entry, a thousand at a time, and the sources without the session", async () => {
     const thousand = Array.from({ length: 1000 }, (_, i) => ({ day: "2026-10-12", id: i }));
     db.admin.answer("diary_entries", { data: thousand, error: null }, { data: [{ id: 1 }] });

@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
 }));
 
 const lib = vi.hoisted(() => ({
-  saveAlbumDays: vi.fn<Fn>(async () => ({ ok: true, added: 3, merged: 0 })),
+  saveAlbumDays: vi.fn<Fn>(async () => ({ ok: true, added: 3, merged: 0, skipped: 0 })),
   finishImport: vi.fn<Fn>(async () => undefined),
   deleteEntry: vi.fn<Fn>(async () => ({ ok: true })),
   removeSource: vi.fn<Fn>(async () => ({ ok: true })),
@@ -21,9 +21,13 @@ const lib = vi.hoisted(() => ({
   setDiaryPublic: vi.fn<Fn>(async () => ({ ok: true })),
   logListen: vi.fn<Fn>(async () => ({ ok: true })),
   createConnectState: vi.fn<Fn>(async () => "STATE"),
+  noteTimeZone: vi.fn<Fn>(async () => undefined),
 }));
 
+const jar = vi.hoisted(() => ({ set: vi.fn() }));
+
 vi.mock("@/lib/supabase/server", () => ({ getCurrentUser: vi.fn(async () => state.user) }));
+vi.mock("next/headers", () => ({ cookies: vi.fn(async () => jar) }));
 vi.mock("@/lib/rate-limit", () => ({
   allowUser: vi.fn(async (bucket: string) => !state.limited.has(bucket)),
   TOO_MANY: "You're doing that a lot. Please wait a minute and try again.",
@@ -42,7 +46,10 @@ vi.mock("@/lib/diary/lastfm", async (original) => ({
   ...(await original<typeof import("@/lib/diary/lastfm")>()),
   lastfmKeys: () => state.keys,
   createConnectState: lib.createConnectState,
+  noteTimeZone: lib.noteTimeZone,
 }));
+
+import { connectCookie } from "@/lib/diary/lastfm";
 
 import {
   deleteDiaryEntry,
@@ -86,24 +93,54 @@ describe("startLastfm", () => {
 
   it("says so when Last.fm isn't set up", async () => {
     state.keys = null;
-    expect(await startLastfm()).toEqual({ error: "Last.fm isn't set up yet." });
+    expect(await startLastfm()).toEqual({ ok: false, error: "Last.fm isn't set up yet." });
     expect(lib.createConnectState).not.toHaveBeenCalled();
   });
 
   it("is held to the write limit", async () => {
     state.limited.add("write");
     expect(await startLastfm()).toEqual({
+      ok: false,
       error: "You're doing that a lot. Please wait a minute and try again.",
     });
   });
 
   it("goes off to Last.fm's approval page, coming back to this website", async () => {
-    const error = await startLastfm().catch((thrown: Error) => thrown);
+    const error = await startLastfm("Europe/London").catch((thrown: Error) => thrown);
     expect(error).toBeInstanceOf(Error);
     const to = new URL((error as Error).message.replace("redirect:", ""));
     expect(to.origin + to.pathname).toBe("https://www.last.fm/api/auth/");
     expect(to.searchParams.get("cb")).toBe("https://getmulo.com/diary/lastfm/callback?state=STATE");
-    expect(lib.createConnectState).toHaveBeenCalledWith("me", "web");
+    expect(lib.createConnectState).toHaveBeenCalledWith("me", "web", "Europe/London");
+    expect(lib.noteTimeZone).toHaveBeenCalledWith("me", "Europe/London");
+  });
+
+  it("ties the connect to this browser with a short-lived cookie", async () => {
+    await startLastfm("Europe/London").catch(() => undefined);
+    expect(jar.set).toHaveBeenCalledWith("mulo_lastfm", connectCookie("STATE"), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/diary/lastfm",
+      maxAge: 600,
+    });
+  });
+
+  it("takes only a time zone that's real", async () => {
+    await startLastfm("Mars/Olympus_Mons").catch(() => undefined);
+    expect(lib.createConnectState).toHaveBeenCalledWith("me", "web", null);
+    await startLastfm({ zone: 1 }).catch(() => undefined);
+    expect(lib.createConnectState).toHaveBeenLastCalledWith("me", "web", null);
+  });
+
+  it("says so, rather than throwing, when the connect can't be started", async () => {
+    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
+    lib.createConnectState.mockRejectedValueOnce(new Error("down"));
+    expect(await startLastfm()).toEqual({
+      ok: false,
+      error: "Couldn't start connecting Last.fm. Please try again.",
+    });
+    expect(jar.set).not.toHaveBeenCalled();
   });
 
   it("comes back to a website running on this computer at its own address", async () => {
@@ -112,6 +149,12 @@ describe("startLastfm", () => {
     const to = new URL(error.message.replace("redirect:", ""));
     expect(to.searchParams.get("cb")).toBe(
       "http://192.168.1.7:3000/diary/lastfm/callback?state=STATE",
+    );
+    // A website without https can't keep a Secure cookie.
+    expect(jar.set).toHaveBeenCalledWith(
+      "mulo_lastfm",
+      connectCookie("STATE"),
+      expect.objectContaining({ secure: false }),
     );
   });
 });
@@ -144,9 +187,11 @@ describe("uploadDiaryBatch", () => {
 
   it("refuses over the import limit, signed out, or a shape it can't read", async () => {
     state.limited.add("import");
+    // Marked, so the import page can wait a minute and carry on.
     expect(await uploadDiaryBatch({ source: "spotify", days: [day] })).toEqual({
       ok: false,
       error: "You're doing that a lot. Please wait a minute and try again.",
+      limited: true,
     });
     state.limited.clear();
     const many = Array.from({ length: 501 }, () => day);
@@ -186,6 +231,22 @@ describe("the diary's other actions", () => {
     expect(lib.deleteEntry).not.toHaveBeenCalled();
     expect(lib.setDiaryPublic).not.toHaveBeenCalled();
     expect(lib.logListen).not.toHaveBeenCalled();
+  });
+
+  it("answer plainly, rather than throwing, when something fails", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const tryAgain = { ok: false, error: "Couldn't save that. Please try again." };
+    lib.deleteEntry.mockRejectedValueOnce(new Error("down"));
+    expect(await deleteDiaryEntry(41)).toEqual(tryAgain);
+    lib.removeSource.mockRejectedValueOnce(new Error("down"));
+    expect(await removeDiarySource("spotify", false)).toEqual(tryAgain);
+    lib.fixAlbum.mockRejectedValueOnce(new Error("down"));
+    expect(await fixDiaryAlbum(41, MBID)).toEqual(tryAgain);
+    lib.setDiaryPublic.mockRejectedValueOnce(new Error("down"));
+    expect(await setDiaryVisibility(true)).toEqual(tryAgain);
+    lib.logListen.mockRejectedValueOnce(new Error("down"));
+    expect(await logDiaryListen(MBID, "2026-10-29")).toEqual(tryAgain);
+    quiet.mockRestore();
   });
 
   it("refuse what isn't an id, a source or a score", async () => {

@@ -38,7 +38,7 @@ const MATCH_TRIES = 3;
 const ENTRY =
   "id, day, artist_name, album_name, album_key, release_mbid, sources, songs, minutes, plays, releases ( mbid, title, cover_art_url, artist_credit )";
 
-/** What the owner sees of their imports. Never the Last.fm session or a connect's state. */
+/** What the owner sees of their imports. Never a connect's state. */
 const SOURCE_STATUS =
   "source, state, lastfm_user, reached_back, synced_to, last_import_at, last_count";
 
@@ -193,7 +193,18 @@ export async function getOwnDiary(userId: string): Promise<DiaryOwn | null> {
   return readOwn(userId, data?.diary_public ?? true);
 }
 
-/** The lines of the months this page covers, from the first of its oldest month. */
+/** The last day of a YYYY-MM-DD's month. */
+export function monthEnd(day: string): string {
+  const [year, month] = day.split("-").map(Number);
+  // Day 0 of the next month is the last of this one.
+  return new Date(Date.UTC(year ?? 1970, month ?? 1, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * The lines of the months this page covers, whole: from the first of its
+ * oldest month to the last of its newest, which an earlier page may have
+ * started.
+ */
 async function readMonths(userId: string, rows: EntryRow[]): Promise<DiaryMonth[]> {
   const newest = rows[0]?.day;
   const oldest = rows[rows.length - 1]?.day;
@@ -203,7 +214,7 @@ async function readMonths(userId: string, rows: EntryRow[]): Promise<DiaryMonth[
   ).rpc("diary_months", {
     p_user: userId,
     p_from: `${oldest.slice(0, 7)}-01`,
-    p_to: newest,
+    p_to: monthEnd(newest),
   });
   if (error) {
     if (!isMissingFunction(error)) logQueryError("diary", error);
@@ -290,7 +301,11 @@ export async function recentListening(userId: string): Promise<DiaryEntry[]> {
   return toEntries(userId, data ?? []);
 }
 
-/** Your diary and imports for your copy of your data. Never the Last.fm session. */
+/**
+ * Your diary and imports for your copy of your data. Never a connect's
+ * state. Throws when either can't be read, rather than give a copy that's
+ * short; before migration 0025 both are empty.
+ */
 export async function diaryCopyOf(userId: string): Promise<{
   entries: unknown[];
   sources: unknown[];
@@ -307,13 +322,18 @@ export async function diaryCopyOf(userId: string): Promise<{
       .order("day")
       .order("id")
       .range(from, from + 999);
-    if (error || !data) break;
-    entries.push(...data);
-    if (data.length < 1000) break;
+    if (error) {
+      if (isMissingTable(error)) break;
+      throw error;
+    }
+    const page = data ?? [];
+    entries.push(...page);
+    if (page.length < 1000) break;
   }
-  const { data: sources } = await client
+  const { data: sources, error } = await client
     .from("diary_sources")
     .select(SOURCE_STATUS)
     .eq("user_id", userId);
+  if (error && !isMissingTable(error)) throw error;
   return { entries, sources: sources ?? [] };
 }
