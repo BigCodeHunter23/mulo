@@ -86,6 +86,8 @@ describe("POST replies", () => {
     for (const body of [
       { kind: "song", targetId: 7, body: "x" },
       { kind: "album", targetId: "7", body: "x" },
+      { kind: "album", targetId: 0, body: "x" },
+      { kind: "album", targetId: -7, body: "x" },
       { kind: "album", targetId: 7 },
     ]) {
       expect((await replies.POST(req("POST", body))).status).toBe(400);

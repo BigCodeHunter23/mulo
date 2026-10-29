@@ -94,7 +94,8 @@ export async function removeTake(takeId: number) {
 
 /**
  * Deletes a reply. Its reports go with it, since there is nothing left to
- * look at.
+ * look at. Its count shows on album and artist pages and the Versus, so
+ * those refresh too.
  */
 export async function removeReply(replyId: number) {
   const admin = await requireAdmin();
@@ -104,4 +105,7 @@ export async function removeReply(replyId: number) {
   const { error } = await createAdminClient().from("replies").delete().eq("id", replyId);
   record(admin, `removed reply ${replyId}`, error);
   revalidatePath("/admin/reports");
+  revalidatePath("/album", "layout");
+  revalidatePath("/artist", "layout");
+  revalidatePath("/versus", "layout");
 }
