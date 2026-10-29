@@ -28,6 +28,20 @@ vi.mock("@/lib/supabase/server", () => ({
   getCurrentUser: vi.fn(async () => ({ id: ME, email: null })),
 }));
 vi.mock("@/lib/blocks", () => ({ hiddenPeople: vi.fn(async () => new Set([HIDDEN])) }));
+// The bell's reply lines are worked out in their own module; here, one from a hidden person.
+vi.mock("@/lib/reply-notifications", () => ({
+  getReplyNotifications: vi.fn(async () => [
+    {
+      kind: "reply",
+      key: "reply-album-7",
+      at: "2026-10-09T00:00:00Z",
+      person: { id: HIDDEN, username: "hidden", display_name: null, avatar_url: null },
+      others: 0,
+      on: "review",
+      subject: { title: "Blonde", href: "/album/m1/reviews/7" },
+    },
+  ]),
+}));
 vi.mock("@/lib/social", () => ({ getFollowingIds: vi.fn(async () => []) }));
 vi.mock("@/lib/versus", () => ({
   getLatestVersusAt: vi.fn(async () => null),
