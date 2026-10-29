@@ -10,12 +10,12 @@ const caller = vi.hoisted(() => ({
 }));
 
 const lib = vi.hoisted(() => ({
-  getThread: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ state: "gone" })),
-  postReply: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({
+  getThread: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({ state: "gone" })),
+  postReply: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
     ok: true,
     reply: { id: 1 },
   })),
-  deleteReply: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({ ok: true })),
+  deleteReply: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({ ok: true })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
