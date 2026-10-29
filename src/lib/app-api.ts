@@ -1267,9 +1267,9 @@ export type LatestNotification = { latest: string | null };
 
 // ── Reports, follows, invites, blocks ──────────────────────────────────
 
-/** What a report is about: a review (album or artist), a take, a list or a person. */
+/** What a report is about: a review (album or artist), a take, a list, a reply or a person. */
 export type ReportTarget =
-  | { kind: "rating" | "artistRating" | "take" | "list"; id: number }
+  | { kind: "rating" | "artistRating" | "take" | "list" | "reply"; id: number }
   | { kind: "profile"; id: string };
 
 /** A report's answer: a thank-you, including for one already sent. */

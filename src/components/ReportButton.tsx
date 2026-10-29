@@ -58,7 +58,7 @@ function AlsoBlock({ id, username, name }: ReportedPerson) {
 }
 
 /**
- * Reports an album review, an artist review, a take, a list or a profile.
+ * Reports an album review, an artist review, a take, a reply, a list or a profile.
  * Kept deliberately quiet in the interface: a small text link that opens the
  * form only when needed.
  */
@@ -68,6 +68,7 @@ export default function ReportButton({
   profileId,
   takeId,
   listId,
+  replyId,
   author,
   signedIn,
   label = "Report",
@@ -79,6 +80,8 @@ export default function ReportButton({
   takeId?: number;
   /** Somebody's list of albums. */
   listId?: number;
+  /** A reply in a thread. */
+  replyId?: number;
   /** Who wrote it, to offer to block them once it's reported. */
   author?: ReportedPerson;
   signedIn: boolean;
@@ -120,6 +123,7 @@ export default function ReportButton({
       {profileId !== undefined && <input type="hidden" name="profile_id" value={profileId} />}
       {takeId !== undefined && <input type="hidden" name="versus_take_id" value={takeId} />}
       {listId !== undefined && <input type="hidden" name="list_id" value={listId} />}
+      {replyId !== undefined && <input type="hidden" name="reply_id" value={replyId} />}
 
       <p className="text-sm font-medium text-text">What&rsquo;s wrong with this?</p>
 

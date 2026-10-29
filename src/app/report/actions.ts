@@ -21,10 +21,11 @@ const reportInput = z
     profile_id: optional(userIdSchema),
     versus_take_id: optional(rowIdText),
     list_id: optional(rowIdText),
+    reply_id: optional(rowIdText),
   })
   .refine(
-    ({ rating_id, artist_rating_id, profile_id, versus_take_id, list_id }) =>
-      [rating_id, artist_rating_id, profile_id, versus_take_id, list_id].filter(
+    ({ rating_id, artist_rating_id, profile_id, versus_take_id, list_id, reply_id }) =>
+      [rating_id, artist_rating_id, profile_id, versus_take_id, list_id, reply_id].filter(
         (target) => target !== undefined,
       ).length === 1,
     "Couldn't send that report. Please try again.",
@@ -42,6 +43,7 @@ export async function submitReport(_prev: ReportState, formData: FormData): Prom
     profile_id: field(formData, "profile_id"),
     versus_take_id: field(formData, "versus_take_id"),
     list_id: field(formData, "list_id"),
+    reply_id: field(formData, "reply_id"),
   });
   if (!input.success) return { error: firstError(input.error) };
   if (!(await allowUser("report", user.id))) return { error: TOO_MANY };
@@ -53,10 +55,11 @@ export async function submitReport(_prev: ReportState, formData: FormData): Prom
     reported_rating_id: report.rating_id ?? null,
     reported_artist_rating_id: report.artist_rating_id ?? null,
     reported_profile_id: report.profile_id ?? null,
-    // Only sent for takes and lists, so other reports still work on a
+    // Only sent for takes, lists and replies, so other reports still work on a
     // database without those columns.
     ...(report.versus_take_id ? { reported_versus_take_id: report.versus_take_id } : {}),
     ...(report.list_id ? { reported_list_id: report.list_id } : {}),
+    ...(report.reply_id ? { reported_reply_id: report.reply_id } : {}),
     reason: report.reason,
     detail: report.detail || null,
   });

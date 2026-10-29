@@ -448,6 +448,14 @@ describe("POST reports", () => {
     (await import("@/app/api/app/v1/reports/route")).POST(json("reports", "POST", body));
   const sent = () => actions.submitReport.mock.calls[0]?.[1] as FormData;
 
+  it("sends a reply's report by its id", async () => {
+    signIn();
+    actions.submitReport.mockResolvedValue({ message: "Thanks" });
+    await report({ target: { kind: "reply", id: 41 }, reason: "Harassment or bullying" });
+    expect(sent().get("reply_id")).toBe("41");
+    expect(sent().get("rating_id")).toBe("");
+  });
+
   it("sends a list's report through the website's own form action", async () => {
     signIn();
     actions.submitReport.mockResolvedValue({

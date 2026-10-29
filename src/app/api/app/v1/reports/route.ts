@@ -11,12 +11,16 @@ const TARGET_FIELD = {
   profile: "profile_id",
   take: "versus_take_id",
   list: "list_id",
+  reply: "reply_id",
 } as const satisfies Record<ReportTarget["kind"], string>;
 
 /** The shape only; `submitReport` checks the reason, the detail and the ids. */
 const reportBody = z.object({
   target: z.discriminatedUnion("kind", [
-    z.object({ kind: z.enum(["rating", "artistRating", "take", "list"]), id: z.number().int() }),
+    z.object({
+      kind: z.enum(["rating", "artistRating", "take", "list", "reply"]),
+      id: z.number().int(),
+    }),
     z.object({ kind: z.literal("profile"), id: z.string().max(40) }),
   ]),
   reason: z.string().max(100),
