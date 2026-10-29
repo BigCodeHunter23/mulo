@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { strToU8, zipSync } from "fflate";
-import { COULD_NOT_READ, NOT_EXTENDED, readSpotifyFiles, type PickedFile } from "./read-spotify";
+import {
+  COULD_NOT_READ,
+  NOT_EXTENDED,
+  readSpotifyFiles,
+  TOO_BIG,
+  type PickedFile,
+} from "./read-spotify";
 
 const row = (song: string, ts = "2026-10-12T10:00:00Z") => ({
   ts,
@@ -12,8 +18,28 @@ const row = (song: string, ts = "2026-10-12T10:00:00Z") => ({
 const json = (rows: object[]) => strToU8(JSON.stringify(rows));
 const picked = (name: string, bytes: Uint8Array): PickedFile => ({
   name,
+  size: bytes.length,
   read: async () => bytes,
 });
+
+const MB = 1024 * 1024;
+
+/** Rewrites what a zip's directory says one entry unpacks to, as a crafted zip would. */
+function claimSize(zip: Uint8Array, name: string, originalSize: number): Uint8Array {
+  const out = zip.slice();
+  const view = new DataView(out.buffer);
+  const target = new TextEncoder().encode(name);
+  for (let at = 0; at + 46 <= out.length; at++) {
+    if (view.getUint32(at, true) !== 0x02014b50) continue;
+    const nameLength = view.getUint16(at + 28, true);
+    const entryName = out.subarray(at + 46, at + 46 + nameLength);
+    if (entryName.length === target.length && entryName.every((b, i) => b === target[i])) {
+      view.setUint32(at + 24, originalSize, true);
+      return out;
+    }
+  }
+  throw new Error(`${name} isn't in the zip's directory`);
+}
 const read = (files: PickedFile[]) => readSpotifyFiles(files, "UTC", { breathe: async () => {} });
 
 describe("readSpotifyFiles", () => {
@@ -54,6 +80,7 @@ describe("readSpotifyFiles", () => {
     const reads: string[] = [];
     const file = (name: string, rows: object[]): PickedFile => ({
       name,
+      size: 100,
       read: async () => {
         reads.push(name);
         return json(rows);
@@ -100,6 +127,7 @@ describe("readSpotifyFiles", () => {
       picked("Streaming_History_Audio_2021.json", strToU8("nope")),
       {
         name: "Streaming_History_Audio_2022.json",
+        size: 100,
         read: async () => Promise.reject(new Error("gone")),
       },
     ]);
@@ -128,6 +156,42 @@ describe("readSpotifyFiles", () => {
     expect(await read([picked("my_spotify_data.zip", new Uint8Array([1, 2, 3]))])).toEqual({
       ok: false,
       error: COULD_NOT_READ,
+    });
+  });
+
+  it("refuses a file too big to read here, without reading it", async () => {
+    const readIt = vi.fn(async () => new Uint8Array());
+    const result = await read([{ name: "my_spotify_data.zip", size: 301 * MB, read: readIt }]);
+    expect(result).toEqual({ ok: false, error: TOO_BIG });
+    expect(readIt).not.toHaveBeenCalled();
+  });
+
+  it("skips an entry claiming to unpack too big, and counts it", async () => {
+    // Stored, so the bytes would read fine if the claim weren't checked.
+    const zip = claimSize(
+      zipSync({
+        "Streaming_History_Audio_2019.json": [json(["A", "B"].map((s) => row(s))), { level: 0 }],
+        "Streaming_History_Audio_2020.json": json(["C", "D"].map((s) => row(s))),
+      }),
+      "Streaming_History_Audio_2019.json",
+      151 * MB,
+    );
+    expect(await read([picked("data.zip", zip)])).toMatchObject({
+      ok: true,
+      plays: 2,
+      unreadable: 1,
+    });
+  });
+
+  it("stops after so many history files, counting the rest", async () => {
+    const files: Record<string, Uint8Array> = {};
+    for (let i = 1; i <= 201; i++) {
+      files[`Streaming_History_Audio_${i}.json`] = json([row(`Song ${i}`)]);
+    }
+    expect(await read([picked("data.zip", zipSync(files))])).toMatchObject({
+      ok: true,
+      plays: 200,
+      unreadable: 1,
     });
   });
 });

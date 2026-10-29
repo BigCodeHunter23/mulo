@@ -61,6 +61,7 @@ export default function SpotifyImport({ isPublic }: { isPublic: boolean }) {
       // Each file is read only when its turn comes, so a big history is never held at once.
       const files: PickedFile[] = Array.from(list, (file) => ({
         name: file.name,
+        size: file.size,
         read: async () => new Uint8Array(await file.arrayBuffer()),
       }));
       await breathe();
