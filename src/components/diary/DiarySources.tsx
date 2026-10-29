@@ -11,7 +11,14 @@ function Row({ children }: { children: React.ReactNode }) {
   return <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">{children}</li>;
 }
 
-function LastfmRow({ status, keys }: { status: DiarySourceStatus | undefined; keys: boolean }) {
+/** Last.fm's line: connect it, or how it's getting on. Also on the import page. */
+export function LastfmRow({
+  status,
+  keys,
+}: {
+  status: DiarySourceStatus | undefined;
+  keys: boolean;
+}) {
   // Without the website's keys there's nothing to connect to.
   if (!status && !keys) return null;
   if (!status || (status.state === "idle" && !status.lastfmUser)) {

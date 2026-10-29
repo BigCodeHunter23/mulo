@@ -22,7 +22,14 @@ vi.mock("@/lib/supabase/errors", async (original) => ({
 }));
 
 import { fakeSupabase } from "../../../test/fake-supabase";
-import { diaryCopyOf, getDiaryPage, PAGE_SIZE, parseCursor, recentListening } from "./read";
+import {
+  diaryCopyOf,
+  getDiaryPage,
+  getOwnDiary,
+  PAGE_SIZE,
+  parseCursor,
+  recentListening,
+} from "./read";
 
 const OWNER = {
   id: "fran-id",
@@ -278,6 +285,56 @@ describe("getDiaryPage", () => {
     db.admin.answer("album_matches", { data: [{ album_key: "nobody|unknown", tries: 3 }] });
     const page = await getDiaryPage("fran", null);
     expect(page?.state === "open" && page.entries[0]?.matching).toBe("none");
+  });
+});
+
+describe("getOwnDiary", () => {
+  it("gives your own switch and sources, for the import page", async () => {
+    vi.stubEnv("LASTFM_API_KEY", "");
+    db.fake.answer("profiles", { data: { diary_public: false }, error: null });
+    db.admin.answer("diary_sources", {
+      data: [
+        {
+          source: "spotify",
+          state: "idle",
+          lastfm_user: null,
+          reached_back: null,
+          synced_to: null,
+          last_import_at: "2026-10-30T09:00:00Z",
+          last_count: 12,
+        },
+      ],
+      error: null,
+    });
+    expect(await getOwnDiary(OWNER.id)).toEqual({
+      public: false,
+      sources: [
+        {
+          source: "spotify",
+          state: "idle",
+          lastfmUser: null,
+          reachedBack: null,
+          syncedAt: null,
+          lastImportAt: "2026-10-30T09:00:00Z",
+          lastCount: 12,
+        },
+      ],
+      waiting: 0,
+      lastfm: false,
+    });
+    expect(db.fake.callsOn("profiles")).toContainEqual({
+      table: "profiles",
+      method: "eq",
+      args: ["id", OWNER.id],
+    });
+  });
+
+  it("is null before migration 0025", async () => {
+    db.fake.answer("profiles", {
+      data: null,
+      error: { code: "42703", message: "no diary_public" },
+    });
+    expect(await getOwnDiary(OWNER.id)).toBeNull();
   });
 });
 

@@ -12,6 +12,7 @@ describe("needsSignIn", () => {
     "/welcome",
     "/diary",
     "/diary/fix/12",
+    "/diary/import",
     "/lists",
     "/lists/new",
     "/lists/12",

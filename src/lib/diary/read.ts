@@ -174,6 +174,25 @@ async function readOwn(userId: string, isPublic: boolean): Promise<DiaryOwn> {
   };
 }
 
+/**
+ * Your own corner of your diary, without its entries (the import page);
+ * null before migration 0025, when there's no diary.
+ */
+export async function getOwnDiary(userId: string): Promise<DiaryOwn | null> {
+  const { data, error } = await (
+    await createClient()
+  )
+    .from("profiles")
+    .select("diary_public")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) {
+    if (!isMissingColumn(error)) logQueryError("diary", error);
+    return null;
+  }
+  return readOwn(userId, data?.diary_public ?? true);
+}
+
 /** The lines of the months this page covers, from the first of its oldest month. */
 async function readMonths(userId: string, rows: EntryRow[]): Promise<DiaryMonth[]> {
   const newest = rows[0]?.day;
