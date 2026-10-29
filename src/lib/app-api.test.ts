@@ -17,6 +17,7 @@ const SHARED = [
   "@/lib/drop-lineup",
   "@/lib/eras",
   "@/lib/rating-kinds",
+  "@/lib/replies-shared",
   "@/lib/versus-shared",
 ];
 

@@ -3,6 +3,7 @@ import type { FriendScore, SearchFriends } from "@/lib/friend-scores";
 import type { RatingKind } from "@/lib/rating-kinds";
 import type { DropAlbum } from "@/lib/drop-lineup";
 import type { Era, Scene } from "@/lib/eras";
+import type { ThreadKind } from "@/lib/replies-shared";
 import type {
   VersusMatchup,
   VersusResult,
@@ -1113,6 +1114,73 @@ export type MyList = { id: number; title: string; has: boolean; full: boolean };
 
 /** `GET albums/[mbid]/lists`: Add to list's ticks, and "On these lists". */
 export type AlbumLists = { mine: MyList[]; featured: ListSummary[] };
+
+// ── Replies (replies.ts) ───────────────────────────────────────────────
+
+/** `POST replies` */
+export type ReplyInput = { kind: ThreadKind; targetId: number; body: string };
+
+/** One reply in a thread. */
+export type Reply = {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: Person;
+  /** The real people it @names, by their own usernames, for links. */
+  mentions: string[];
+  /** Yours: nothing to report. */
+  mine: boolean;
+  /** Yours, or on your own review or take. */
+  canDelete: boolean;
+};
+
+/**
+ * What a thread is about. A review is shaped like a feed item (`kind`,
+ * `ratingId`, `reaction`) and a take is a `VersusTake`, so a love or a nah
+ * changes it wherever it shows.
+ */
+export type ThreadHead =
+  | {
+      kind: "album";
+      ratingId: number;
+      reaction: ReactionSummary;
+      created_at: string;
+      author: Author;
+      score: number;
+      review: string;
+      release: FeedAlbum;
+    }
+  | {
+      kind: "artist";
+      ratingId: number;
+      reaction: ReactionSummary;
+      created_at: string;
+      author: Author;
+      score: number;
+      review: string;
+      artist: { mbid: string; name: string; image_url: string | null };
+    }
+  | { kind: "take"; take: VersusTake; matchup: VersusMatchup };
+
+/** `GET threads/{album|artist|take}/{id}` */
+export type ThreadPage =
+  | {
+      state: "open";
+      head: ThreadHead;
+      /** Oldest first, leaving out anybody hidden from the viewer; none signed out. */
+      replies: Reply[];
+      /** Signed in, and replies exist. */
+      canReply: boolean;
+      /** False until migration 0024 runs: no replies, and none can be posted. */
+      available: boolean;
+    }
+  /** The review or take was deleted or cleared, or its writer is hidden from you. */
+  | { state: "gone" }
+  /** A take on today's Versus before you've picked: pick first, as on the Versus page. */
+  | { state: "locked"; day: string };
+
+/** `POST replies`: the saved reply, to show in place of the one on its way. */
+export type ReplyResult = { ok: true; reply: Reply } | AppError;
 
 // ── Notifications ──────────────────────────────────────────────────────
 
