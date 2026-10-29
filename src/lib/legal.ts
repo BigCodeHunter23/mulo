@@ -18,4 +18,4 @@ export const MINIMUM_AGE = 13;
 export const JURISDICTION = "New South Wales, Australia";
 
 /** Shown at the top of both pages, so nobody wonders how old they are. */
-export const LAST_UPDATED = "28 October 2026";
+export const LAST_UPDATED = "29 October 2026";

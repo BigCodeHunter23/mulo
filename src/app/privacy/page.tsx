@@ -102,18 +102,42 @@ export default function PrivacyPage() {
       <Section title="What other people can see">
         <p>
           Your scores, reviews, replies, lists and who you follow are visible to other people on
-          MULO — that&rsquo;s the point of it. They are not visible to the open internet:{" "}
-          <strong className="text-text">
-            somebody without an account can&rsquo;t see what you&rsquo;ve rated, your lists, or what
-            anybody is rating right now.
-          </strong>{" "}
-          All they get of a profile is a name, a picture, what you were raised on and your GOAT, so
-          a link you send somebody lands somewhere real.
+          MULO — that&rsquo;s the point of it. Some of it can be seen by anybody, including people
+          without an account and search engines:
+        </p>
+        <List
+          items={[
+            <>
+              <strong className="text-text">Written reviews</strong>, with their score and your
+              name, on album and artist pages.
+            </>,
+            <>
+              <strong className="text-text">Your takes on the Daily Versus</strong>, once that
+              day&rsquo;s matchup is over.
+            </>,
+            <>
+              <strong className="text-text">Your profile:</strong> your name, picture, bio, what you
+              were raised on, your GOAT, your badges, your streak, the kinds of music you score
+              highest, how many records you&rsquo;ve rated, your average score, and how many people
+              you follow and how many follow you.
+            </>,
+            <>
+              <strong className="text-text">The pages your profile shares:</strong> your mixtape for
+              each month, your ranking of an artist&rsquo;s albums, how you rate against everybody
+              else, and your milestones. Each shows some of what you&rsquo;ve rated, with your
+              scores.
+            </>,
+          ]}
+        />
+        <p>
+          <strong className="text-text">The rest needs an account:</strong> everything you&rsquo;ve
+          rated in one place, your Top Shelf, your lists, who you follow and who follows you by
+          name, the newest ratings from everybody, and replies.
         </p>
         <p>
-          <strong className="text-text">Replies</strong> are seen by people who are signed in, as
-          reviews are. You can delete your own replies, and the writer of a review can delete any
-          reply on it.
+          <strong className="text-text">Replies</strong> are only for people who are signed in:
+          unlike reviews, nobody without an account can read them. You can delete your own replies,
+          and the writer of a review or take can delete any reply on it.
         </p>
         <p>
           <strong className="text-text">Your email address is never shown to anybody</strong>,
