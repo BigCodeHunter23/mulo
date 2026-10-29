@@ -44,10 +44,17 @@ export default function RatingForm({
   existing: { score: number; review: string | null } | null;
 }) {
   const [score, setScore] = useState<number | null>(existing?.score ?? null);
+  // A score saved elsewhere on the page (Log a listen) arrives with the
+  // refreshed page; one saved here is already showing.
+  const [givenScore, setGivenScore] = useState(existing?.score ?? null);
   const [savedReview, setSavedReview] = useState(existing?.review ?? "");
   const [draft, setDraft] = useState(existing?.review ?? "");
   const [status, setStatus] = useState<Status>(null);
   const [pending, startTransition] = useTransition();
+  if (!pending && (existing?.score ?? null) !== givenScore) {
+    setGivenScore(existing?.score ?? null);
+    setScore(existing?.score ?? null);
+  }
   const { celebrate, overlay } = useBadgeUnlock();
   /**
    * Set when a score lands a long way from everybody else's. Disagreement is

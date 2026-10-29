@@ -15,6 +15,7 @@ import WhereNext from "@/components/WhereNext";
 import RatingForm from "@/components/RatingForm";
 import ListenOn from "@/components/ListenOn";
 import AddToList from "@/components/AddToList";
+import LogListen from "@/components/LogListen";
 import TrackView from "@/components/TrackView";
 import ListCard from "@/components/ListCard";
 import { getListsWithAlbum, getMyListsFor } from "@/lib/lists";
@@ -155,8 +156,9 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                 )}
 
                 <ListenOn artist={artist?.name ?? null} title={release.title} className="mt-4" />
-                <div className="mt-3 flex justify-center sm:justify-start">
+                <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
                   <AddToList releaseMbid={mbid} signedIn={signedIn} lists={myLists} />
+                  <LogListen mbid={mbid} signedIn={signedIn} score={ownRating?.score ?? null} />
                 </div>
               </div>
 
