@@ -1,6 +1,6 @@
 import "server-only";
 import { albumDays, localDay, type AlbumDay, type Play } from "@/lib/diary-shared";
-import { finishImport, saveAlbumDays, type SaveDaysResult } from "@/lib/diary/entries";
+import { DIARY_FULL, finishImport, saveAlbumDays, type SaveDaysResult } from "@/lib/diary/entries";
 import { lastfmKeys, needsReconnect, recentTracks, type RecentPage } from "@/lib/diary/lastfm";
 import { readTimeZone } from "@/lib/push/store";
 import { zoneOrSydney } from "@/lib/push/zones";
@@ -12,7 +12,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * each page back until the next page has finished it. Once it reaches the
  * start, the account is synced every hour by reading back 26 hours, so the
  * whole of today is always counted; merging keeps the larger counts, so
- * reading a day again never lowers it.
+ * reading a day again never lowers it. A full diary ends an import where it
+ * is and lets syncs move on, so neither asks Last.fm for plays it can't keep.
  */
 
 export type LastfmRow = {
@@ -133,12 +134,15 @@ async function importTurn(
     const split = last ? { done: plays, carry: [] } : splitOldestDay(plays, zone);
     const keep = split.carry.length > CARRY_MAX ? { done: plays, carry: [] } : split;
     const saved = await deps.save(row.user_id, albumDays(keep.done, zone));
-    if (!saved.ok) throw new Error(saved.error);
-    added += saved.added;
+    // A full diary takes nothing more, so the import ends here, with what it added.
+    const full = !saved.ok && saved.error === DIARY_FULL;
+    if (!saved.ok && !full) throw new Error(saved.error);
+    if (saved.ok) added += saved.added;
     carry = keep.carry;
     const oldest = oldestOf(plays);
-    const reached = Number.isFinite(oldest) ? { reached_back: new Date(oldest).toISOString() } : {};
-    if (last) {
+    const reached =
+      Number.isFinite(oldest) && !full ? { reached_back: new Date(oldest).toISOString() } : {};
+    if (last || full) {
       await deps.update(row.user_id, {
         state: "syncing",
         import_page: null,
@@ -199,7 +203,9 @@ async function syncTurn(
   }
 
   const saved = await deps.save(row.user_id, albumDays(plays, zone));
-  if (!saved.ok) throw new Error(saved.error);
+  // A full diary takes nothing more; moving on keeps the next sync from
+  // reading the same plays again.
+  if (!saved.ok && saved.error !== DIARY_FULL) throw new Error(saved.error);
   const syncedTo = !behind && read === rest.length ? at.getTime() : behind ? reached : null;
   await deps.update(row.user_id, {
     worked_at: at.toISOString(),

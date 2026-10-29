@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Play } from "@/lib/diary-shared";
+import { DIARY_FULL } from "./entries";
 import { LastfmError, type RecentPage } from "./lastfm";
 import { advanceLastfm, splitOldestDay, type LastfmDeps, type LastfmRow } from "./lastfm-jobs";
 
@@ -151,6 +152,49 @@ describe("advanceLastfm", () => {
       worked_at: at.toISOString(),
       synced_to: "2026-10-02T10:00:00.000Z",
     });
+  });
+
+  it("ends an import when the diary is full, rather than asking Last.fm again every run", async () => {
+    const d = deps({
+      due: vi.fn(async () => [row({ import_page: 3, import_added: 120 })]),
+      page: vi.fn(async () => ({
+        page: 3,
+        totalPages: 9,
+        plays: [play("2026-10-12T10:00:00Z", "A"), play("2026-10-11T10:00:00Z", "B")],
+      })),
+      save: vi.fn(async () => ({ ok: false as const, error: DIARY_FULL })),
+    });
+    const report = await advanceLastfm(at, Date.now() + 10_000, d);
+    expect(d.page).toHaveBeenCalledTimes(1);
+    expect(d.update).toHaveBeenCalledWith(
+      "u1",
+      expect.objectContaining({
+        state: "syncing",
+        import_page: null,
+        import_added: 120,
+        carry: null,
+      }),
+    );
+    expect(d.finished).toHaveBeenCalledWith("u1", 120);
+    expect(report).toEqual({ people: 1, errors: 0 });
+  });
+
+  it("moves a sync on when the diary is full", async () => {
+    const d = deps({
+      due: vi.fn(async () => [row({ state: "syncing" })]),
+      page: vi.fn(async () => ({
+        page: 1,
+        totalPages: 1,
+        plays: [play("2026-10-30T10:00:00Z", "A")],
+      })),
+      save: vi.fn(async () => ({ ok: false as const, error: DIARY_FULL })),
+    });
+    const report = await advanceLastfm(at, Date.now() + 10_000, d);
+    expect(d.update).toHaveBeenCalledWith(
+      "u1",
+      expect.objectContaining({ synced_to: at.toISOString() }),
+    );
+    expect(report).toEqual({ people: 1, errors: 0 });
   });
 
   it("asks to reconnect when Last.fm won't read the account", async () => {

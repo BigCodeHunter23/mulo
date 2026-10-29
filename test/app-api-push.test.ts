@@ -26,6 +26,9 @@ const store = vi.hoisted(() => ({
   saveSettings: vi.fn(async () => {}),
 }));
 const tick = vi.hoisted(() => ({ runTick: vi.fn(async () => ({ due: 1, sent: 1, receipts: 0 })) }));
+const diaryTick = vi.hoisted(() => ({
+  runDiaryTick: vi.fn(async () => ({ matched: 2, missed: 0, lastfmPeople: 1, errors: 0 })),
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   bearerToken: vi.fn(async () => caller.token),
@@ -39,6 +42,7 @@ vi.mock("@/lib/rate-limit", async (original) => ({
 }));
 vi.mock("@/lib/push/store", () => store);
 vi.mock("@/lib/push/tick", () => tick);
+vi.mock("@/lib/diary/tick", () => diaryTick);
 
 import * as devices from "@/app/api/app/v1/push/devices/route";
 import * as forget from "@/app/api/app/v1/push/devices/forget/route";
@@ -169,11 +173,20 @@ describe("push/tick", () => {
     const res = await clock.POST(req("POST", {}, { authorization: "Bearer nope" }));
     expect(res.status).toBe(401);
     expect(tick.runTick).not.toHaveBeenCalled();
+    expect(diaryTick.runDiaryTick).not.toHaveBeenCalled();
   });
 
-  it("runs with it", async () => {
+  it("runs with it, sending the pushes and then moving the diary on", async () => {
     vi.stubEnv("PUSH_TICK_SECRET", "s".repeat(40));
     const res = await clock.POST(req("POST", {}, { authorization: `Bearer ${"s".repeat(40)}` }));
-    expect(await res.json()).toEqual({ due: 1, sent: 1, receipts: 0 });
+    expect(await res.json()).toEqual({
+      due: 1,
+      sent: 1,
+      receipts: 0,
+      diary: { matched: 2, missed: 0, lastfmPeople: 1, errors: 0 },
+    });
+    expect(tick.runTick.mock.invocationCallOrder[0]).toBeLessThan(
+      diaryTick.runDiaryTick.mock.invocationCallOrder[0]!,
+    );
   });
 });
