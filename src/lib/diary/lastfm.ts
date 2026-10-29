@@ -17,6 +17,9 @@ export const PAGE_LIMIT = 200;
 /** How long a connect may take, from Connect to coming back. */
 const STATE_MINUTES = 10;
 
+/** What Connect Last.fm says before the website has its keys. */
+export const LASTFM_OFF = "Last.fm isn't set up yet.";
+
 export type LastfmKeys = { key: string; secret: string };
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
