@@ -4,7 +4,7 @@ import type { SaveResult } from "@/lib/app-api";
 import { appJson, appRoute, readBody, signedInCaller } from "@/lib/app-route";
 import { allowUser, RateLimitedError } from "@/lib/rate-limit";
 import { registerDevice, removeDevice, touchClock } from "@/lib/push/store";
-import { isTimeZone } from "@/lib/push/zones";
+import { canonicalZone } from "@/lib/push/zones";
 import { expoPushToken } from "@/lib/validation";
 
 const registerBody = z.object({
@@ -27,7 +27,7 @@ export const POST = appRoute(async (request: NextRequest) => {
   if (body instanceof Response) return body;
 
   await registerDevice(user.id, body.token, body.platform);
-  await touchClock(user.id, isTimeZone(body.timeZone) ? body.timeZone : null);
+  await touchClock(user.id, canonicalZone(body.timeZone));
   return appJson<SaveResult>({ ok: true });
 });
 

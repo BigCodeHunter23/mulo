@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTimeZone, localClock, SYDNEY, zoneOrSydney } from "@/lib/push/zones";
+import { canonicalZone, isTimeZone, localClock, SYDNEY, zoneOrSydney } from "@/lib/push/zones";
 
 describe("time zones", () => {
   it("knows a real zone from a made-up one", () => {
@@ -8,6 +8,22 @@ describe("time zones", () => {
     expect(isTimeZone("")).toBe(false);
     expect(isTimeZone(42)).toBe(false);
     expect(isTimeZone("x".repeat(65))).toBe(false);
+  });
+
+  it("spells a zone the runtime's way", () => {
+    expect(canonicalZone("europe/london")).toBe("Europe/London");
+    expect(canonicalZone("AMERICA/NEW_YORK")).toBe("America/New_York");
+    expect(canonicalZone("Europe/London")).toBe("Europe/London");
+    expect(canonicalZone("Nowhere/Land")).toBeNull();
+    expect(canonicalZone("")).toBeNull();
+    expect(canonicalZone(null)).toBeNull();
+    expect(canonicalZone("x".repeat(65))).toBeNull();
+  });
+
+  it("reads the same clock however the zone is spelled", () => {
+    const at = new Date("2026-10-28T22:30:00Z");
+    expect(localClock(at, "europe/london")).toEqual(localClock(at, "Europe/London"));
+    expect(zoneOrSydney("europe/london")).toBe("Europe/London");
   });
 
   it("falls back to Sydney's", () => {

@@ -72,6 +72,11 @@ describe("push/devices", () => {
     expect(store.touchClock).toHaveBeenCalledWith("me", "Europe/London");
   });
 
+  it("saves a time zone in the runtime's own spelling", async () => {
+    await devices.POST(req("POST", { token: TOKEN, platform: "ios", timeZone: "europe/london" }));
+    expect(store.touchClock).toHaveBeenCalledWith("me", "Europe/London");
+  });
+
   it("ignores an unknown time zone", async () => {
     await devices.POST(req("POST", { token: TOKEN, platform: "ios", timeZone: "Nowhere/Land" }));
     expect(store.touchClock).toHaveBeenCalledWith("me", null);

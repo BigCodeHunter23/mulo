@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyFollow, notifyLove, type EventDeps } from "@/lib/push/events";
+import {
+  notifyFollow,
+  notifyLove,
+  PEOPLE_PUSHES_PER_HOUR,
+  type EventDeps,
+} from "@/lib/push/events";
 
 vi.mock("@/lib/push/store", () => ({}));
 vi.mock("@/lib/push/send", () => ({}));
@@ -9,6 +14,7 @@ const at = new Date("2026-10-29T08:42:00Z");
 function deps(over: Partial<EventDeps> = {}): EventDeps {
   return {
     personOf: vi.fn(async () => ({ username: "sam", display_name: "Sam" })),
+    peoplePushesSince: vi.fn(async () => 0),
     blockedEitherWay: vi.fn(async () => false),
     loveTarget: vi.fn(async () => ({
       ownerId: "owner",
@@ -75,6 +81,21 @@ describe("pushes from what people do", () => {
     expect(d.send).not.toHaveBeenCalled();
     expect(d.loveTarget).toHaveBeenCalledTimes(1);
     expect(d.loveTarget).not.toHaveBeenCalledWith("pick", 1);
+  });
+
+  it("stops pushing follows and loves to somebody who's had ten in the last hour", async () => {
+    const d = deps({ peoplePushesSince: vi.fn(async () => PEOPLE_PUSHES_PER_HOUR) });
+    await notifyFollow("sam-id", "jo-id", at, d);
+    await notifyLove("album", 7, "sam-id", at, d);
+    expect(d.send).not.toHaveBeenCalled();
+    expect(d.peoplePushesSince).toHaveBeenCalledWith("jo-id", new Date("2026-10-29T07:42:00Z"));
+    expect(d.peoplePushesSince).toHaveBeenCalledWith("owner", new Date("2026-10-29T07:42:00Z"));
+  });
+
+  it("still pushes the tenth", async () => {
+    const d = deps({ peoplePushesSince: vi.fn(async () => PEOPLE_PUSHES_PER_HOUR - 1) });
+    await notifyFollow("sam-id", "jo-id", at, d);
+    expect(d.send).toHaveBeenCalledTimes(1);
   });
 
   it("never throws", async () => {

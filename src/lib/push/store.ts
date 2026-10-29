@@ -226,6 +226,7 @@ export async function claimPushes(entries: LogEntry[]): Promise<Set<string>> {
   if (error) throw error;
   return new Set(
     (data ?? []).map((row) =>
+      // The column's check (migration 0023) allows only the PushKind names.
       logKey({ userId: row.user_id, kind: row.kind as PushKind, key: row.key }),
     ),
   );
@@ -261,7 +262,33 @@ export async function loggedAlready(
   return new Set(rows.map((row) => row.user_id));
 }
 
+/**
+ * How many follow and love pushes somebody has been sent since `since`, so a
+ * crowd can't flood one phone (each push is once per follower or rating, but
+ * there can be many of those).
+ */
+export async function peoplePushesSince(userId: string, since: Date): Promise<number> {
+  const { count, error } = await db()
+    .from("push_log")
+    .select("user_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("kind", ["follow", "love"])
+    .gt("sent_at", since.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export type LoggedTickets = LogEntry & { tickets: Ticketed[] };
+
+/** The log's tickets column is JSON, so only entries of the shape `saveTickets` writes are kept. */
+function toTickets(value: unknown): Ticketed[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    if (typeof item !== "object" || item === null) return [];
+    const { id, token } = item as { id?: unknown; token?: unknown };
+    return typeof id === "string" && typeof token === "string" ? [{ id, token }] : [];
+  });
+}
 
 /** Pushes sent 15 minutes to a day ago whose receipts haven't been read (Expo keeps them a day). */
 export async function uncheckedTickets(at: Date): Promise<LoggedTickets[]> {
@@ -271,13 +298,16 @@ export async function uncheckedTickets(at: Date): Promise<LoggedTickets[]> {
     .eq("receipts_checked", false)
     .lt("sent_at", new Date(at.getTime() - 15 * 60_000).toISOString())
     .gt("sent_at", new Date(at.getTime() - 24 * 3_600_000).toISOString())
+    // Oldest first, so the ones closest to Expo's one-day limit are read before they go.
+    .order("sent_at")
     .limit(500);
   if (error) throw error;
   return (data ?? []).map((row) => ({
     userId: row.user_id,
+    // The column's check (migration 0023) allows only the PushKind names.
     kind: row.kind as PushKind,
     key: row.key,
-    tickets: (row.tickets ?? []) as Ticketed[],
+    tickets: toTickets(row.tickets),
   }));
 }
 

@@ -2,7 +2,8 @@
 
 import { getCurrentUser } from "@/lib/supabase/server";
 import { touchClock } from "@/lib/push/store";
-import { isTimeZone } from "@/lib/push/zones";
+import { canonicalZone } from "@/lib/push/zones";
+import { allowUser } from "@/lib/rate-limit";
 
 /**
  * The browser says where it is, so streaks and pushes run on the visitor's
@@ -12,8 +13,10 @@ import { isTimeZone } from "@/lib/push/zones";
 export async function reportClock(timeZone: unknown): Promise<void> {
   const user = await getCurrentUser();
   if (!user) return;
+  // Each page load reports, so a script calling this in a loop is held to the write limit.
+  if (!(await allowUser("write", user.id))) return;
   try {
-    await touchClock(user.id, isTimeZone(timeZone) ? timeZone : null);
+    await touchClock(user.id, canonicalZone(timeZone));
   } catch (error) {
     console.error("[clock] couldn't note the visit:", error);
   }

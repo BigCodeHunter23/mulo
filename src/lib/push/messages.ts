@@ -21,8 +21,32 @@ export type LoveSubject =
 /** Yesterday's Versus, as one person's push tells it. */
 export type VersusLine = { title: string; winner: string | null; left: number; right: number };
 
+/** Longest a person's name, or a record's or matchup's title, may run in a push. */
+const NAME_MAX = 40;
+const TITLE_MAX = 80;
+
+/**
+ * Names and titles come from people (or MusicBrainz), so before they go on a
+ * lock screen: no control or format characters (a newline, or a bidi
+ * override that makes the push read backwards), one space between words,
+ * and no longer than `max`, ending in "…" when cut.
+ */
+export function clean(text: string, max: number): string {
+  const tidy = text
+    .replace(/\s+/gu, " ")
+    .replace(/[\p{Cc}\p{Cf}]/gu, "")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  const chars = Array.from(tidy);
+  if (chars.length <= max) return tidy;
+  const cut = chars.slice(0, max - 1).join("");
+  return `${cut.trimEnd()}…`;
+}
+
+const title = (text: string) => clean(text, TITLE_MAX);
+
 export function nameOf(person: Person): string {
-  return person.display_name?.trim() || person.username;
+  return clean(person.display_name ?? "", NAME_MAX) || clean(person.username, NAME_MAX);
 }
 
 export function followMessage(follower: Person): PushContent {
@@ -34,17 +58,17 @@ export function loveMessage(lover: Person, subject: LoveSubject): PushContent {
   switch (subject.kind) {
     case "album":
       return {
-        title: `${name} loved your ${subject.review ? "review" : "rating"} of ${subject.title}`,
+        title: `${name} loved your ${subject.review ? "review" : "rating"} of ${title(subject.title)}`,
         url: `/album/${subject.mbid}`,
       };
     case "artist":
       return {
-        title: `${name} loved your rating of ${subject.name}`,
+        title: `${name} loved your rating of ${title(subject.name)}`,
         url: `/artist/${subject.mbid}`,
       };
     case "take":
       return {
-        title: `${name} loved your take on ${subject.title}`,
+        title: `${name} loved your take on ${title(subject.title)}`,
         url: `/versus/${subject.day}`,
       };
   }
@@ -59,14 +83,16 @@ export function split(left: number, right: number): [number, number] {
 }
 
 export function versusMessage(today: { title: string }, result?: VersusLine): PushContent {
+  const matchup = title(today.title);
   if (!result) {
-    return { title: `Today's Versus: ${today.title}.`, body: "Who you got?", url: "/versus" };
+    return { title: `Today's Versus: ${matchup}.`, body: "Who you got?", url: "/versus" };
   }
   const [l, r] = split(result.left, result.right);
-  const title = result.winner
-    ? `${result.winner} took ${result.title}, ${Math.max(l, r)}–${Math.min(l, r)}.`
-    : `${result.title} finished level, ${l}–${r}.`;
-  return { title, body: `Today: ${today.title}. Who you got?`, url: "/versus" };
+  const yesterday = title(result.title);
+  const line = result.winner
+    ? `${title(result.winner)} took ${yesterday}, ${Math.max(l, r)}–${Math.min(l, r)}.`
+    : `${yesterday} finished level, ${l}–${r}.`;
+  return { title: line, body: `Today: ${matchup}. Who you got?`, url: "/versus" };
 }
 
 export function dropMessage(): PushContent {

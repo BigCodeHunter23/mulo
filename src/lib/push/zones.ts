@@ -5,38 +5,49 @@
 
 export const SYDNEY = "Australia/Sydney";
 
+/**
+ * A time zone the runtime knows, in its own spelling ("europe/london" is
+ * "Europe/London"), or null. Zones are saved this way, so one place is never
+ * two zones, nor two cached formats.
+ */
+export function canonicalZone(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: value }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
 /** Whether this is a time zone the runtime knows, such as "Europe/London". */
 export function isTimeZone(value: unknown): value is string {
-  if (typeof value !== "string" || value.length === 0 || value.length > 64) return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
+  return canonicalZone(value) !== null;
 }
 
 /** Somebody's zone, or Sydney's when they have none we know. */
 export function zoneOrSydney(value: string | null | undefined): string {
-  return isTimeZone(value) ? value : SYDNEY;
+  return canonicalZone(value) ?? SYDNEY;
 }
 
+/** One format per zone, kept under the zone's own spelling so the cache can't grow past the zones there are. */
 const formats = new Map<string, Intl.DateTimeFormat>();
 
 function formatFor(timeZone: string): Intl.DateTimeFormat {
-  let format = formats.get(timeZone);
-  if (!format) {
-    format = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    });
-    formats.set(timeZone, format);
-  }
+  const cached = formats.get(timeZone);
+  if (cached) return cached;
+  const format = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const canonical = format.resolvedOptions().timeZone;
+  const known = formats.get(canonical);
+  if (known) return known;
+  formats.set(canonical, format);
   return format;
 }
 

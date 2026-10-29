@@ -143,9 +143,9 @@ async function paced<T>(
 ): Promise<void> {
   let next = 0;
   const worker = async () => {
-    while (next < items.length && Date.now() < deadline) {
-      const item = items[next++] as T;
-      await work(item);
+    // The index is taken and checked in one step, so no two workers share one.
+    for (let index = next++; index < items.length && Date.now() < deadline; index = next++) {
+      await work(items[index]);
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));

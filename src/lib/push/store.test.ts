@@ -15,10 +15,12 @@ import {
   forgetDevice,
   logKey,
   markChecked,
+  peoplePushesSince,
   personOf,
   readTimeZone,
   tickCandidates,
   toColumns,
+  uncheckedTickets,
   toSettings,
   touchClock,
 } from "@/lib/push/store";
@@ -142,6 +144,59 @@ describe("forgetDevice", () => {
     const failure = new Error("down");
     client.current = { from: () => query({ error: failure }) };
     await expect(forgetDevice("ExponentPushToken[x]")).rejects.toBe(failure);
+  });
+});
+
+describe("peoplePushesSince", () => {
+  it("counts one person's follow and love pushes since a moment", async () => {
+    const calls: [string, unknown[]][] = [];
+    client.current = { from: () => query({ count: 4, error: null }, calls) };
+    expect(await peoplePushesSince("u", new Date("2026-10-29T07:00:00Z"))).toBe(4);
+    expect(calls).toContainEqual(["select", ["user_id", { count: "exact", head: true }]]);
+    expect(calls).toContainEqual(["eq", ["user_id", "u"]]);
+    expect(calls).toContainEqual(["in", ["kind", ["follow", "love"]]]);
+    expect(calls).toContainEqual(["gt", ["sent_at", "2026-10-29T07:00:00.000Z"]]);
+  });
+
+  it("throws a failed count", async () => {
+    const failure = new Error("down");
+    client.current = { from: () => query({ count: null, error: failure }) };
+    await expect(peoplePushesSince("u", new Date())).rejects.toBe(failure);
+  });
+});
+
+describe("uncheckedTickets", () => {
+  it("reads the oldest first, and keeps only tickets of the right shape", async () => {
+    const calls: [string, unknown[]][] = [];
+    client.current = {
+      from: () =>
+        query(
+          {
+            data: [
+              {
+                user_id: "a",
+                kind: "follow",
+                key: "k",
+                tickets: [
+                  { id: "t1", token: "T1" },
+                  { id: 2, token: "T2" },
+                  null,
+                  "x",
+                  { id: "t3" },
+                ],
+              },
+              { user_id: "b", kind: "love", key: "l", tickets: { id: "t4", token: "T4" } },
+            ],
+            error: null,
+          },
+          calls,
+        ),
+    };
+    expect(await uncheckedTickets(new Date())).toEqual([
+      { userId: "a", kind: "follow", key: "k", tickets: [{ id: "t1", token: "T1" }] },
+      { userId: "b", kind: "love", key: "l", tickets: [] },
+    ]);
+    expect(calls).toContainEqual(["order", ["sent_at"]]);
   });
 });
 
