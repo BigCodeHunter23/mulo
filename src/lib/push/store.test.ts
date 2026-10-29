@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import {
   blockedEitherWay,
   devicesOf,
+  followsEitherWay,
   forgetDevice,
   logKey,
   markChecked,
@@ -20,6 +21,7 @@ import {
   personOf,
   pushCopyOf,
   readTimeZone,
+  repliedIn,
   replyTarget,
   saveMentions,
   tickCandidates,
@@ -464,5 +466,64 @@ describe("saveMentions", () => {
     await saveMentions(41, []);
     client.current = { from: () => query({ data: null, error: { code: "57014" } }) };
     await expect(saveMentions(41, [A])).rejects.toEqual({ code: "57014" });
+  });
+});
+
+describe("followsEitherWay", () => {
+  it("finds who follows somebody and whom they follow, among the people asked about", async () => {
+    const calls: [string, unknown[]][] = [];
+    const answers = [
+      { data: [{ following_id: A }], error: null },
+      { data: [{ follower_id: B }, { follower_id: A }], error: null },
+    ];
+    const from = vi.fn(() => query(answers.shift(), calls));
+    client.current = { from };
+    const C = "00000000-0000-4000-8000-000000000003";
+    expect(await followsEitherWay("joe", [A, B, C])).toEqual(new Set([A, B]));
+    expect(from).toHaveBeenCalledWith("follows");
+    expect(calls).toContainEqual(["eq", ["follower_id", "joe"]]);
+    expect(calls).toContainEqual(["in", ["following_id", [A, B, C]]]);
+    expect(calls).toContainEqual(["eq", ["following_id", "joe"]]);
+    expect(calls).toContainEqual(["in", ["follower_id", [A, B, C]]]);
+  });
+
+  it("reads long lists in chunks of 100, asks nothing for nobody, and throws a failed read", async () => {
+    expect(await followsEitherWay("joe", [])).toEqual(new Set());
+    const calls: [string, unknown[]][] = [];
+    client.current = { from: () => query({ data: [], error: null }, calls) };
+    await followsEitherWay(
+      "joe",
+      Array.from({ length: 150 }, (_, i) => `u${i}`),
+    );
+    const sizes = calls.filter(([n]) => n === "in").map(([, a]) => (a[1] as string[]).length);
+    expect(sizes.sort()).toEqual([100, 100, 50, 50].sort());
+    const failure = new Error("down");
+    client.current = { from: () => query({ data: null, error: failure }) };
+    await expect(followsEitherWay("joe", [A])).rejects.toBe(failure);
+  });
+});
+
+describe("repliedIn", () => {
+  it("finds who of these people has replied in one thread", async () => {
+    const calls: [string, unknown[]][] = [];
+    const from = vi.fn(() => query({ data: [{ user_id: A }, { user_id: A }], error: null }, calls));
+    client.current = { from };
+    expect(await repliedIn("take", 9, [A, B])).toEqual(new Set([A]));
+    expect(from).toHaveBeenCalledWith("replies");
+    expect(calls).toContainEqual(["eq", ["versus_take_id", 9]]);
+    expect(calls).toContainEqual(["in", ["user_id", [A, B]]]);
+  });
+
+  it("reads the right thread for reviews, asks nothing for nobody, and throws a failed read", async () => {
+    expect(await repliedIn("album", 7, [])).toEqual(new Set());
+    const calls: [string, unknown[]][] = [];
+    client.current = { from: () => query({ data: [], error: null }, calls) };
+    await repliedIn("album", 7, [A]);
+    await repliedIn("artist", 8, [A]);
+    expect(calls).toContainEqual(["eq", ["rating_id", 7]]);
+    expect(calls).toContainEqual(["eq", ["artist_rating_id", 8]]);
+    const failure = new Error("down");
+    client.current = { from: () => query({ data: null, error: failure }) };
+    await expect(repliedIn("album", 7, [A])).rejects.toBe(failure);
   });
 });

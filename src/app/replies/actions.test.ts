@@ -54,6 +54,9 @@ vi.mock("@/lib/push/store", () => ({
   })),
   peopleNamed: vi.fn(async () => []),
   picksIn: vi.fn(async () => new Set()),
+  // Everybody named follows the replier, or the replier them.
+  followsEitherWay: vi.fn(async (_person: string, ids: string[]) => new Set(ids)),
+  repliedIn: vi.fn(async () => new Set()),
   blockedEitherWay: vi.fn(async () => false),
   saveMentions: vi.fn(async () => {}),
 }));
@@ -137,6 +140,20 @@ describe("postReply", () => {
     expect(await postReply("album", 7, "@kim @lee fair.")).toMatchObject({ ok: true });
     expect(store.replyTarget).toHaveBeenCalledWith("album", 7);
     expect(store.saveMentions).toHaveBeenCalledWith(41, [KIM]);
+  });
+
+  it("keeps nobody it names who has no connection with the replier or the thread", async () => {
+    vi.mocked(store.peopleNamed).mockResolvedValueOnce([
+      { id: KIM, username: "kim", display_name: null },
+    ]);
+    vi.mocked(store.followsEitherWay).mockResolvedValueOnce(new Set());
+    saves();
+    expect(await postReply("album", 7, "@kim fair.")).toMatchObject({
+      ok: true,
+      reply: { mentions: ["Kim"] },
+    });
+    expect(store.repliedIn).toHaveBeenCalledWith("album", 7, [KIM]);
+    expect(store.saveMentions).not.toHaveBeenCalled();
   });
 
   it("still posts when keeping who it names fails", async () => {

@@ -258,12 +258,14 @@ exception when check_violation then
   raise notice 'Left reports_detail_length unvalidated: some existing reports break it.';
 end $$;
 
--- Who each reply names, kept when it's posted, for the bell: the first five
--- @names that are real people allowed to read the thread (not the replier or
--- the thread's owner, nobody blocked either way with either, and on a take
--- whose matchup is still open, only people who've picked). The website
--- writes it with the service role; each person reads only their own rows,
--- and a reply hidden from them stays hidden through replies' own rules.
+-- Who each reply names, kept when it's posted, for the bell: of the first
+-- five @names, the real people with a connection (they follow the replier,
+-- the replier follows them, or they've replied in the thread before) who are
+-- allowed to read the thread (not the replier or the thread's owner, nobody
+-- blocked either way with either, and on a take whose matchup is still open,
+-- only people who've picked). A stranger's @name tells them nothing. The
+-- website writes it with the service role; each person reads only their own
+-- rows, and a reply hidden from them stays hidden through replies' own rules.
 --
 -- user_id points at the account, not the profile: a table whose key is a
 -- reply and a profile would look to PostgREST like a link between replies

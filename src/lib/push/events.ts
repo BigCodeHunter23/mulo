@@ -20,6 +20,8 @@ export type EventDeps = {
   replyTarget: typeof store.replyTarget;
   peopleNamed: typeof store.peopleNamed;
   picksIn: typeof store.picksIn;
+  followsEitherWay: typeof store.followsEitherWay;
+  repliedIn: typeof store.repliedIn;
   saveMentions: typeof store.saveMentions;
   send: (messages: Parameters<typeof sendPushes>[0]) => Promise<number>;
 };
@@ -32,6 +34,8 @@ const real = (): EventDeps => ({
   replyTarget: store.replyTarget,
   peopleNamed: store.peopleNamed,
   picksIn: store.picksIn,
+  followsEitherWay: store.followsEitherWay,
+  repliedIn: store.repliedIn,
   saveMentions: store.saveMentions,
   send: (messages) => sendPushes(messages),
 });
@@ -114,20 +118,27 @@ export type Named = { id: string; username: string; display_name: string | null 
 /**
  * Of the first five @names in a reply, the people who may hear they were
  * named: real people other than the replier and the thread's owner (who
- * hears as its owner), nobody blocked either way with either of them, and on
- * a take whose matchup is still open, only people who've picked, since
- * nobody else can read the thread yet. Pushes and the bell both go by this.
+ * hears as its owner), with a connection to the reply (they follow the
+ * replier, the replier follows them, or they've replied in the thread
+ * before), nobody blocked either way with either of them, and on a take
+ * whose matchup is still open, only people who've picked, since nobody else
+ * can read the thread yet. A stranger's @name is still a link to their
+ * profile; it just tells them nothing. Pushes and the bell both go by this.
  */
 export async function resolveMentions(
-  event: Pick<ReplyEvent, "replierId" | "body">,
+  event: Pick<ReplyEvent, "kind" | "targetId" | "replierId" | "body">,
   target: Pick<store.ReplyTarget, "ownerId" | "openMatchup">,
-  deps: Pick<EventDeps, "peopleNamed" | "picksIn" | "blockedEitherWay">,
+  deps: Pick<
+    EventDeps,
+    "peopleNamed" | "picksIn" | "blockedEitherWay" | "followsEitherWay" | "repliedIn"
+  >,
 ): Promise<Named[]> {
   const names = parseMentions(event.body);
   if (names.length === 0) return [];
   let named = (await deps.peopleNamed(names)).filter(
     (person) => person.id !== event.replierId && person.id !== target.ownerId,
   );
+  named = await connected(event, named, deps);
   if (target.openMatchup !== null && named.length > 0) {
     const picked = await deps.picksIn(
       target.openMatchup,
@@ -143,6 +154,33 @@ export async function resolveMentions(
     ),
   );
   return named.filter((_, i) => !blocked[i]);
+}
+
+/**
+ * Of the people named, those with a connection: a follow either way with the
+ * replier, or a reply of their own in the thread. The thread is only asked
+ * about for the people the follows didn't settle.
+ */
+async function connected(
+  event: Pick<ReplyEvent, "kind" | "targetId" | "replierId">,
+  named: Named[],
+  deps: Pick<EventDeps, "followsEitherWay" | "repliedIn">,
+): Promise<Named[]> {
+  if (named.length === 0) return [];
+  const follows = await deps.followsEitherWay(
+    event.replierId,
+    named.map((person) => person.id),
+  );
+  const rest = named.filter((person) => !follows.has(person.id));
+  const replied =
+    rest.length > 0
+      ? await deps.repliedIn(
+          event.kind,
+          event.targetId,
+          rest.map((person) => person.id),
+        )
+      : new Set<string>();
+  return named.filter((person) => follows.has(person.id) || replied.has(person.id));
 }
 
 /**
@@ -173,14 +211,15 @@ export async function recordMentions(
 
 /**
  * "Jo replied to your review of Blonde" for the author, and "Jo mentioned you
- * on Sam's review of Blonde" for each of the first five people named, at
- * most once an hour per thread for each of them. Never for your own reply,
- * never across a block (with the replier, or for somebody named, with the
- * thread's owner too), and not to anyone who's had ten follow, love and
- * reply pushes in the past hour. An author who's named gets the author's
- * push only. Earlier repliers hear about it in the bell only. On a take
- * whose matchup is still open, only people who've picked are told: nobody
- * else can read the thread yet.
+ * on Sam's review of Blonde" for each of the first five people named who
+ * have a connection to it (`resolveMentions`), at most once an hour per
+ * thread for each of them. Never for your own reply, never across a block
+ * (with the replier, or for somebody named, with the thread's owner too),
+ * and not to anyone who's had ten follow, love and reply pushes in the past
+ * hour. An author who's named gets the author's push only. Earlier repliers
+ * hear about it in the bell only, unless they're named. On a take whose
+ * matchup is still open, only people who've picked are told: nobody else
+ * can read the thread yet.
  */
 export async function notifyReply(
   event: ReplyEvent,

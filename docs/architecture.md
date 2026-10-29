@@ -288,8 +288,14 @@ Blonde") and the people it names ("Jo mentioned you on Sam's review of
 Blonde"), through `notifyReply` in `src/lib/push/events.ts`: once an hour per
 thread for each person, never across a block, under the Replies switch, and
 not to anyone who's already had ten follow, love and reply pushes in the
-past hour. A named author gets the author's push only. The bell's `reply`,
-`mention` and `thread` lines come from `src/lib/reply-notifications.ts`.
+past hour. A named author gets the author's push only. An @name tells
+somebody (a push, and a `mention` line in the bell) only when they have a
+connection: they follow the replier, the replier follows them, or they've
+replied in the thread before. A stranger's @name is still a link to their
+profile, and tells them nothing. `resolveMentions` holds that rule once for
+both, reading follows and earlier replies with the service role. The bell's
+`reply`, `mention` and `thread` lines come from
+`src/lib/reply-notifications.ts`.
 Reported replies land in the admin inbox with Remove reply; a report reads
 the reply as the reporter (so one hidden from them can't be reported) and
 keeps its first 1,000 characters in the report's detail, after the

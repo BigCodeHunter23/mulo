@@ -36,6 +36,9 @@ function deps(over: Partial<EventDeps> = {}): EventDeps {
       async () => [] as { id: string; username: string; display_name: string | null }[],
     ),
     picksIn: vi.fn(async () => new Set<string>()),
+    // Everybody named follows the replier, unless a test says otherwise.
+    followsEitherWay: vi.fn(async (_person: string, ids: string[]) => new Set(ids)),
+    repliedIn: vi.fn(async () => new Set<string>()),
     saveMentions: vi.fn(async () => {}),
     send: vi.fn(async () => 1),
     ...over,
@@ -168,6 +171,43 @@ describe("reply pushes", () => {
     ]);
   });
 
+  it("tells nobody about a stranger named: only the author hears", async () => {
+    const d = deps({
+      peopleNamed: vi.fn(async () => [kim]),
+      followsEitherWay: vi.fn(async () => new Set<string>()),
+    });
+    await notifyReply(reply("@kim listen"), at, d);
+    expect(d.followsEitherWay).toHaveBeenCalledWith("joe-id", ["kim-id"]);
+    expect(d.repliedIn).toHaveBeenCalledWith("album", 7, ["kim-id"]);
+    const sent = vi.mocked(d.send).mock.calls[0]?.[0] ?? [];
+    expect(sent.map((m) => m.userId)).toEqual(["owner"]);
+  });
+
+  it("tells somebody the replier follows, or who follows them", async () => {
+    // The store answers both directions in one; here Kim is linked either way.
+    const d = deps({
+      peopleNamed: vi.fn(async () => [kim, { id: "lee-id", username: "lee", display_name: null }]),
+      followsEitherWay: vi.fn(async () => new Set(["kim-id"])),
+    });
+    await notifyReply(reply("@kim @lee"), at, d);
+    expect(d.followsEitherWay).toHaveBeenCalledWith("joe-id", ["kim-id", "lee-id"]);
+    // Only the one the follows didn't settle is looked for in the thread.
+    expect(d.repliedIn).toHaveBeenCalledWith("album", 7, ["lee-id"]);
+    const sent = vi.mocked(d.send).mock.calls[0]?.[0] ?? [];
+    expect(sent.map((m) => m.userId)).toEqual(["owner", "kim-id"]);
+  });
+
+  it("tells somebody who has replied in the thread before, though nobody follows anybody", async () => {
+    const d = deps({
+      peopleNamed: vi.fn(async () => [kim]),
+      followsEitherWay: vi.fn(async () => new Set<string>()),
+      repliedIn: vi.fn(async () => new Set(["kim-id"])),
+    });
+    await notifyReply(reply("@kim"), at, d);
+    const sent = vi.mocked(d.send).mock.calls[0]?.[0] ?? [];
+    expect(sent.map((m) => m.userId)).toEqual(["owner", "kim-id"]);
+  });
+
   it("gives a named author the author's push only, and never the replier one", async () => {
     const d = deps({
       peopleNamed: vi.fn(async () => [
@@ -180,6 +220,8 @@ describe("reply pushes", () => {
     expect(sent.map((m) => [m.userId, m.title])).toEqual([
       ["owner", "Jo replied to your review of Blonde"],
     ]);
+    // The author is in the thread already, so there's no connection to look for.
+    expect(d.followsEitherWay).not.toHaveBeenCalled();
   });
 
   it("never pushes your own reply on your own review to you", async () => {
@@ -288,6 +330,22 @@ describe("keeping who a reply names", () => {
     await recordMentions(42, { ...event("@kim @lee"), kind: "take", targetId: 9 }, d);
     expect(d.replyTarget).toHaveBeenCalledWith("take", 9);
     expect(d.saveMentions).toHaveBeenCalledWith(42, ["lee-id"]);
+  });
+
+  it("keeps nobody who has no connection with the replier or the thread", async () => {
+    const d = deps({
+      peopleNamed: vi.fn(async () => [kim, lee]),
+      followsEitherWay: vi.fn(async () => new Set(["lee-id"])),
+      repliedIn: vi.fn(async () => new Set<string>()),
+    });
+    await recordMentions(45, event("@kim @lee"), d);
+    expect(d.saveMentions).toHaveBeenCalledWith(45, ["lee-id"]);
+    const strangers = deps({
+      peopleNamed: vi.fn(async () => [kim]),
+      followsEitherWay: vi.fn(async () => new Set<string>()),
+    });
+    await recordMentions(46, event("@kim"), strangers);
+    expect(strangers.saveMentions).not.toHaveBeenCalled();
   });
 
   it("asks nothing of a reply that names nobody, and keeps nothing when nobody's left", async () => {

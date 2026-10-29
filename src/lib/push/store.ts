@@ -4,6 +4,7 @@ import { MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/ver
 import type { NotificationSettings, PushPlatform } from "@/lib/app-api";
 import type { LoveSubject, Person, ReplySubject } from "@/lib/push/messages";
 import { ALL_ON, type PushKind } from "@/lib/push/who";
+import type { ThreadKind } from "@/lib/replies-shared";
 import { readAll } from "@/lib/supabase/read-all";
 import { USERNAME_PATTERN } from "@/lib/validation";
 
@@ -420,6 +421,62 @@ export async function picksIn(matchupId: number, userIds: string[]): Promise<Set
       .from("versus_votes")
       .select("user_id")
       .eq("matchup_id", matchupId)
+      .in("user_id", chunk);
+    if (error) throw error;
+    return data ?? [];
+  });
+  return new Set(rows.map((row) => row.user_id));
+}
+
+/**
+ * Of these people, who follows somebody or is followed by them: either way
+ * is a connection, for who hears about an @name.
+ */
+export async function followsEitherWay(personId: string, userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const client = db();
+  const [following, followers] = await Promise.all([
+    inChunks(userIds, async (chunk) => {
+      const { data, error } = await client
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", personId)
+        .in("following_id", chunk);
+      if (error) throw error;
+      return (data ?? []).map((row) => row.following_id);
+    }),
+    inChunks(userIds, async (chunk) => {
+      const { data, error } = await client
+        .from("follows")
+        .select("follower_id")
+        .eq("following_id", personId)
+        .in("follower_id", chunk);
+      if (error) throw error;
+      return (data ?? []).map((row) => row.follower_id);
+    }),
+  ]);
+  return new Set([...following, ...followers]);
+}
+
+/** Which column of `replies` points at each kind of thread (migration 0024). */
+const THREAD_COLUMN = {
+  album: "rating_id",
+  artist: "artist_rating_id",
+  take: "versus_take_id",
+} as const satisfies Record<ThreadKind, string>;
+
+/** Of these people, who has replied in this thread. */
+export async function repliedIn(
+  kind: ThreadKind,
+  id: number,
+  userIds: string[],
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await inChunks(userIds, async (chunk) => {
+    const { data, error } = await db()
+      .from("replies")
+      .select("user_id")
+      .eq(THREAD_COLUMN[kind], id)
       .in("user_id", chunk);
     if (error) throw error;
     return data ?? [];
