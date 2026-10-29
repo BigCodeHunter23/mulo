@@ -151,6 +151,7 @@ async function readHead(
   if (error) throw error;
   if (!data) return null;
 
+  // The generated types read the joined matchup as an array-or-object union, which MatchupRow narrows.
   const matchup = toMatchup(data.versus_matchups as unknown as MatchupRow);
   const open = matchup.day >= sydneyDay();
   const theirs = data.user_id === userId;
@@ -203,7 +204,7 @@ async function readReplies(
     if (isMissingTable(error)) return { rows: [], available: false };
     throw error;
   }
-  const newestFirst = (data ?? []) as unknown as ReplyRow[];
+  const newestFirst = (data ?? []) as ReplyRow[];
   return { rows: [...newestFirst].reverse(), available: true };
 }
 

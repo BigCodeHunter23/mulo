@@ -236,6 +236,7 @@ type Read = { data: unknown; error: { code?: string; message: string } | null };
  * A read's rows. A failed one is logged and reads as none, so the rest of the
  * bell still shows; before migration 0024 has run there's nothing to log.
  */
+// The caller names the row shape its select string returns; the client can't infer it from a dynamic select.
 function rowsOf<Row>(result: Read | null): Row[] {
   if (!result) return [];
   if (result.error) {
