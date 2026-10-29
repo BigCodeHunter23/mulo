@@ -22,7 +22,7 @@ import {
 const keys = { key: "KEY", secret: "SECRET" };
 
 const answer = (body: unknown, status = 200) =>
-  vi.fn(async (_input: string, _init?: RequestInit) =>
+  vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(async () =>
     Promise.resolve(new Response(JSON.stringify(body), { status })),
   );
 
