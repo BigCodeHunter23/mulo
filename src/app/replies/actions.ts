@@ -59,6 +59,16 @@ export async function postReply(
   targetId: number,
   body: string,
 ): Promise<ReplyResult> {
+  try {
+    return await post(kind, targetId, body);
+  } catch (error) {
+    // Nothing thrown here may reach the page; say "try again" instead.
+    console.error("[replies] post failed:", error);
+    return { ok: false, error: TRY_AGAIN };
+  }
+}
+
+async function post(kind: ThreadKind, targetId: number, body: string): Promise<ReplyResult> {
   if (!target.safeParse({ kind, targetId }).success || typeof body !== "string") {
     return { ok: false, error: TRY_AGAIN };
   }
@@ -82,6 +92,7 @@ export async function postReply(
     .eq("user_id", user.id)
     .eq(column, targetId);
   if (countError) return { ok: false, error: refusal(countError) };
+  // The count and the insert aren't atomic, so a burst could pass the cap; the rate limit bounds it.
   if ((count ?? 0) >= PER_THREAD_MAX) {
     return { ok: false, error: "That's the most replies you can post here." };
   }
@@ -128,6 +139,15 @@ export async function postReply(
  * alone and said so.
  */
 export async function deleteReply(replyId: number): Promise<SaveResult> {
+  try {
+    return await remove(replyId);
+  } catch (error) {
+    console.error("[replies] delete failed:", error);
+    return { ok: false, error: TRY_AGAIN };
+  }
+}
+
+async function remove(replyId: number): Promise<SaveResult> {
   if (!rowIdSchema.safeParse(replyId).success) return { ok: false, error: TRY_AGAIN };
 
   const user = await getCurrentUser();

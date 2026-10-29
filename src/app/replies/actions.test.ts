@@ -355,3 +355,35 @@ describe("deleteReply", () => {
     expect(await deleteReply(41)).toEqual({ ok: false, error: "Log in first." });
   });
 });
+
+describe("actions never throw to the page", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  const TRY_AGAIN = { ok: false, error: "Couldn't save that. Please try again." };
+
+  it("postReply answers try again when reading the thread throws", async () => {
+    vi.mocked(replyable).mockRejectedValueOnce(new Error("query failed"));
+    expect(await postReply("album", 7, "hi")).toEqual(TRY_AGAIN);
+    expect(console.error).toHaveBeenCalled();
+    expect(inserted()).toEqual([]);
+  });
+
+  it("postReply answers try again when the sign-in check throws", async () => {
+    vi.mocked(allowUser).mockRejectedValueOnce(new Error("down"));
+    expect(await postReply("album", 7, "hi")).toEqual(TRY_AGAIN);
+  });
+
+  it("postReply answers try again when the insert throws", async () => {
+    vi.spyOn(db.admin.client, "from").mockImplementationOnce(() => {
+      throw new Error("no connection");
+    });
+    expect(await postReply("album", 7, "hi")).toEqual(TRY_AGAIN);
+  });
+
+  it("deleteReply answers try again when anything throws", async () => {
+    vi.mocked(allowUser).mockRejectedValueOnce(new Error("down"));
+    expect(await deleteReply(41)).toEqual(TRY_AGAIN);
+    expect(console.error).toHaveBeenCalled();
+  });
+});
