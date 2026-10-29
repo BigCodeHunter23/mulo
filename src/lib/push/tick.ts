@@ -3,7 +3,7 @@ import * as store from "@/lib/push/store";
 import { sendPushes } from "@/lib/push/send";
 import { checkReceipts } from "@/lib/push/receipts";
 import { dropMessage, streakMessage, versusMessage, type PushMessage } from "@/lib/push/messages";
-import { inSlot, isAway, SLOTS, streakDue } from "@/lib/push/who";
+import { inSlot, isAway, SLOTS, streakDue, type PushKind } from "@/lib/push/who";
 import { localClock, zoneOrSydney } from "@/lib/push/zones";
 import { currentDrop } from "@/lib/drop";
 import { getStreak } from "@/lib/streak";
@@ -40,34 +40,67 @@ const real = (): TickDeps => ({
   pruneLog: store.pruneLog,
 });
 
-export type TickReport = { due: number; sent: number; receipts: number };
+export type TickReport = { due: number; sent: number; receipts: number; errors: number };
+
+/** The streak checks stop starting after this long, and finish on the next run. */
+const BUDGET_MS = 40_000;
+
+/** How many streak checks run at once. */
+const STREAK_CONCURRENCY = 5;
 
 type Candidate = store.Candidate;
+
+/** People grouped by their own local day, which is what a timed push is keyed by. */
+function byLocalDay(people: Candidate[], at: Date): Map<string, Candidate[]> {
+  const days = new Map<string, Candidate[]>();
+  for (const p of people) {
+    const { day } = localClock(at, zoneOrSydney(p.timeZone));
+    const group = days.get(day);
+    if (group) group.push(p);
+    else days.set(day, [p]);
+  }
+  return days;
+}
+
+/** The people not yet sent `kind` for their own day, with that day. */
+async function notLogged(
+  kind: PushKind,
+  people: Candidate[],
+  at: Date,
+  deps: TickDeps,
+): Promise<{ person: Candidate; day: string }[]> {
+  const due: { person: Candidate; day: string }[] = [];
+  for (const [day, group] of byLocalDay(people, at)) {
+    const logged = await deps.loggedAlready(
+      kind,
+      day,
+      group.map((p) => p.userId),
+    );
+    for (const person of group) if (!logged.has(person.userId)) due.push({ person, day });
+  }
+  return due;
+}
 
 async function versusPushes(people: Candidate[], at: Date, deps: TickDeps): Promise<PushMessage[]> {
   const today = await deps.todaysMatchup();
   if (!today) return [];
-  const day = sydneyDay(at);
-  const logged = await deps.loggedAlready(
-    "versus",
-    day,
-    people.map((p) => p.userId),
-  );
-  const due = people.filter((p) => !logged.has(p.userId));
+  // Each person's key is their own local day, so a window that spans Sydney's
+  // midnight can't send twice. The matchup is still Sydney's today.
+  const due = await notLogged("versus", people, at, deps);
   if (due.length === 0) return [];
 
-  const yesterday = await deps.matchupForDay(shiftDay(day, -1));
+  const yesterday = await deps.matchupForDay(shiftDay(sydneyDay(at), -1));
   const picked = yesterday
     ? await deps.picksIn(
         yesterday.id,
-        due.map((p) => p.userId),
+        due.map((d) => d.person.userId),
       )
     : new Set<string>();
   const tally = yesterday && picked.size > 0 ? await deps.countPicks(yesterday.id) : null;
 
-  return due.map((p) => {
+  return due.map(({ person, day }) => {
     const result =
-      yesterday && tally && picked.has(p.userId) && tally.left + tally.right > 0
+      yesterday && tally && picked.has(person.userId) && tally.left + tally.right > 0
         ? {
             title: yesterday.title,
             winner:
@@ -80,7 +113,7 @@ async function versusPushes(people: Candidate[], at: Date, deps: TickDeps): Prom
             right: tally.right,
           }
         : undefined;
-    return { userId: p.userId, kind: "versus", key: day, ...versusMessage(today, result) };
+    return { userId: person.userId, kind: "versus", key: day, ...versusMessage(today, result) };
   });
 }
 
@@ -97,43 +130,78 @@ async function dropPushes(people: Candidate[], at: Date, deps: TickDeps): Promis
     .map((p) => ({ userId: p.userId, kind: "drop", key, ...dropMessage() }));
 }
 
-async function streakPushes(people: Candidate[], at: Date, deps: TickDeps): Promise<PushMessage[]> {
-  // Each person's key is their own local day, so group them by it.
-  const byDay = new Map<string, Candidate[]>();
-  for (const p of people) {
-    const { day } = localClock(at, zoneOrSydney(p.timeZone));
-    byDay.set(day, [...(byDay.get(day) ?? []), p]);
-  }
+/** Runs `work` over `items`, at most `limit` at once, none started after `deadline`. */
+async function paced<T>(
+  items: T[],
+  limit: number,
+  deadline: number,
+  work: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length && Date.now() < deadline) {
+      const item = items[next++] as T;
+      await work(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
 
+async function streakPushes(
+  people: Candidate[],
+  at: Date,
+  deps: TickDeps,
+  deadline: number,
+  failed: () => void,
+): Promise<PushMessage[]> {
   const messages: PushMessage[] = [];
-  for (const [day, group] of byDay) {
-    const logged = await deps.loggedAlready(
-      "streak",
-      day,
-      group.map((p) => p.userId),
-    );
-    for (const p of group) {
-      if (logged.has(p.userId)) continue;
-      const streak = await deps.streakOf(p.userId, zoneOrSydney(p.timeZone));
+  const due = await notLogged("streak", people, at, deps);
+  await paced(due, STREAK_CONCURRENCY, deadline, async ({ person, day }) => {
+    try {
+      const streak = await deps.streakOf(person.userId, zoneOrSydney(person.timeZone));
       if (streakDue(streak)) {
         messages.push({
-          userId: p.userId,
+          userId: person.userId,
           kind: "streak",
           key: day,
           ...streakMessage(streak.days),
         });
       }
+    } catch (error) {
+      failed();
+      console.error("[push] a streak check failed:", error);
     }
-  }
+  });
   return messages;
 }
 
 /**
  * One run of the clock, every 15 minutes: the timed pushes due where each
- * person is, then Expo's receipts and a tidy of the log.
+ * person is, then Expo's receipts and a tidy of the log. A failure in one step
+ * is logged and counted, and the rest carry on.
  */
-export async function runTick(at = new Date(), deps: TickDeps = real()): Promise<TickReport> {
-  const awake = (await deps.candidates()).filter((p) => !isAway(p.lastSeenAt, at));
+export async function runTick(
+  at = new Date(),
+  deps: TickDeps = real(),
+  options: { deadline?: number } = {},
+): Promise<TickReport> {
+  const deadline = options.deadline ?? Date.now() + BUDGET_MS;
+  let errors = 0;
+  const attempt = async <T>(what: string, run: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await run();
+    } catch (error) {
+      errors += 1;
+      console.error(`[push] ${what} failed:`, error);
+      return fallback;
+    }
+  };
+
+  const awake = await attempt(
+    "candidates",
+    async () => (await deps.candidates()).filter((p) => !isAway(p.lastSeenAt, at)),
+    [] as Candidate[],
+  );
   const due = (slot: number, on: (p: Candidate) => boolean) =>
     awake.filter((p) => on(p) && inSlot(at, zoneOrSydney(p.timeZone), slot));
 
@@ -142,13 +210,24 @@ export async function runTick(at = new Date(), deps: TickDeps = real()): Promise
   const streak = due(SLOTS.streak, (p) => p.settings.streak);
 
   const messages = [
-    ...(versus.length ? await versusPushes(versus, at, deps) : []),
-    ...(drop.length ? await dropPushes(drop, at, deps) : []),
-    ...(streak.length ? await streakPushes(streak, at, deps) : []),
+    ...(versus.length
+      ? await attempt("versus pushes", () => versusPushes(versus, at, deps), [])
+      : []),
+    ...(drop.length ? await attempt("drop pushes", () => dropPushes(drop, at, deps), []) : []),
+    ...(streak.length
+      ? await attempt(
+          "streak pushes",
+          () =>
+            streakPushes(streak, at, deps, deadline, () => {
+              errors += 1;
+            }),
+          [],
+        )
+      : []),
   ];
 
-  const sent = await deps.send(messages);
-  const receipts = await deps.checkReceipts(at);
-  await deps.pruneLog(at);
-  return { due: messages.length, sent, receipts };
+  const sent = await attempt("sending", () => deps.send(messages), 0);
+  const receipts = await attempt("receipts", () => deps.checkReceipts(at), 0);
+  await attempt("pruning", () => deps.pruneLog(at), undefined);
+  return { due: messages.length, sent, receipts, errors };
 }

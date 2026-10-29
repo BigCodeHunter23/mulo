@@ -7,8 +7,10 @@ vi.mock("@/lib/push/store", () => ({}));
 vi.mock("@/lib/push/send", () => ({}));
 vi.mock("@/lib/push/receipts", () => ({}));
 vi.mock("@/lib/versus", () => ({
-  sydneyDay: () => "2026-10-29",
-  shiftDay: (day: string, n: number) => (n === -1 ? "2026-10-28" : day),
+  sydneyDay: (at: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(at),
+  shiftDay: (day: string, n: number) =>
+    new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10),
 }));
 vi.mock("@/lib/drop", () => ({
   currentDrop: () => ({
@@ -71,7 +73,7 @@ const NOON = new Date("2026-10-29T01:05:00Z");
 const SEVEN = new Date("2026-10-29T08:05:00Z");
 
 describe("the clock", () => {
-  it("sends today's Versus at 9am, keyed by the Sydney day", async () => {
+  it("sends today's Versus at 9am, keyed by the person's own day", async () => {
     const d = deps();
     await runTick(NINE, d);
     expect(d.sent).toEqual([
@@ -142,5 +144,138 @@ describe("the clock", () => {
     await runTick(NINE, d);
     expect(d.checkReceipts).toHaveBeenCalled();
     expect(d.pruneLog).toHaveBeenCalled();
+  });
+
+  it("leaves out a London person in the Sydney 9am window, and sends in their own", async () => {
+    const london = (userId: string) => sydney(userId, { timeZone: "Europe/London" });
+    const d = deps({ candidates: vi.fn(async () => [london("l")]) });
+    await runTick(NINE, d);
+    expect(d.sent).toEqual([]);
+    // 09:05 on 29 Oct in London (GMT since 25 Oct).
+    await runTick(new Date("2026-10-29T09:05:00Z"), d);
+    expect(d.sent).toEqual([
+      expect.objectContaining({ userId: "l", kind: "versus", key: "2026-10-29" }),
+    ]);
+  });
+
+  it("gives the plain Versus wording to someone who didn't pick yesterday", async () => {
+    const d = deps({ picksIn: vi.fn(async () => new Set(["someone-else"])) });
+    await runTick(NINE, d);
+    expect(d.sent[0]?.title).toBe("Today's Versus: Under Pressure.");
+  });
+
+  it("calls a tied Versus level", async () => {
+    const d = deps({
+      picksIn: vi.fn(async () => new Set(["a"])),
+      countPicks: vi.fn(async () => ({ left: 5, right: 5 })),
+    });
+    await runTick(NINE, d);
+    expect(d.sent[0]?.title).toBe("King of New York finished level, 50–50.");
+  });
+
+  it("sends nothing for a streak of 1", async () => {
+    const d = deps({ streakOf: vi.fn(async () => ({ days: 1, today: false, best: 1 })) });
+    await runTick(SEVEN, d);
+    expect(d.sent).toEqual([]);
+  });
+
+  it("sends Versus once for a window that spans Sydney's midnight", async () => {
+    const keys = new Set<string>();
+    const d = deps({
+      candidates: vi.fn(async () => [sydney("n", { timeZone: "America/St_Johns" })]),
+      loggedAlready: vi.fn(async (kind: string, key: string) =>
+        keys.has(`${kind}:${key}`) ? new Set(["n"]) : new Set<string>(),
+      ),
+      send: vi.fn(async (messages: PushMessage[]) => {
+        for (const m of messages) keys.add(`${m.kind}:${m.key}`);
+        return messages.length;
+      }),
+    });
+    // 09:20 and 09:35 in St John's (UTC-3:30), either side of Sydney's midnight (13:00 UTC).
+    await runTick(new Date("2026-11-05T12:50:00Z"), d);
+    await runTick(new Date("2026-11-05T13:05:00Z"), d);
+    expect(d.send).toHaveBeenNthCalledWith(1, [expect.objectContaining({ key: "2026-11-05" })]);
+    expect(d.send).toHaveBeenNthCalledWith(2, []);
+  });
+});
+
+describe("a run that goes wrong", () => {
+  it("still sends Versus, checks receipts and prunes when a streak check throws", async () => {
+    const d = deps({ streakOf: vi.fn(async () => Promise.reject(new Error("db down"))) });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const versus = await runTick(NINE, d);
+    expect(versus.errors).toBe(0);
+    const report = await runTick(SEVEN, d);
+    expect(report.errors).toBe(1);
+    expect(d.checkReceipts).toHaveBeenCalledTimes(2);
+    expect(d.pruneLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the Versus push when the streak step fails in the same run", async () => {
+    // Both slots at once: a person whose Versus and streak windows can't coincide, so two people.
+    const d = deps({
+      candidates: vi.fn(async () => [sydney("a"), sydney("z", { timeZone: "Pacific/Auckland" })]),
+      streakOf: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+      loggedAlready: vi.fn(async (kind: string) => {
+        if (kind === "streak") throw new Error("log down");
+        return new Set<string>();
+      }),
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // 09:05 Sydney; Auckland is 11:05 then, so only a is due.
+    const report = await runTick(NINE, d);
+    expect(d.sent).toHaveLength(1);
+    expect(report.sent).toBe(1);
+  });
+
+  it("still runs receipts and prune when candidates throws", async () => {
+    const d = deps({
+      candidates: vi.fn(async () => {
+        throw new Error("no db");
+      }),
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const report = await runTick(NINE, d);
+    expect(report).toEqual({ due: 0, sent: 0, receipts: 0, errors: 1 });
+    expect(d.checkReceipts).toHaveBeenCalled();
+    expect(d.pruneLog).toHaveBeenCalled();
+  });
+
+  it("counts a failed send and a failed prune", async () => {
+    const d = deps({
+      send: vi.fn(async () => Promise.reject(new Error("expo down"))),
+      pruneLog: vi.fn(async () => Promise.reject(new Error("prune"))),
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const report = await runTick(NINE, d);
+    expect(report.errors).toBe(2);
+    expect(d.checkReceipts).toHaveBeenCalled();
+  });
+
+  it("starts no streak checks once the deadline has passed", async () => {
+    const d = deps();
+    const report = await runTick(SEVEN, d, { deadline: 0 });
+    expect(d.streakOf).not.toHaveBeenCalled();
+    expect(report.errors).toBe(0);
+  });
+
+  it("runs at most five streak checks at once", async () => {
+    let running = 0;
+    let peak = 0;
+    const d = deps({
+      candidates: vi.fn(async () => Array.from({ length: 12 }, (_, i) => sydney(`u${i}`))),
+      streakOf: vi.fn(async () => {
+        running += 1;
+        peak = Math.max(peak, running);
+        await new Promise((r) => setTimeout(r, 1));
+        running -= 1;
+        return { days: 5, today: false, best: 5 };
+      }),
+    });
+    await runTick(SEVEN, d);
+    expect(peak).toBe(5);
+    expect(d.sent).toHaveLength(12);
   });
 });

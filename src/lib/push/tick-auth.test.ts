@@ -16,4 +16,13 @@ describe("the clock's secret", () => {
     expect(tickAllowed("Bearer short", "short")).toBe(false);
     expect(tickAllowed("Bearer x", undefined)).toBe(false);
   });
+
+  it("accepts a secret of exactly 32 characters", () => {
+    const secret = "k".repeat(32);
+    expect(tickAllowed(`Bearer ${secret}`, secret)).toBe(true);
+  });
+
+  it("refuses a lowercase bearer prefix", () => {
+    expect(tickAllowed(`bearer ${SECRET}`, SECRET)).toBe(false);
+  });
 });
