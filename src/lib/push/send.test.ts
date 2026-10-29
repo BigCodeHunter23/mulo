@@ -70,6 +70,42 @@ describe("sendPushes", () => {
     expect(d.dropTokens).toHaveBeenCalledWith(["T-a"]);
   });
 
+  it("keeps the ok phone's ticket and drops the other for one person with two phones", async () => {
+    const d = deps({
+      devicesOf: vi.fn(async () => [
+        { token: "P1", user_id: "a" },
+        { token: "P2", user_id: "a" },
+      ]),
+      postToExpo: vi.fn(async () => [
+        { status: "ok" as const, id: "id0" },
+        { status: "error" as const, details: { error: "DeviceNotRegistered" } },
+      ]),
+    });
+    expect(await sendPushes([msg("a")], d)).toBe(2);
+    expect(d.saveTickets).toHaveBeenCalledTimes(1);
+    expect(d.saveTickets).toHaveBeenCalledWith({ userId: "a", kind: "follow", key: "k-a" }, [
+      { id: "id0", token: "P1" },
+    ]);
+    expect(d.dropTokens).toHaveBeenCalledWith(["P2"]);
+  });
+
+  it("saves and drops nothing for a ticket from a refused batch", async () => {
+    const d = deps({
+      postToExpo: vi.fn(async () => [undefined]) as unknown as SendDeps["postToExpo"],
+    });
+    await sendPushes([msg("a")], d);
+    expect(d.saveTickets).not.toHaveBeenCalled();
+    expect(d.dropTokens).toHaveBeenCalledWith([]);
+  });
+
+  it("passes the body when there is one and leaves it out when there isn't", async () => {
+    const d = deps();
+    await sendPushes([{ ...msg("a"), body: "Nice taste" }, msg("b")], d);
+    const [sent] = vi.mocked(d.postToExpo).mock.calls[0]!;
+    expect(sent[0]).toMatchObject({ body: "Nice taste" });
+    expect(sent[1]).not.toHaveProperty("body");
+  });
+
   it("never throws", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const d = deps({

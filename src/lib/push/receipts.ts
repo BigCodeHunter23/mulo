@@ -36,8 +36,13 @@ export async function checkReceipts(at = new Date(), deps: ReceiptDeps = real())
         console.error("[push] a push wasn't delivered:", receipt.details?.error ?? receipt.message);
     }
 
+    // Expo answers only receipts that are ready, so an entry is done only
+    // once all its tickets are; the rest wait for the next run (the window
+    // in `uncheckedTickets` lets them age out).
+    const complete = entries.filter((e) => e.tickets.every((t) => t.id in receipts));
+
     await deps.dropTokens([...dead]);
-    await deps.markChecked(entries);
+    if (complete.length > 0) await deps.markChecked(complete);
     return tickets.length;
   } catch (error) {
     console.error("[push] checking receipts failed:", error);

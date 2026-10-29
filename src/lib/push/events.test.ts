@@ -41,6 +41,14 @@ describe("pushes from what people do", () => {
     expect(d.send).not.toHaveBeenCalled();
   });
 
+  it("asks about blocks between the right two people", async () => {
+    const d = deps();
+    await notifyFollow("sam-id", "jo-id", at, d);
+    expect(d.blockedEitherWay).toHaveBeenCalledWith("jo-id", "sam-id");
+    await notifyLove("album", 7, "sam-id", at, d);
+    expect(d.blockedEitherWay).toHaveBeenCalledWith("owner", "sam-id");
+  });
+
   it("tells the owner about a love, once an hour per rating", async () => {
     const d = deps();
     await notifyLove("album", 7, "sam-id", at, d);
@@ -65,6 +73,8 @@ describe("pushes from what people do", () => {
     await notifyLove("artist", 1, "sam-id", at, d);
     await notifyLove("pick", 1, "sam-id", at, d);
     expect(d.send).not.toHaveBeenCalled();
+    expect(d.loveTarget).toHaveBeenCalledTimes(1);
+    expect(d.loveTarget).not.toHaveBeenCalledWith("pick", 1);
   });
 
   it("never throws", async () => {

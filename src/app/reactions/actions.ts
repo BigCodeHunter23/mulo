@@ -56,8 +56,9 @@ export async function setReaction(
     row[column] = ratingId;
     const { error } = await supabase.from("reactions").insert(row);
     if (error) return TRY_AGAIN;
-    // Only a love tells the owner; a nah stays between you and the bell.
-    if (value === 1) later(() => notifyLove(kind, ratingId, user.id));
+    // Only a love tells the owner, and a Versus pick has no owner to tell;
+    // a nah stays between you and the bell.
+    if (value === 1 && kind !== "pick") later(() => notifyLove(kind, ratingId, user.id));
   }
 
   return { ok: true };

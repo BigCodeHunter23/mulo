@@ -30,6 +30,51 @@ describe("checkReceipts", () => {
     expect(d.markChecked).toHaveBeenCalledWith([entry]);
   });
 
+  it("leaves an entry unchecked while one of its receipts isn't ready", async () => {
+    const waiting = { ...entry, key: "w", tickets: [{ id: "t3", token: "T3" }] };
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [entry, waiting]),
+      fetchReceipts: vi.fn(async () => ({
+        t1: { status: "ok" as const },
+        t2: { status: "ok" as const },
+      })),
+      dropTokens: vi.fn(async () => {}),
+      markChecked: vi.fn(async () => {}),
+    };
+    await checkReceipts(new Date(), d);
+    expect(d.markChecked).toHaveBeenCalledWith([entry]);
+  });
+
+  it("logs another error and keeps the phone", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [entry]),
+      fetchReceipts: vi.fn(async () => ({
+        t1: { status: "ok" as const },
+        t2: { status: "error" as const, details: { error: "MessageRateExceeded" } },
+      })),
+      dropTokens: vi.fn(async () => {}),
+      markChecked: vi.fn(async () => {}),
+    };
+    await checkReceipts(new Date(), d);
+    expect(log).toHaveBeenCalled();
+    expect(d.dropTokens).toHaveBeenCalledWith([]);
+    expect(d.markChecked).toHaveBeenCalledWith([entry]);
+  });
+
+  it("marks an entry that has no tickets", async () => {
+    const empty = { ...entry, tickets: [] };
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [empty]),
+      fetchReceipts: vi.fn(),
+      dropTokens: vi.fn(async () => {}),
+      markChecked: vi.fn(async () => {}),
+    };
+    await checkReceipts(new Date(), d);
+    expect(d.fetchReceipts).not.toHaveBeenCalled();
+    expect(d.markChecked).toHaveBeenCalledWith([empty]);
+  });
+
   it("does nothing when there's nothing to check", async () => {
     const d: ReceiptDeps = {
       uncheckedTickets: vi.fn(async () => []),

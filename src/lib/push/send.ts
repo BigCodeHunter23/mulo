@@ -37,6 +37,9 @@ export async function sendPushes(
     const wanted = messages.filter((m) => wants(switches.get(m.userId) ?? ALL_ON, m.kind));
     if (wanted.length === 0) return 0;
 
+    // Delivery is at most once, on purpose: a message is claimed before it is
+    // sent, so a crash in between never sends it twice. The cost is that a
+    // person with no phones yet uses up that push.
     const claimed = await deps.claimPushes(wanted);
     const fresh = wanted.filter((m) => claimed.has(store.logKey(m)));
     if (fresh.length === 0) return 0;
