@@ -40,6 +40,7 @@ export const POST = appRoute(async (request: NextRequest) => {
 export const DELETE = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  if (!(await allowUser("write", user.id))) throw new RateLimitedError("write");
   const body = await readBody(request, removeBody);
   if (body instanceof Response) return body;
 
