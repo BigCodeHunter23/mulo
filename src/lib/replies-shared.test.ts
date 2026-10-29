@@ -8,6 +8,7 @@ import {
   replyCountText,
   splitMentions,
   THREAD_GONE,
+  THREAD_MAX,
   threadHref,
   withoutFormatting,
 } from "@/lib/replies-shared";
@@ -86,6 +87,7 @@ describe("the rest", () => {
     expect(REPLY_LIMIT).toBe(1000);
     expect(COUNT_FROM).toBe(900);
     expect(THREAD_GONE).toBe("This review has gone.");
+    expect(THREAD_MAX).toBe(500);
   });
 });
 

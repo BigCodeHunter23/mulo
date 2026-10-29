@@ -14,6 +14,9 @@ export const REPLY_LIMIT = 1000;
 /** The reply box counts down from this many characters. */
 export const COUNT_FROM = 900;
 
+/** A thread shows this many replies at most, the newest, oldest first. */
+export const THREAD_MAX = 500;
+
 /**
  * Unicode's format characters (direction overrides and isolates, zero-width
  * spaces, soft hyphens), except the zero-width joiner and non-joiner, which

@@ -156,8 +156,9 @@ describe("getThread", () => {
   it("answers the review, its replies oldest first, and what the owner may do", async () => {
     db.user = { id: "owner", email: null };
     db.fake.answer("ratings", { data: albumRow(), error: null });
+    // Read newest first, so the newest 500 are the ones kept.
     db.fake.answer("replies", {
-      data: [replyRow(1), replyRow(2, SAM, "@Joe thanks")],
+      data: [replyRow(2, SAM, "@Joe thanks"), replyRow(1)],
       error: null,
     });
     db.fake.answer("profiles", { data: [{ id: "jo", username: "Joe" }], error: null });
@@ -184,17 +185,34 @@ describe("getThread", () => {
       method: "eq",
       args: ["rating_id", 7],
     });
-    expect(db.fake.callsOn("replies")).toContainEqual({
-      table: "replies",
-      method: "order",
-      args: ["created_at", { ascending: true }],
-    });
+    expect(db.fake.callsOn("replies")).toEqual(
+      expect.arrayContaining([
+        { table: "replies", method: "order", args: ["created_at", { ascending: false }] },
+        { table: "replies", method: "order", args: ["id", { ascending: false }] },
+        { table: "replies", method: "limit", args: [500] },
+      ]),
+    );
+  });
+
+  it("looks up at most 100 different names a page, all at once", async () => {
+    // 24 replies naming five different people each: 120 names.
+    const rows = Array.from({ length: 24 }, (_, i) =>
+      replyRow(i + 1, JO, [1, 2, 3, 4, 5].map((n) => `@name${i * 5 + n}`).join(" ")),
+    );
+    db.fake.answer("ratings", { data: albumRow(), error: null });
+    db.fake.answer("replies", { data: rows, error: null });
+    await open("album", 7);
+    const asked = db.fake
+      .callsOn("profiles")
+      .filter((call) => call.method === "or")
+      .map((call) => String(call.args[0]).split(",").length);
+    expect(asked).toEqual([50, 50]);
   });
 
   it("lets somebody else delete only their own replies", async () => {
     db.user = { id: "jo", email: null };
     db.fake.answer("ratings", { data: albumRow(), error: null });
-    db.fake.answer("replies", { data: [replyRow(1), replyRow(2, SAM)], error: null });
+    db.fake.answer("replies", { data: [replyRow(2, SAM), replyRow(1)], error: null });
     const page = await open("album", 7);
     expect(page.replies.map((r) => r.canDelete)).toEqual([true, false]);
   });

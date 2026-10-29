@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ThreadHead, ThreadPage } from "@/lib/app-api";
 import { artistPhotoSrc, coverSrc } from "@/lib/cover-url";
-import { THREAD_GONE } from "@/lib/replies-shared";
+import { THREAD_GONE, THREAD_MAX } from "@/lib/replies-shared";
 import Avatar from "@/components/Avatar";
 import LoginLink from "@/components/LoginLink";
 import Reactions from "@/components/Reactions";
@@ -132,12 +132,19 @@ export default function Thread({ page, signedIn }: { page: Open; signedIn: boole
         ) : !page.available ? (
           <p className="text-sm text-text-muted">Replies aren&rsquo;t available yet.</p>
         ) : (
-          <ThreadReplies
-            kind={head.kind}
-            targetId={head.kind === "take" ? head.take.id : head.ratingId}
-            initial={page.replies}
-            canReply={page.canReply}
-          />
+          <>
+            {page.replies.length >= THREAD_MAX && (
+              <p className="mb-4 text-xs text-text-muted">
+                Showing the latest {THREAD_MAX} replies.
+              </p>
+            )}
+            <ThreadReplies
+              kind={head.kind}
+              targetId={head.kind === "take" ? head.take.id : head.ratingId}
+              initial={page.replies}
+              canReply={page.canReply}
+            />
+          </>
         )}
       </section>
     </main>

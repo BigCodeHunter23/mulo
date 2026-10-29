@@ -3,7 +3,7 @@ import { cache } from "react";
 import type { Person, Reply, ThreadHead, ThreadPage } from "@/lib/app-api";
 import { hiddenPeople } from "@/lib/blocks";
 import { getReactions, NO_REACTIONS } from "@/lib/reactions";
-import { parseMentions, type ThreadKind } from "@/lib/replies-shared";
+import { parseMentions, THREAD_MAX, type ThreadKind } from "@/lib/replies-shared";
 import { isMissingFunction, isMissingTable, logQueryError } from "@/lib/supabase/errors";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
@@ -39,8 +39,8 @@ const CHUNK = 100;
 /** Names asked about in one `or()`, to keep the address short. */
 const NAMES_CHUNK = 50;
 
-/** The most replies a thread shows, from the oldest. */
-const THREAD_MAX = 500;
+/** The most different @names looked up for one page. */
+const NAMES_MAX = 100;
 
 const PERSON = "profiles!inner ( id, username, display_name, avatar_url )";
 
@@ -183,7 +183,10 @@ async function readHead(
 
 type ReplyRow = { id: number; body: string; created_at: string; user_id: string; profiles: Person };
 
-/** A thread's replies, oldest first; `available` is false before migration 0024. */
+/**
+ * A thread's newest replies, up to `THREAD_MAX`, oldest first, so a new reply
+ * is never left off a long thread; `available` is false before migration 0024.
+ */
 async function readReplies(
   supabase: Supabase,
   kind: ThreadKind,
@@ -193,40 +196,47 @@ async function readReplies(
     .from("replies")
     .select(`id, body, created_at, user_id, ${PERSON}`)
     .eq(REPLY_COLUMNS[kind], id)
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(THREAD_MAX);
   if (error) {
     if (isMissingTable(error)) return { rows: [], available: false };
     throw error;
   }
-  return { rows: (data ?? []) as unknown as ReplyRow[], available: true };
+  const newestFirst = (data ?? []) as unknown as ReplyRow[];
+  return { rows: [...newestFirst].reverse(), available: true };
 }
 
 /**
  * The real, visible people some replies name, by lower-cased name, each
- * with their own username. `ilike` reads "_" as any one character, so only
- * exact names are kept.
+ * with their own username: the first `NAMES_MAX` different names, asked
+ * about together. `ilike` reads "_" as any one character, so only exact
+ * names are kept.
  */
 async function realNames(
   supabase: Supabase,
   bodies: string[],
   hidden: Set<string>,
 ): Promise<Map<string, string>> {
-  const wanted = [...new Set(bodies.flatMap((body) => parseMentions(body)))];
-  const found = new Map<string, string>();
+  const wanted = [...new Set(bodies.flatMap((body) => parseMentions(body)))].slice(0, NAMES_MAX);
+  const chunks: string[][] = [];
   for (let i = 0; i < wanted.length; i += NAMES_CHUNK) {
-    const chunk = wanted.slice(i, i + NAMES_CHUNK);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, username")
-      // "_" escaped, so "@a_c" can't match "abc" and crowd out real names.
-      .or(chunk.map((name) => `username.ilike.${name.replace(/_/g, "\\_")}`).join(","));
-    if (error) {
-      logQueryError("replies", error);
-      break;
-    }
-    for (const row of data ?? []) {
+    chunks.push(wanted.slice(i, i + NAMES_CHUNK));
+  }
+  const answers = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username")
+        // "_" escaped, so "@a_c" can't match "abc" and crowd out real names.
+        .or(chunk.map((name) => `username.ilike.${name.replace(/_/g, "\\_")}`).join(","));
+      if (error) logQueryError("replies", error);
+      return { chunk, rows: data ?? [] };
+    }),
+  );
+  const found = new Map<string, string>();
+  for (const { chunk, rows } of answers) {
+    for (const row of rows) {
       const name = row.username.toLowerCase();
       if (chunk.includes(name) && !hidden.has(row.id)) found.set(name, row.username);
     }
