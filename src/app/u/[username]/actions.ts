@@ -6,6 +6,8 @@ import { userIdSchema, usernameSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 import { logQueryError } from "@/lib/supabase/errors";
 import type { FollowResult } from "@/lib/app-api";
+import { notifyFollow } from "@/lib/push/events";
+import { later } from "@/lib/push/later";
 import type { ReportReason } from "@/lib/report-reasons";
 
 export type { FollowResult };
@@ -43,6 +45,9 @@ export async function setFollowing(
   if (error && error.code !== "23505") {
     return { ok: false, error: "Couldn't update that. Please try again." };
   }
+
+  // A first follow tells them; a repeat (23505) or an unfollow does not.
+  if (follow && !error) later(() => notifyFollow(user.id, targetId));
 
   // The username only says which page to refresh; never trust it for more.
   if (usernameSchema.safeParse(username).success) revalidatePath(`/u/${username}`);

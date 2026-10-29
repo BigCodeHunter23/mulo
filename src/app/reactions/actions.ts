@@ -5,6 +5,8 @@ import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import type { TablesInsert } from "@/lib/supabase/database.types";
 import { REACTION_COLUMNS, type ReactionKind } from "@/lib/reactions";
 import { rowIdSchema } from "@/lib/validation";
+import { notifyLove } from "@/lib/push/events";
+import { later } from "@/lib/push/later";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
 
 export type ReactionResult = { ok: true } | { ok: false; error: string };
@@ -54,6 +56,8 @@ export async function setReaction(
     row[column] = ratingId;
     const { error } = await supabase.from("reactions").insert(row);
     if (error) return TRY_AGAIN;
+    // Only a love tells the owner; a nah stays between you and the bell.
+    if (value === 1) later(() => notifyLove(kind, ratingId, user.id));
   }
 
   return { ok: true };
