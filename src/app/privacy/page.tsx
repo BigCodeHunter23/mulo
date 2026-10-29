@@ -55,6 +55,17 @@ export default function PrivacyPage() {
               you report.
             </>,
             <>
+              <strong className="text-text">If you turn on notifications in the app:</strong> the
+              address Expo gives your phone so a notification can reach it, whether it&rsquo;s an
+              iPhone or Android, which notifications you&rsquo;ve switched off, and a log of what
+              was sent for a month, so nothing arrives twice.
+            </>,
+            <>
+              <strong className="text-text">Your time zone and when you were last here</strong>, so
+              streaks and reminders run on your own clock and stop if you&rsquo;ve been away a
+              while. Nobody else can see either.
+            </>,
+            <>
               <strong className="text-text">A little technical housekeeping:</strong> your network
               address for a short while, so nobody can hammer the site with thousands of requests,
               and ordinary server logs.
@@ -132,6 +143,11 @@ export default function PrivacyPage() {
               it for them, so it sees the phone&rsquo;s network address and the app&rsquo;s version,
               never your account.
             </>,
+            <>
+              <strong className="text-text">Expo, then Apple or Google</strong> carry notifications,
+              if you turn them on: they get your phone&rsquo;s notification address and the words of
+              each one (a name, a record&rsquo;s title), to show it on your phone.
+            </>,
           ]}
         />
         <p>
@@ -152,7 +168,8 @@ export default function PrivacyPage() {
           items={[
             <>
               <strong className="text-text">Download my data</strong> hands you a file with
-              everything you&rsquo;ve put in — every score, review, list and follow.
+              everything you&rsquo;ve put in — every score, review, list and follow — and your
+              notification settings.
             </>,
             <>
               <strong className="text-text">Deleting your account</strong> removes your profile and
