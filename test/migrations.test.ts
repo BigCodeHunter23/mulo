@@ -691,6 +691,21 @@ describe("0024 replies", () => {
        values ('${U(1)}', ${reply?.id ?? 0}, '${U(4)}', 'Spam or advertising')`,
     );
   });
+
+  it("has room in a report for the reply's words beside the reporter's own", async () => {
+    const [reply] = await replyAs(U(4), "artist_rating_id", artistReview, "Report me too.");
+    // The reporter's 500 characters, a blank line, "Reply: " and the reply's 1,000.
+    await db.exec(
+      `insert into public.reports (reporter_id, reported_reply_id, reason, detail)
+       values ('${U(1)}', ${reply?.id ?? 0}, 'Spam or advertising',
+               repeat('d', 500) || E'\\n\\nReply: ' || repeat('r', 1000))`,
+    );
+    await refuses(
+      db,
+      `insert into public.reports (reporter_id, reported_profile_id, reason, detail)
+       values ('${U(1)}', '${U(4)}', 'Spam or advertising', repeat('x', 1601))`,
+    );
+  });
 });
 
 describe("0024 reply mentions", () => {

@@ -31,6 +31,34 @@ const reportInput = z
     "Couldn't send that report. Please try again.",
   );
 
+const NOT_SENT = "Couldn't send that report. Please try again.";
+
+/** How much of a reported reply is kept with the report. */
+const REPLY_KEPT = 1000;
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * What a report of a reply says: the reporter's own words, then "Reply: "
+ * and the reply's first 1,000 characters, so the report carries the words
+ * it's about. Read through the reporter's own session, so a reply hidden
+ * from them (or gone) can't be reported: null.
+ */
+async function withReply(
+  supabase: Supabase,
+  replyId: number,
+  detail: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("replies")
+    .select("body")
+    .eq("id", replyId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const words = `Reply: ${Array.from(data.body).slice(0, REPLY_KEPT).join("")}`;
+  return detail ? `${detail}\n\n${words}` : words;
+}
+
 export async function submitReport(_prev: ReportState, formData: FormData): Promise<ReportState> {
   const user = await getCurrentUser();
   if (!user) return { error: "Log in to report something." };
@@ -50,6 +78,12 @@ export async function submitReport(_prev: ReportState, formData: FormData): Prom
   const report = input.data;
 
   const supabase = await createClient();
+  let detail = report.detail || null;
+  if (report.reply_id) {
+    detail = await withReply(supabase, report.reply_id, report.detail);
+    if (detail === null) return { error: NOT_SENT };
+  }
+
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
     reported_rating_id: report.rating_id ?? null,
@@ -61,7 +95,7 @@ export async function submitReport(_prev: ReportState, formData: FormData): Prom
     ...(report.list_id ? { reported_list_id: report.list_id } : {}),
     ...(report.reply_id ? { reported_reply_id: report.reply_id } : {}),
     reason: report.reason,
-    detail: report.detail || null,
+    detail,
   });
 
   if (error) {
@@ -70,7 +104,7 @@ export async function submitReport(_prev: ReportState, formData: FormData): Prom
       return { message: "You've already reported this. Thanks — we have it." };
     }
     console.error("[report] insert failed:", error.code, error.message);
-    return { error: "Couldn't send that report. Please try again." };
+    return { error: NOT_SENT };
   }
 
   return {

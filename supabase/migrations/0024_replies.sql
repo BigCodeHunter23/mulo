@@ -243,6 +243,21 @@ create unique index if not exists reports_unique_reply
   on public.reports (reporter_id, reported_reply_id)
   where reported_reply_id is not null;
 
+-- A reply's report keeps its words in the detail ("Reply: " and up to 1,000
+-- characters, after the reporter's own 500), so the limit from 0016 grows to
+-- fit. The form still holds the reporter to 500. Only ever loosened, so the
+-- rows already there pass; checked without failing, as 0016 does.
+alter table public.reports drop constraint if exists reports_detail_length;
+alter table public.reports add constraint reports_detail_length
+  check (detail is null or char_length(detail) <= 1600) not valid;
+
+do $$
+begin
+  alter table public.reports validate constraint reports_detail_length;
+exception when check_violation then
+  raise notice 'Left reports_detail_length unvalidated: some existing reports break it.';
+end $$;
+
 -- Who each reply names, kept when it's posted, for the bell: the first five
 -- @names that are real people allowed to read the thread (not the replier or
 -- the thread's owner, nobody blocked either way with either, and on a take
