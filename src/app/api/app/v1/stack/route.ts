@@ -29,5 +29,8 @@ export const GET = appRoute(async (request: NextRequest) => {
     genre,
     decades: [...STACK_DECADES],
     genres: GENRE_FAMILIES.map(({ id, name }) => ({ id, label: name })),
+    // From your listening isn't drawn yet: every run is the usual one.
+    from: null,
+    listening: 0,
   });
 });

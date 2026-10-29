@@ -50,4 +50,9 @@ describe("who gets what", () => {
     expect(streakDue({ days: 1, today: false, best: 4 })).toBe(false);
     expect(streakDue({ days: 9, today: true, best: 9 })).toBe(false);
   });
+
+  it("has a Diary switch", () => {
+    expect(ALL_ON.diary).toBe(true);
+    expect(wants({ ...ALL_ON, diary: false }, "diary")).toBe(false);
+  });
 });

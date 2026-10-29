@@ -6,7 +6,7 @@ import { localClock } from "@/lib/push/zones";
  * database; `tick.ts` and `events.ts` feed them.
  */
 
-export type PushKind = "follow" | "love" | "reply" | "versus" | "drop" | "streak";
+export type PushKind = "follow" | "love" | "reply" | "versus" | "drop" | "streak" | "diary";
 
 /** Minutes past local midnight when each timed push goes out. */
 export const SLOTS = { versus: 9 * 60, drop: 12 * 60, streak: 19 * 60 } as const;
@@ -24,6 +24,7 @@ export const ALL_ON: NotificationSettings = {
   versus: true,
   drop: true,
   streak: true,
+  diary: true,
 };
 
 /** Whether it's within the hour after `slot` where somebody is. */
@@ -44,6 +45,7 @@ const SWITCH: Record<PushKind, keyof NotificationSettings> = {
   versus: "versus",
   drop: "drop",
   streak: "streak",
+  diary: "diary",
 };
 
 export function wants(settings: NotificationSettings, kind: PushKind): boolean {

@@ -2,6 +2,7 @@ import type { Badge } from "@/lib/badge-catalog";
 import type { FriendScore, SearchFriends } from "@/lib/friend-scores";
 import type { RatingKind } from "@/lib/rating-kinds";
 import type { DropAlbum } from "@/lib/drop-lineup";
+import type { AlbumDay, DiarySource, ImportSource } from "@/lib/diary-shared";
 import type { Era, Scene } from "@/lib/eras";
 import type { ThreadKind } from "@/lib/replies-shared";
 import type {
@@ -22,6 +23,8 @@ import type {
  * framework-free: type imports only, and only from files the app copies too.
  * `src/lib/app-api.test.ts` holds it to that.
  */
+
+export type { AlbumDay, DiarySource, ImportSource };
 
 // --- Catalogue, scores and reviews (catalog.ts, ratings.ts, reviews.ts, reactions.ts) ---
 
@@ -367,6 +370,86 @@ export type StackAlbum = {
 /** A filter a page offers: a genre family, a chart type. */
 export type FilterOption<Id extends string = string> = { id: Id; label: string };
 
+// --- The listening diary (diary/, spec 2026-10-29-listening-diary-design.md) ---
+
+/** One album on one day in somebody's diary. */
+export type DiaryEntry = {
+  id: number;
+  /** YYYY-MM-DD, the listener's own day. */
+  day: string;
+  /** The names as the source gave them, shown until it's matched. */
+  artist: string;
+  album: string;
+  /** The MULO album it was matched to. */
+  release: { mbid: string; title: string; cover: string | null; artist: string | null } | null;
+  /** "none" once matching gave up, when the owner can say which album it is. */
+  matching: "matched" | "pending" | "none";
+  /** The diary owner's own score for the album. */
+  score: number | null;
+  sources: DiarySource[];
+  songs: number;
+  minutes: number;
+  plays: number;
+};
+
+/** A month's line: different albums, and minutes. `month` is YYYY-MM. */
+export type DiaryMonth = { month: string; albums: number; minutes: number };
+
+export type DiarySourceStatus = {
+  source: ImportSource;
+  state: "idle" | "importing" | "syncing" | "needs_reconnect";
+  lastfmUser: string | null;
+  /** How far back a Last.fm import has reached. */
+  reachedBack: string | null;
+  syncedAt: string | null;
+  lastImportAt: string | null;
+  lastCount: number | null;
+};
+
+/** What only the diary's owner sees. */
+export type DiaryOwn = {
+  public: boolean;
+  sources: DiarySourceStatus[];
+  /** Matched albums in the diary not rated yet. */
+  waiting: number;
+  /** False until the website has a Last.fm key. */
+  lastfm: boolean;
+};
+
+/** `GET diary/{username}?before=` */
+export type DiaryPage =
+  | {
+      state: "open";
+      person: Person;
+      entries: DiaryEntry[];
+      months: DiaryMonth[];
+      /** The `before` for the next page, or null at the end. */
+      next: string | null;
+      own: DiaryOwn | null;
+    }
+  /** Somebody else's diary they've kept to themselves. */
+  | { state: "private"; person: Person }
+  /** Before migration 0025 runs. */
+  | { state: "unavailable"; person: Person };
+
+/** `POST diary/entries/batch`: up to `BATCH_MAX` album-days; the last batch says it's done. */
+export type DiaryBatch = {
+  source: "spotify" | "apple";
+  days: AlbumDay[];
+  done?: { total: number };
+};
+
+export type DiaryBatchResult = { ok: true; added: number; merged: number } | AppError;
+
+/** `POST diary/entries`: Log a listen. */
+export type LogListen = { mbid: string; day: string; score?: number };
+
+/** `POST diary/lastfm/start`: Last.fm's approval page, for the browser sheet. */
+export type LastfmStartResult = { ok: true; url: string } | AppError;
+
+/** `GET/PATCH me/diary` */
+export type DiarySettings = { public: boolean };
+
 // --- The Gauntlet (gauntlet.ts) ---
 
 export type SetProgress = {
@@ -578,6 +661,8 @@ export type NotificationSettings = {
   versus: boolean;
   drop: boolean;
   streak: boolean;
+  /** A finished import: "Your Last.fm history is in". */
+  diary: boolean;
 };
 
 export type PushPlatform = "ios" | "android";
@@ -698,6 +783,8 @@ export type ProfilePage = {
   lists: { top: ListSummary[]; count: number };
   /** The record they were raised on. */
   raisedOn: RaisedOn | null;
+  /** The latest matched entries of their diary, when you may see it; empty otherwise. */
+  diary: DiaryEntry[];
 };
 
 /**
@@ -737,6 +824,10 @@ export type StackRun = {
   genre: string | null;
   decades: number[];
   genres: FilterOption[];
+  /** "listening" for the From your listening deck. */
+  from: "listening" | null;
+  /** How many albums from your listening wait for a score; the choice shows above 0. */
+  listening: number;
 };
 
 /** A Versus's takes, as far as the viewer may see them. */
@@ -1257,7 +1348,9 @@ export type Notification =
   /** Today's Daily Versus is up and they haven't picked yet. */
   | { kind: "versus-live"; key: string; at: string; matchup: VersusMatchup }
   /** A Versus they picked in has closed. */
-  | { kind: "versus-result"; key: string; at: string; result: VersusResult };
+  | { kind: "versus-result"; key: string; at: string; result: VersusResult }
+  /** An import finished: "Your Last.fm history is in: 820 albums to rate." */
+  | { kind: "diary-import"; key: string; at: string; source: ImportSource; count: number };
 
 /** `GET notifications`; `following` marks who already gets a Follow back. */
 export type NotificationsPage = { notifications: Notification[]; following: string[] };

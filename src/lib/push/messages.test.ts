@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clean,
+  diaryMessage,
   dropMessage,
   followMessage,
   loveMessage,
@@ -169,5 +170,20 @@ describe("reply pushes", () => {
     expect(long.endsWith("…")).toBe(true);
     expect(firstLine("a\u202Eb")).toBe("ab");
     expect(firstLine("\n \n")).toBe("");
+  });
+});
+
+describe("diaryMessage", () => {
+  it("says an import is in, and how many albums wait", () => {
+    expect(diaryMessage("lastfm", 820)).toEqual({
+      title: "Your Last.fm history is in",
+      body: "820 albums to rate.",
+      url: "/diary",
+    });
+    expect(diaryMessage("spotify", 1)).toEqual({
+      title: "Your Spotify history is in",
+      body: "1 album to rate.",
+      url: "/diary",
+    });
   });
 });

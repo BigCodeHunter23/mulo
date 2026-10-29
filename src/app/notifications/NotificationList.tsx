@@ -58,6 +58,8 @@ function Icon({ item }: { item: Notification }) {
   if (item.kind === "versus-result") {
     return <VersusFaces matchup={item.result.matchup} winner={leader(item.result.tally)} />;
   }
+  // Nothing sends an import's line yet; it gets its own look when the imports do.
+  if (item.kind === "diary-import") return null;
 
   return (
     <Link href={`/u/${item.person.username}`} className="shrink-0">
@@ -159,6 +161,8 @@ function Text({ item }: { item: Notification }) {
       );
     case "versus-result":
       return <VersusResultText result={item.result} />;
+    case "diary-import":
+      return null;
   }
 }
 

@@ -13,6 +13,7 @@ const change = z
     versus: z.boolean(),
     drop: z.boolean(),
     streak: z.boolean(),
+    diary: z.boolean(),
   })
   .partial()
   .strict()

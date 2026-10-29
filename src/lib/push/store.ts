@@ -43,7 +43,7 @@ export async function readTimeZone(userId: string): Promise<string | null> {
 }
 
 const SETTINGS =
-  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak";
+  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak, notify_diary";
 
 type SettingsRow = {
   notify_follows: boolean;
@@ -52,6 +52,7 @@ type SettingsRow = {
   notify_versus: boolean;
   notify_drop: boolean;
   notify_streak: boolean;
+  notify_diary: boolean;
 };
 
 const COLUMN = {
@@ -61,6 +62,7 @@ const COLUMN = {
   versus: "notify_versus",
   drop: "notify_drop",
   streak: "notify_streak",
+  diary: "notify_diary",
 } as const satisfies Record<keyof NotificationSettings, keyof SettingsRow>;
 
 /** A missing row means nothing was ever switched off. */
@@ -73,6 +75,7 @@ export function toSettings(row: SettingsRow | null | undefined): NotificationSet
     versus: row.notify_versus,
     drop: row.notify_drop,
     streak: row.notify_streak,
+    diary: row.notify_diary,
   };
 }
 

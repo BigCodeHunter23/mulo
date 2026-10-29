@@ -85,6 +85,8 @@ export const GET = appRoute(
       taste,
       lists: { top: shown.slice(0, LISTS_SHOWN), count: shown.length },
       raisedOn,
+      // The Listening section isn't read yet, so it stays hidden.
+      diary: [],
     });
   },
 );

@@ -75,6 +75,7 @@ describe("toSettings, toColumns and logKey", () => {
         notify_versus: false,
         notify_drop: true,
         notify_streak: false,
+        notify_diary: false,
       }),
     ).toEqual({
       follows: false,
@@ -83,13 +84,15 @@ describe("toSettings, toColumns and logKey", () => {
       versus: false,
       drop: true,
       streak: false,
+      diary: false,
     });
   });
 
   it("maps only the switches given to their columns", () => {
-    expect(toColumns({ drop: false, streak: true })).toEqual({
+    expect(toColumns({ drop: false, streak: true, diary: false })).toEqual({
       notify_drop: false,
       notify_streak: true,
+      notify_diary: false,
     });
     expect(toColumns({})).toEqual({});
   });
@@ -222,6 +225,7 @@ describe("pushCopyOf", () => {
       notify_versus: true,
       notify_drop: true,
       notify_streak: false,
+      notify_diary: true,
     };
     const phones = [
       { platform: "ios", created_at: "2026-10-01T00:00:00Z", last_seen_at: "2026-10-29T08:00:00Z" },

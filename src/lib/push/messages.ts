@@ -1,3 +1,4 @@
+import { SOURCE_NAME, type ImportSource } from "@/lib/diary-shared";
 import { threadHref } from "@/lib/replies-shared";
 import type { PushKind } from "@/lib/push/who";
 
@@ -107,6 +108,15 @@ export function dropMessage(): PushContent {
 
 export function streakMessage(days: number): PushContent {
   return { title: `Your ${days}-day streak ends at midnight.`, url: "/stack" };
+}
+
+/** "Your Last.fm history is in", once an import finishes. Opens your diary. */
+export function diaryMessage(source: ImportSource, count: number): PushContent {
+  return {
+    title: `Your ${SOURCE_NAME[source]} history is in`,
+    body: `${count.toLocaleString("en")} album${count === 1 ? "" : "s"} to rate.`,
+    url: "/diary",
+  };
 }
 
 /** What a reply was on. `id` is the review's or take's own id. */
