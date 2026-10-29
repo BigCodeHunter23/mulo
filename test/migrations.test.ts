@@ -361,11 +361,15 @@ describe("0023 push notifications", () => {
   });
 
   it("forgets a deleted account's phones, switches and log", async () => {
+    await db.exec(
+      `insert into public.push_devices (token, user_id, platform) values ('ExponentPushToken[c]', '${U(1)}', 'ios')`,
+    );
     await db.exec(`delete from auth.users where id = '${U(1)}'`);
     const { rows } = await db.query(
       `select (select count(*) from public.personal_settings where user_id = '${U(1)}')::int as s,
+              (select count(*) from public.push_devices where user_id = '${U(1)}')::int as d,
               (select count(*) from public.push_log where user_id = '${U(1)}')::int as l`,
     );
-    expect(rows[0]).toEqual({ s: 0, l: 0 });
+    expect(rows[0]).toEqual({ s: 0, d: 0, l: 0 });
   });
 });
