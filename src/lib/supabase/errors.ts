@@ -25,3 +25,11 @@ export function logQueryError(area: string, error: QueryError, migration?: strin
 export function isMissingTable(error: { code?: string; message?: string } | null): boolean {
   return error?.code === "PGRST205" || error?.code === "42P01";
 }
+
+/**
+ * Postgres's code, and PostgREST's, for a column that doesn't exist: a
+ * migration that adds one hasn't run yet.
+ */
+export function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}

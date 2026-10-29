@@ -5,6 +5,7 @@ import type { NotificationSettings, PushPlatform } from "@/lib/app-api";
 import type { LoveSubject, Person, ReplySubject } from "@/lib/push/messages";
 import { ALL_ON, type PushKind } from "@/lib/push/who";
 import type { ThreadKind } from "@/lib/replies-shared";
+import { isMissingColumn } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { USERNAME_PATTERN } from "@/lib/validation";
 
@@ -44,6 +45,25 @@ export async function readTimeZone(userId: string): Promise<string | null> {
 
 const SETTINGS =
   "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak, notify_diary";
+/** The switches before migration 0025 added Diary's. */
+const SETTINGS_BEFORE_DIARY =
+  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak";
+type Switches = typeof SETTINGS | typeof SETTINGS_BEFORE_DIARY;
+
+/**
+ * Runs a read of the switches, and runs it again without Diary's when the
+ * database doesn't have that column yet: the website may go live before
+ * migration 0025 runs, and that mustn't stop every other push. Diary then
+ * counts as on. The column list is one of two, which the client's query
+ * parser can't type, so each read names its row (`StoredSwitches` and the
+ * other columns it asks for).
+ */
+async function readingSwitches<T extends { error: { code?: string } | null }>(
+  read: (switches: Switches) => PromiseLike<T>,
+): Promise<T> {
+  const result = await read(SETTINGS);
+  return isMissingColumn(result.error) ? read(SETTINGS_BEFORE_DIARY) : result;
+}
 
 type SettingsRow = {
   notify_follows: boolean;
@@ -65,8 +85,12 @@ const COLUMN = {
   diary: "notify_diary",
 } as const satisfies Record<keyof NotificationSettings, keyof SettingsRow>;
 
+/** A row read before migration 0025, which has no Diary switch. */
+type StoredSwitches = Omit<SettingsRow, "notify_diary"> & { notify_diary?: boolean };
+type Clock = { time_zone: string | null; last_seen_at: string | null };
+
 /** A missing row means nothing was ever switched off. */
-export function toSettings(row: SettingsRow | null | undefined): NotificationSettings {
+export function toSettings(row: StoredSwitches | null | undefined): NotificationSettings {
   if (!row) return { ...ALL_ON };
   return {
     follows: row.notify_follows,
@@ -75,7 +99,7 @@ export function toSettings(row: SettingsRow | null | undefined): NotificationSet
     versus: row.notify_versus,
     drop: row.notify_drop,
     streak: row.notify_streak,
-    diary: row.notify_diary,
+    diary: row.notify_diary ?? true,
   };
 }
 
@@ -88,15 +112,21 @@ export function toColumns(patch: Partial<NotificationSettings>): Partial<Setting
 }
 
 export async function readSettings(userId: string): Promise<NotificationSettings> {
-  const { data, error } = await db()
-    .from("personal_settings")
-    .select(SETTINGS)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { data, error } = await readingSwitches((switches) =>
+    db()
+      .from("personal_settings")
+      .select<Switches, StoredSwitches>(switches)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  );
   if (error) throw error;
   return toSettings(data);
 }
 
+/**
+ * Writes only the switches given, so before migration 0025 every switch but
+ * Diary's still saves.
+ */
 export async function saveSettings(
   userId: string,
   patch: Partial<NotificationSettings>,
@@ -109,7 +139,7 @@ export async function saveSettings(
 
 /** What somebody's copy of their data says about pushes. */
 export type PushCopy = {
-  settings: (SettingsRow & { time_zone: string | null; last_seen_at: string | null }) | null;
+  settings: (SettingsRow & Clock) | null;
   phones: { platform: string; created_at: string; last_seen_at: string }[];
 };
 
@@ -121,11 +151,13 @@ export type PushCopy = {
 export async function pushCopyOf(userId: string): Promise<PushCopy> {
   const client = db();
   const [settings, phones] = await Promise.all([
-    client
-      .from("personal_settings")
-      .select(`time_zone, last_seen_at, ${SETTINGS}`)
-      .eq("user_id", userId)
-      .maybeSingle(),
+    readingSwitches((switches) =>
+      client
+        .from("personal_settings")
+        .select<string, StoredSwitches & Clock>(`time_zone, last_seen_at, ${switches}`)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ),
     client
       .from("push_devices")
       .select("platform, created_at, last_seen_at")
@@ -134,16 +166,21 @@ export async function pushCopyOf(userId: string): Promise<PushCopy> {
   ]);
   if (settings.error) throw settings.error;
   if (phones.error) throw phones.error;
-  return { settings: settings.data ?? null, phones: phones.data ?? [] };
+  return {
+    settings: settings.data ? { notify_diary: true, ...settings.data } : null,
+    phones: phones.data ?? [],
+  };
 }
 
 export async function readSwitches(userIds: string[]): Promise<Map<string, NotificationSettings>> {
   if (userIds.length === 0) return new Map();
   const rows = await inChunks(userIds, async (chunk) => {
-    const { data, error } = await db()
-      .from("personal_settings")
-      .select(`user_id, ${SETTINGS}`)
-      .in("user_id", chunk);
+    const { data, error } = await readingSwitches((switches) =>
+      db()
+        .from("personal_settings")
+        .select<string, StoredSwitches & { user_id: string }>(`user_id, ${switches}`)
+        .in("user_id", chunk),
+    );
     if (error) throw error;
     return data ?? [];
   });
@@ -401,10 +438,14 @@ export async function tickCandidates(): Promise<Candidate[]> {
   const ids = [...new Set(devices.map((d) => d.user_id))];
 
   const rows = await inChunks(ids, async (chunk) => {
-    const { data, error: readError } = await client
-      .from("personal_settings")
-      .select(`user_id, time_zone, last_seen_at, ${SETTINGS}`)
-      .in("user_id", chunk);
+    const { data, error: readError } = await readingSwitches((switches) =>
+      client
+        .from("personal_settings")
+        .select<string, StoredSwitches & Clock & { user_id: string }>(
+          `user_id, time_zone, last_seen_at, ${switches}`,
+        )
+        .in("user_id", chunk),
+    );
     if (readError) throw readError;
     return data ?? [];
   });

@@ -20,7 +20,10 @@ import {
   peoplePushesSince,
   personOf,
   pushCopyOf,
+  readSettings,
+  readSwitches,
   readTimeZone,
+  saveSettings,
   repliedIn,
   replyTarget,
   saveMentions,
@@ -529,5 +532,94 @@ describe("repliedIn", () => {
     const failure = new Error("down");
     client.current = { from: () => query({ data: null, error: failure }) };
     await expect(repliedIn("album", 7, [A])).rejects.toBe(failure);
+  });
+});
+
+describe("before migration 0025", () => {
+  const OLD = {
+    notify_follows: false,
+    notify_loves: true,
+    notify_replies: true,
+    notify_versus: true,
+    notify_drop: false,
+    notify_streak: true,
+  };
+  const missing = { data: null, error: { code: "42703", message: "column does not exist" } };
+
+  /** Answers each read in turn, keeping what each one selected. */
+  function answering(...results: unknown[]) {
+    const selects: string[] = [];
+    client.current = {
+      from: () => {
+        const calls: [string, unknown[]][] = [];
+        const next = results.shift();
+        const chain = query(next, calls);
+        return new Proxy(chain as object, {
+          get(target, name) {
+            if (name === "select") {
+              return (columns: string) => {
+                selects.push(columns);
+                return chain;
+              };
+            }
+            return Reflect.get(target, name);
+          },
+        });
+      },
+    };
+    return selects;
+  }
+
+  it("reads the switches again without Diary's, and counts Diary as on", async () => {
+    const selects = answering(missing, { data: OLD, error: null });
+    expect(await readSettings("u")).toEqual({
+      follows: false,
+      loves: true,
+      replies: true,
+      versus: true,
+      drop: false,
+      streak: true,
+      diary: true,
+    });
+    expect(selects[0]).toContain("notify_diary");
+    expect(selects[1]).not.toContain("notify_diary");
+    expect(selects[1]).toContain("notify_streak");
+  });
+
+  it("keeps sending: readSwitches and the data copy manage without it too", async () => {
+    answering(missing, { data: [{ user_id: "u", ...OLD }], error: null });
+    expect((await readSwitches(["u"])).get("u")).toMatchObject({ follows: false, diary: true });
+
+    // The settings, then the phones (read alongside), then the settings again.
+    answering(
+      missing,
+      { data: [], error: null },
+      { data: { time_zone: null, last_seen_at: null, ...OLD }, error: null },
+    );
+    expect((await pushCopyOf("u")).settings).toMatchObject({ notify_diary: true });
+  });
+
+  it("PostgREST's own code for a missing column counts too", async () => {
+    answering(
+      { data: null, error: { code: "PGRST204", message: "no column" } },
+      { data: OLD, error: null },
+    );
+    expect((await readSettings("u")).diary).toBe(true);
+  });
+
+  it("still throws any other failure", async () => {
+    const failure = { code: "57014", message: "timeout" };
+    answering({ data: null, error: failure });
+    await expect(readSettings("u")).rejects.toBe(failure);
+  });
+
+  it("saves only the switches given, so other switches save without the column", async () => {
+    const calls: [string, unknown[]][] = [];
+    client.current = { from: () => query({ error: null }, calls) };
+    await saveSettings("u", { drop: false });
+    expect(calls).toContainEqual([
+      "upsert",
+      [{ user_id: "u", notify_drop: false }, { onConflict: "user_id" }],
+    ]);
   });
 });
