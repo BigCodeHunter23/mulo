@@ -75,6 +75,59 @@ describe("checkReceipts", () => {
     expect(d.markChecked).toHaveBeenCalledWith([empty]);
   });
 
+  it("logs only Expo's error code, never its message", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [entry]),
+      fetchReceipts: vi.fn(async () => ({
+        t1: { status: "error" as const, message: "ExponentPushToken[secret] failed" },
+        t2: {
+          status: "error" as const,
+          message: "ExponentPushToken[secret] failed",
+          details: { error: "MessageTooBig" },
+        },
+      })),
+      dropTokens: vi.fn(async () => {}),
+      markChecked: vi.fn(async () => {}),
+    };
+    await checkReceipts(new Date(), d);
+    const logged = JSON.stringify(log.mock.calls);
+    expect(logged).toContain("unknown");
+    expect(logged).toContain("MessageTooBig");
+    expect(logged).not.toContain("ExponentPushToken");
+  });
+
+  it("reads receipts 1000 tickets at a time, and starts no batch after the deadline", async () => {
+    const big = (key: string) => ({
+      ...entry,
+      key,
+      tickets: Array.from({ length: 600 }, (_, i) => ({ id: `${key}-${i}`, token: "T" })),
+    });
+    const deadline = Date.now() + 60_000;
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [big("a"), big("b"), big("c")]),
+      fetchReceipts: vi.fn(async () => {
+        vi.spyOn(Date, "now").mockReturnValue(deadline + 1);
+        return {};
+      }),
+      dropTokens: vi.fn(async () => {}),
+      markChecked: vi.fn(async () => {}),
+    };
+    expect(await checkReceipts(new Date(), d, { deadline })).toBe(600);
+    expect(d.fetchReceipts).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads none once the deadline has passed", async () => {
+    const d: ReceiptDeps = {
+      uncheckedTickets: vi.fn(async () => [entry]),
+      fetchReceipts: vi.fn(),
+      dropTokens: vi.fn(),
+      markChecked: vi.fn(),
+    };
+    expect(await checkReceipts(new Date(), d, { deadline: 0 })).toBe(0);
+    expect(d.fetchReceipts).not.toHaveBeenCalled();
+  });
+
   it("does nothing when there's nothing to check", async () => {
     const d: ReceiptDeps = {
       uncheckedTickets: vi.fn(async () => []),

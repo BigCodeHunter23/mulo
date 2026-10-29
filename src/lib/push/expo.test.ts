@@ -67,6 +67,61 @@ describe("Expo's push service", () => {
     expect(await postToExpo([{ to: "T", title: "x" }])).toEqual([undefined]);
   });
 
+  it("reads a null ticket as no ticket for that push only", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ data: [null, { status: "ok", id: "b" }] }))),
+    );
+    expect(
+      await postToExpo([
+        { to: "T1", title: "x" },
+        { to: "T2", title: "x" },
+      ]),
+    ).toEqual([undefined, { status: "ok", id: "b" }]);
+  });
+
+  it("treats a ticket of the wrong shape as a lost batch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ status: "ok" }, { status: "ok", id: "b" }, "nonsense"] }),
+          ),
+      ),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(
+      await postToExpo([
+        { to: "T1", title: "x" },
+        { to: "T2", title: "x" },
+        { to: "T3", title: "x" },
+      ]),
+    ).toEqual([undefined, undefined, undefined]);
+    expect(log).toHaveBeenCalled();
+  });
+
+  it("treats an answer without data as a lost batch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ errors: [{ code: "X" }] }))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await postToExpo([{ to: "T", title: "x" }])).toEqual([undefined]);
+  });
+
+  it("ignores a receipts answer of the wrong shape", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ data: { a: { status: "ok" }, b: { status: 42 } } })),
+      ),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await fetchReceipts(["a", "b"])).toEqual({});
+  });
+
   it("skips a receipts batch that throws and keeps the rest", async () => {
     let call = 0;
     vi.stubGlobal(

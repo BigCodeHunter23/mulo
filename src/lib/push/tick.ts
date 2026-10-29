@@ -21,8 +21,8 @@ export type TickDeps = {
   ratedAlbum: typeof store.ratedAlbum;
   loggedAlready: typeof store.loggedAlready;
   streakOf: (userId: string, timeZone: string) => Promise<Streak>;
-  send: (messages: PushMessage[]) => Promise<number>;
-  checkReceipts: (at: Date) => Promise<number>;
+  send: (messages: PushMessage[], deadline: number) => Promise<number>;
+  checkReceipts: (at: Date, deadline: number) => Promise<number>;
   pruneLog: (at: Date) => Promise<void>;
 };
 
@@ -35,14 +35,18 @@ const real = (): TickDeps => ({
   ratedAlbum: store.ratedAlbum,
   loggedAlready: store.loggedAlready,
   streakOf: (userId, timeZone) => getStreak(userId, timeZone, createAdminClient()),
-  send: (messages) => sendPushes(messages),
-  checkReceipts: (at) => checkReceipts(at),
+  send: (messages, deadline) => sendPushes(messages, undefined, { deadline }),
+  checkReceipts: (at, deadline) => checkReceipts(at, undefined, { deadline }),
   pruneLog: store.pruneLog,
 });
 
 export type TickReport = { due: number; sent: number; receipts: number; errors: number };
 
-/** The streak checks stop starting after this long, and finish on the next run. */
+/**
+ * Nothing new starts after this long (streak checks, batches of pushes or of
+ * receipts), so a run ends well inside the endpoint's 60 seconds. What's
+ * left is picked up by the next run: nothing was claimed for it.
+ */
 const BUDGET_MS = 40_000;
 
 /** How many streak checks run at once. */
@@ -226,8 +230,11 @@ export async function runTick(
       : []),
   ];
 
-  const sent = await attempt("sending", () => deps.send(messages), 0);
-  const receipts = await attempt("receipts", () => deps.checkReceipts(at), 0);
+  const late = () => Date.now() >= deadline;
+  const sent = late() ? 0 : await attempt("sending", () => deps.send(messages, deadline), 0);
+  const receipts = late()
+    ? 0
+    : await attempt("receipts", () => deps.checkReceipts(at, deadline), 0);
   await attempt("pruning", () => deps.pruneLog(at), undefined);
   return { due: messages.length, sent, receipts, errors };
 }

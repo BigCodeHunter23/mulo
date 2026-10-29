@@ -194,8 +194,12 @@ describe("the clock", () => {
     // 09:20 and 09:35 in St John's (UTC-3:30), either side of Sydney's midnight (13:00 UTC).
     await runTick(new Date("2026-11-05T12:50:00Z"), d);
     await runTick(new Date("2026-11-05T13:05:00Z"), d);
-    expect(d.send).toHaveBeenNthCalledWith(1, [expect.objectContaining({ key: "2026-11-05" })]);
-    expect(d.send).toHaveBeenNthCalledWith(2, []);
+    expect(d.send).toHaveBeenNthCalledWith(
+      1,
+      [expect.objectContaining({ key: "2026-11-05" })],
+      expect.any(Number),
+    );
+    expect(d.send).toHaveBeenNthCalledWith(2, [], expect.any(Number));
   });
 });
 
@@ -254,11 +258,22 @@ describe("a run that goes wrong", () => {
     expect(d.checkReceipts).toHaveBeenCalled();
   });
 
-  it("starts no streak checks once the deadline has passed", async () => {
+  it("starts no streak checks, sending or receipts once the deadline has passed", async () => {
     const d = deps();
     const report = await runTick(SEVEN, d, { deadline: 0 });
     expect(d.streakOf).not.toHaveBeenCalled();
+    expect(d.send).not.toHaveBeenCalled();
+    expect(d.checkReceipts).not.toHaveBeenCalled();
+    expect(d.pruneLog).toHaveBeenCalled();
     expect(report.errors).toBe(0);
+  });
+
+  it("hands its deadline to sending and to receipts", async () => {
+    const d = deps();
+    const deadline = Date.now() + 60_000;
+    await runTick(NINE, d, { deadline });
+    expect(d.send).toHaveBeenCalledWith(expect.any(Array), deadline);
+    expect(d.checkReceipts).toHaveBeenCalledWith(NINE, deadline);
   });
 
   it("runs at most five streak checks at once", async () => {
