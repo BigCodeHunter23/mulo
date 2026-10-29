@@ -55,6 +55,10 @@ export default function PrivacyPage() {
               and anything you report.
             </>,
             <>
+              <strong className="text-text">Your listening diary</strong>, if you keep one: what
+              you&rsquo;ve listened to, and on which day. More on it below.
+            </>,
+            <>
               <strong className="text-text">If you turn on notifications in the app:</strong> the
               address Expo gives your phone so a notification can reach it, whether it&rsquo;s an
               iPhone or Android, which notifications you&rsquo;ve switched off, and a log of what
@@ -122,6 +126,10 @@ export default function PrivacyPage() {
               you follow and how many follow you.
             </>,
             <>
+              <strong className="text-text">Your listening diary</strong>, unless you make it
+              private: the albums you listened to and when, on your profile and its own page.
+            </>,
+            <>
               <strong className="text-text">The pages your profile shares:</strong> your mixtape for
               each month, your ranking of an artist&rsquo;s albums, how you rate against everybody
               else, and your milestones. Each shows some of what you&rsquo;ve rated, with your
@@ -146,6 +154,47 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
+      <Section title="Your listening diary">
+        <p>
+          The diary keeps each album you listened to on a day: how many of its songs you played,
+          roughly how long for, and where it came from. It fills from what you choose:
+        </p>
+        <List
+          items={[
+            <>
+              <strong className="text-text">What you log yourself</strong>, from an album&rsquo;s
+              page.
+            </>,
+            <>
+              <strong className="text-text">Last.fm</strong>, once you connect it on Last.fm&rsquo;s
+              own page. MULO reads your plays there (when each was, and its song, album and artist)
+              every hour until you disconnect, and keeps the key Last.fm gives it for that until you
+              do.
+            </>,
+            <>
+              <strong className="text-text">Spotify&rsquo;s extended streaming history</strong>, the
+              file Spotify sends when you ask for it. It&rsquo;s read on your own device, in your
+              browser or the app, and only the albums are sent to MULO, never the file.
+            </>,
+            <>
+              <strong className="text-text">Apple Music</strong>, in the iPhone app: your
+              library&rsquo;s play counts and when each album was last played, read on your phone.
+            </>,
+          ]}
+        />
+        <p>
+          To find which album a name means, MULO asks ListenBrainz and MusicBrainz about the album
+          and artist names (and one song&rsquo;s), with nothing that says who you are.
+        </p>
+        <p>
+          Your diary is public on your profile, like your ratings, unless you switch off{" "}
+          <strong className="text-text">Show my diary</strong> in your account settings. Somebody
+          you&rsquo;ve blocked, or who has blocked you, never sees it. You can delete anything in
+          it, remove everything one source added, or disconnect Last.fm. The diary comes with your
+          download, and goes when you delete your account.
+        </p>
+      </Section>
+
       <Section title="Who else holds it">
         <p>
           MULO is a small site built on a few services, and your information passes through them:
@@ -166,6 +215,10 @@ export default function PrivacyPage() {
             <>
               <strong className="text-text">Apple and Google</strong>, only if you continue with
               them: they confirm it&rsquo;s you, and know you signed in to MULO.
+            </>,
+            <>
+              <strong className="text-text">Last.fm</strong>, only if you connect it: it knows
+              you&rsquo;ve let MULO read your plays, until you disconnect.
             </>,
             <>
               <strong className="text-text">Expo</strong> delivers fixes to the app. Your phone asks
@@ -197,8 +250,8 @@ export default function PrivacyPage() {
           items={[
             <>
               <strong className="text-text">Download my data</strong> hands you a file with
-              everything you&rsquo;ve put in — every score, review, reply, list and follow — and
-              your notification settings.
+              everything you&rsquo;ve put in — every score, review, reply, list and follow, and your
+              listening diary — and your notification settings.
             </>,
             <>
               <strong className="text-text">Deleting your account</strong> removes your profile and

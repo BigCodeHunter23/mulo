@@ -228,3 +228,30 @@ replies and posting says replies aren't available yet; nothing else changes.
 
 Check: open an album with a review on the live site while signed in, choose
 Reply under a review, and post one. The album page then shows "1 reply".
+
+## 9. Listening diary
+
+Turns on the listening diary: an album on a day, logged by hand, from
+Last.fm, and from Spotify's extended streaming history. Until you do this,
+diaries say "The diary isn't available yet." and profiles show no Listening;
+nothing else changes. Pushes (section 7) should be set up first: the diary's
+matching and Last.fm run on the same clock.
+
+1. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0025_listening_diary.sql` and run it. Safe to run
+   twice.
+2. Optional, for Connect Last.fm: make an API account at
+   https://www.last.fm/api/account/create, with the callback
+   `https://getmulo.com/diary/lastfm/callback`. In Vercel, add its key and
+   secret as `LASTFM_API_KEY` and `LASTFM_API_SECRET`, and redeploy. Without
+   them, Connect Last.fm isn't offered.
+3. Optional, for quicker matching: a ListenBrainz token from
+   https://listenbrainz.org/settings/, added in Vercel as
+   `LISTENBRAINZ_TOKEN`. Without it, matching uses MusicBrainz only, which
+   is slower.
+
+Check: in the SQL Editor, `select count(*) from album_matches;` answers (0 is
+fine). A quarter of an hour later, the clock's answer includes `diary`: in
+the SQL Editor,
+`select content from net._http_response order by created desc limit 1;`
+should show `"diary":{…}`.

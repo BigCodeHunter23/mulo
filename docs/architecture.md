@@ -312,6 +312,71 @@ The app API: `GET threads/{album|artist|take}/{id}` (answers `state: "open"`,
 `"gone"` or `"locked"`), `POST replies`, `DELETE replies/{id}`, and `POST
 reports` with `{ kind: "reply", id }`.
 
+## Listening diary
+
+A diary is an album on a day: each album somebody listened to on one day, in
+their own time zone (migration 0025). An album-day counts when four of its
+songs, or twenty minutes of it, were played that day (`albumDays` in
+`src/lib/diary-shared.ts`, the rules the app copies). Three tables:
+
+- `diary_entries`: the album-days, one per person, day and album name
+  (`album_key`, the artist and album folded together), with the album once
+  it's matched (`release_mbid`), how many songs, minutes and plays, and
+  which sources it came from. Read through the visitor's own session:
+  `diary_visible` lets anyone, signed out too, read a public diary except
+  across a block, and only the owner read a private one
+  (`profiles.diary_public`, Show my diary).
+- `album_matches`: shared by everybody, one row per album name, with the
+  album it was matched to, so each name is looked up once.
+- `diary_sources`: each person's imports and their state, the Last.fm
+  session key among them. Only the service role reads it; the owner sees
+  its state, never the key.
+
+Only the website writes, with the service role, after its own checks (signed
+in, zod, the rate limit, 50,000 entries at most, the listen rule), through
+one database function, `diary_merge`: the same album on the same day from
+another source merges into the entry already there, keeping the larger counts
+and adding the source. `diary_remove_source` takes one source off every
+entry and deletes the entries it alone added. `src/lib/diary/entries.ts`
+holds the writes, `read.ts` the reads.
+
+The clock (`push/tick`, every 15 minutes) moves the diary on after the
+pushes, in `src/lib/diary/tick.ts`:
+
+1. **Matching** (`match.ts`): names waiting in `album_matches`, the longest
+   waiting first, are looked up in ListenBrainz in bulk, by one of the
+   album's songs, then in MusicBrainz's search, one a second. A found album
+   goes into the catalogue with what the lookup gave; its page fetches the
+   rest on its first visit. A name nothing finds waits an hour, then six,
+   and after three tries is "no match", which its owners can fix with Which
+   album is this (`/diary/fix/<id>`).
+2. **Last.fm** (`lastfm-jobs.ts`): an import reads somebody's history newest
+   first, a page at a time, holding the oldest day of each page back until
+   the next page has finished it, so a day split across pages counts whole.
+   Once it reaches the start, the account is synced every hour by reading
+   back 26 hours, so today is always counted whole; merging keeps the larger
+   counts, so reading a day again never lowers it. Last.fm plays have no
+   length, so each counts as three and a half minutes.
+
+Connecting Last.fm (`lastfm.ts`) sends people to Last.fm's approval page and
+back to `/diary/lastfm/callback` with a single-use state that lasts ten
+minutes and says who they are and whether they came from the website or the
+app, so no cookie is needed. The callback address is built from
+`callbackOrigin()`, so `NEXT_PUBLIC_SITE_URL` decides where Last.fm returns.
+
+Spotify's extended streaming history is read where it's picked: in the
+browser on `/diary/import` (`src/lib/diary/read-spotify.ts`, with `fflate`
+for the zip) or on the phone. Only album-days are sent, 500 at a time; the
+last call says the import is done, for the bell line and the push. Apple
+Music's library is read by the iPhone app.
+
+Your data copy (`src/lib/export.ts`) has the diary's entries and sources,
+never the Last.fm session. The app API: `GET diary/{username}?before=`,
+`POST diary/entries` (log a listen), `POST diary/entries/batch`, `DELETE
+diary/entries/{id}`, `POST diary/entries/{id}/album` (Which album is this),
+`DELETE diary/sources/{source}`, `POST diary/lastfm/start`, and `GET/PATCH
+me/diary` (Show my diary).
+
 ## The database schema
 
 - `supabase/migrations/` holds numbered SQL files. The owner runs each one

@@ -3,6 +3,7 @@ import { createClient, type CurrentUser } from "@/lib/supabase/server";
 import { isMissingTable, logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import { pushCopyOf, type PushCopy } from "@/lib/push/store";
+import { diaryCopyOf } from "@/lib/diary/read";
 
 /**
  * Everything one person has put into MULO, as a file they can keep, for the
@@ -21,6 +22,12 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
   const push = pushCopyOf(user.id).catch((error: unknown): PushCopy => {
     console.error("[account export] push settings couldn't be read:", error);
     return { settings: null, phones: [] };
+  });
+  // The diary's private tables are read with the service role too; before
+  // migration 0025 it comes back empty.
+  const diary = diaryCopyOf(user.id).catch((error: unknown) => {
+    console.error("[account export] the diary couldn't be read:", error);
+    return null;
   });
 
   const [profile, albums, artists, songs, lists, following, followers, picks, replies] =
@@ -114,7 +121,7 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
   if (replies.error && !isMissingTable(replies.error))
     logQueryError("account export", replies.error);
 
-  const pushCopy = await push;
+  const [pushCopy, diaryCopy] = await Promise.all([push, diary]);
 
   const body = {
     exported_at: new Date().toISOString(),
@@ -133,6 +140,7 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
     replies: replies.data,
     push_settings: pushCopy.settings,
     push_phones: pushCopy.phones,
+    diary: diaryCopy,
   };
 
   const day = new Date().toISOString().slice(0, 10);

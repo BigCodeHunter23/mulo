@@ -147,6 +147,12 @@ pending Q1.
 | `/api/notifications/unread` | authed (otherwise `false`) | same |
 | OG images, `*/story`, `/records/[mbid]` | public | public, with hardened fetches and rate limits |
 | Server actions: rate, review, follow, react, lists, GOAT, versus, mixtape, raised-on, invite, report | authed + RLS ownership | same, plus zod and rate limits |
+| `/u/[username]/diary` (listening diary, added with migration 0025) | public unless the owner switches off Show my diary; RLS (`diary_visible`) hides it across a block | same |
+| `/diary`, `/diary/import`, `/diary/fix/[id]` | authed (`SIGNED_IN_ONLY` in `src/lib/access.ts`, and `requireUser`); a fix reads only your own entry | same |
+| `/diary/lastfm/callback` | public on purpose: the app's browser sheet comes back without a session. Whose account it is comes from a single-use state that lasts ten minutes | same |
+| Diary server actions (`src/app/diary/actions.ts`): connect Last.fm, upload a batch, log, delete, fix, remove a source, Show my diary | authed, zod, rate limits (`write`; uploads `import`); written with the service role after those checks | same |
+| App API: `diary/{username}` (GET) | as the page: the caller's session decides, rate-limited reads | same |
+| App API: `diary/entries` (POST), `diary/entries/batch` (POST), `diary/entries/{id}` (DELETE), `diary/entries/{id}/album` (POST), `diary/sources/{source}` (DELETE), `diary/lastfm/start` (POST), `me/diary` (GET, PATCH) | authed bearer, zod, rate limits; your own entries only | same |
 
 ---
 
