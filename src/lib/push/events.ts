@@ -176,10 +176,11 @@ export async function recordMentions(
  * on Sam's review of Blonde" for each of the first five people named, at
  * most once an hour per thread for each of them. Never for your own reply,
  * never across a block (with the replier, or for somebody named, with the
- * thread's owner too), and inside the cap of ten people pushes an hour. An
- * author who's named gets the author's push only. Earlier repliers hear
- * about it in the bell only. On a take whose matchup is still open, only
- * people who've picked are told: nobody else can read the thread yet.
+ * thread's owner too), and not to anyone who's had ten follow, love and
+ * reply pushes in the past hour. An author who's named gets the author's
+ * push only. Earlier repliers hear about it in the bell only. On a take
+ * whose matchup is still open, only people who've picked are told: nobody
+ * else can read the thread yet.
  */
 export async function notifyReply(
   event: ReplyEvent,
