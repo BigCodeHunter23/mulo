@@ -37,6 +37,7 @@ describe("a copy of your data", () => {
     expect(push.pushCopyOf).toHaveBeenCalledWith("me");
     expect(body.push_settings).toEqual(settings);
     expect(body.push_phones).toEqual(phones);
+    expect(body.replies).toEqual([]);
   });
 
   it("still comes when the push settings can't be read", async () => {

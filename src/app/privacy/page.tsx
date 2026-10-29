@@ -50,9 +50,9 @@ export default function PrivacyPage() {
               when you choose one, and only that picture leaves your phone.
             </>,
             <>
-              <strong className="text-text">What you put in:</strong> scores, reviews, lists, your
-              GOAT, Versus picks and takes, who you follow, who you&rsquo;ve blocked, and anything
-              you report.
+              <strong className="text-text">What you put in:</strong> scores, reviews, replies,
+              lists, your GOAT, Versus picks and takes, who you follow, who you&rsquo;ve blocked,
+              and anything you report.
             </>,
             <>
               <strong className="text-text">If you turn on notifications in the app:</strong> the
@@ -101,14 +101,19 @@ export default function PrivacyPage() {
 
       <Section title="What other people can see">
         <p>
-          Your scores, reviews, lists and who you follow are visible to other people on MULO —
-          that&rsquo;s the point of it. They are not visible to the open internet:{" "}
+          Your scores, reviews, replies, lists and who you follow are visible to other people on
+          MULO — that&rsquo;s the point of it. They are not visible to the open internet:{" "}
           <strong className="text-text">
             somebody without an account can&rsquo;t see what you&rsquo;ve rated, your lists, or what
             anybody is rating right now.
           </strong>{" "}
           All they get of a profile is a name, a picture, what you were raised on and your GOAT, so
           a link you send somebody lands somewhere real.
+        </p>
+        <p>
+          <strong className="text-text">Replies</strong> are seen by people who are signed in, as
+          reviews are. You can delete your own replies, and the writer of a review can delete any
+          reply on it.
         </p>
         <p>
           <strong className="text-text">Your email address is never shown to anybody</strong>,
@@ -168,8 +173,8 @@ export default function PrivacyPage() {
           items={[
             <>
               <strong className="text-text">Download my data</strong> hands you a file with
-              everything you&rsquo;ve put in — every score, review, list and follow — and your
-              notification settings.
+              everything you&rsquo;ve put in — every score, review, reply, list and follow — and
+              your notification settings.
             </>,
             <>
               <strong className="text-text">Deleting your account</strong> removes your profile and

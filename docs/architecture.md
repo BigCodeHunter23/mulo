@@ -207,9 +207,9 @@ pushes after 30 days away.
 
 Each push claims a row in `push_log` before it's sent, keyed by person, kind
 and a key that says how often that kind may go: a follow once a day per
-follower, a love once an hour per rating or take, Versus and streaks once per
+follower, a love once an hour per rating or take, a reply once an hour per thread, Versus and streaks once per
 local day, the Drop once a week. A repeated run or a retry can't send it
-twice. Nobody gets more than ten follow and love pushes in an hour; past that
+twice. Nobody gets more than ten follow, love and reply pushes in an hour; past that
 they still show in the bell. The clock claims and sends up to 100 phones at a
 time and starts no batch (of pushes or receipts) after its 40-second budget,
 so what it leaves was never claimed and goes on the next run.
@@ -224,7 +224,7 @@ src/lib/push/
   store.ts       every database read and write for pushes
   send.ts        filters by switches, claims in the log, sends, records tickets
   receipts.ts    checks Expo's receipts and drops phones that are gone
-  events.ts      notifyFollow, notifyLove, and the cap of ten an hour
+  events.ts      notifyFollow, notifyLove, notifyReply, and the cap of ten an hour
   later.ts       runs a task after the response
   tick.ts        the clock's run: Versus, Drop, streak, receipts, pruning
   tick-auth.ts   checks the clock's secret
@@ -239,6 +239,45 @@ deleted account), by when there may be no session. It's limited per address
 and always answers `{ ok: true }`. Knowing a token only lets you stop pushes
 to that phone, which registering it again already could. Setting up the clock
 is in `docs/supabase-setup.md`.
+
+## Replies
+
+Anyone signed in can answer a written album or artist review, or a Versus
+take, in one flat thread, oldest first (migration 0024, table `replies`).
+Each thread has one address on the website and in the app:
+`/album/<mbid>/reviews/<rating id>`, `/artist/<mbid>/reviews/<artist rating
+id>` and `/versus/<day>/takes/<take id>`; an address whose parts don't agree
+is not found. A take on today's Versus stays locked until you've picked, as
+takes do on the Versus page.
+
+Row-level security holds the rules: signed-in people read replies except by
+or to people hidden from them (`hidden_profiles()`), reply as themselves
+only where neither side has blocked the other, and delete their own replies
+or any on their own review or take. Signed-out visitors read none. Nothing is
+edited. Clearing a review's words deletes its replies (a trigger), so a later
+review never inherits an old thread. Every read goes through the visitor's
+own client for those rules to apply.
+
+`src/lib/replies.ts` reads threads (`getThread`), counts (`getReplyCounts`,
+one read per hundred ids, filled into `Review`, feed items and takes when a
+page is read) and whether you may reply; `src/app/replies/actions.ts` posts
+and deletes (trimmed, 1 to 1,000 characters, `isRespectful`, the `post` rate
+limit). `src/lib/replies-shared.ts` holds the plain rules the app copies:
+limits, @name parsing (an "@" and a username, not after a letter or digit;
+the first five different names count) and thread addresses.
+
+A reply pushes its review's or take's author ("Jo replied to your review of
+Blonde") and the people it names ("Jo mentioned you on Sam's review of
+Blonde"), through `notifyReply` in `src/lib/push/events.ts`: once an hour per
+thread for each person, never across a block, inside the cap of ten people
+pushes an hour, under the Replies switch. A named author gets the author's
+push only. The bell's `reply`, `mention` and `thread` lines come from
+`src/lib/reply-notifications.ts`. Reported replies land in the admin inbox
+with Remove reply.
+
+The app API: `GET threads/{album|artist|take}/{id}` (answers `state: "open"`,
+`"gone"` or `"locked"`), `POST replies`, `DELETE replies/{id}`, and `POST
+reports` with `{ kind: "reply", id }`.
 
 ## The database schema
 

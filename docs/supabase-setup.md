@@ -217,3 +217,14 @@ To change the secret (if it may have leaked, say), make a new one as in step
 and the Vault, with the `vault.update_secret` line above. Between the two,
 the clock's calls get a `401` and nothing is sent; the next run after both
 match catches up.
+
+## 8. Replies
+
+Turns on replies on reviews and takes. Until you do this, threads show no
+replies and posting says replies aren't available yet; nothing else changes.
+
+1. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0024_replies.sql` and run it. Safe to run twice.
+
+Check: open an album with a review on the live site while signed in, choose
+Reply under a review, and post one. The album page then shows "1 reply".
