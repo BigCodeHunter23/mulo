@@ -60,6 +60,7 @@ export default function ReplyRow({
               <button
                 type="button"
                 onClick={() => onReply(reply.author.username)}
+                aria-label={`Reply to ${name}`}
                 className={quiet}
               >
                 Reply
@@ -72,6 +73,7 @@ export default function ReplyRow({
                   if (window.confirm("Delete this reply? It can't be brought back."))
                     onDelete(reply);
                 }}
+                aria-label={`Delete reply by ${name}`}
                 className={quiet}
               >
                 Delete

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COUNT_FROM,
+  countAnnouncement,
   MENTIONS_MAX,
   parseMentions,
   prefillFor,
@@ -106,5 +107,20 @@ describe("withoutFormatting", () => {
 
   it("leaves nothing of a reply made only of them", () => {
     expect(withoutFormatting("\u202E\u200B\u2066").trim()).toBe("");
+  });
+});
+
+describe("countAnnouncement", () => {
+  it("says nothing until 900 characters", () => {
+    expect(countAnnouncement(0)).toBe("");
+    expect(countAnnouncement(899)).toBe("");
+  });
+
+  it("changes only on crossing 900, 950 and 1,000, not with every key", () => {
+    expect(countAnnouncement(900)).toBe("100 characters left");
+    expect(countAnnouncement(949)).toBe("100 characters left");
+    expect(countAnnouncement(950)).toBe("50 characters left");
+    expect(countAnnouncement(999)).toBe("50 characters left");
+    expect(countAnnouncement(1000)).toBe("No characters left");
   });
 });

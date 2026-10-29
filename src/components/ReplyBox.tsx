@@ -1,7 +1,7 @@
 "use client";
 
 import type { Ref } from "react";
-import { COUNT_FROM, REPLY_LIMIT } from "@/lib/replies-shared";
+import { COUNT_FROM, countAnnouncement, REPLY_LIMIT } from "@/lib/replies-shared";
 import { buttonClass, fieldClass } from "@/components/ui";
 
 /** Below this many characters left, the count turns red, as for takes. */
@@ -43,11 +43,16 @@ export default function ReplyBox({
         className={`${fieldClass} resize-y`}
       />
       <div className="flex items-center justify-between gap-3">
+        {/* The count changes with every key, so screen readers are told only on
+            crossing 900, 950 and 1,000, by the line beside it. */}
         <span
-          aria-live="polite"
+          aria-hidden="true"
           className={`text-xs tabular-nums ${left < NEARLY_OUT ? "text-score-you" : "text-text-muted"}`}
         >
           {value.length >= COUNT_FROM ? `${left} characters left` : ""}
+        </span>
+        <span aria-live="polite" className="sr-only">
+          {countAnnouncement(value.length)}
         </span>
         <button
           type="submit"

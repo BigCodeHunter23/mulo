@@ -29,6 +29,9 @@ export default function ThreadReplies({
   const [replies, setReplies] = useState(initial);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A failed delete is said above the replies, since the box (and its error
+  // line) isn't there when you can't reply.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -39,6 +42,7 @@ export default function ThreadReplies({
 
   function post() {
     setError(null);
+    setDeleteError(null);
     const body = draft;
     startTransition(async () => {
       const result = await postReply(kind, targetId, body);
@@ -55,11 +59,11 @@ export default function ThreadReplies({
   }
 
   function remove(reply: Reply) {
-    setError(null);
+    setDeleteError(null);
     startTransition(async () => {
       const result = await deleteReply(reply.id);
       if (!result.ok) {
-        setError(result.error);
+        setDeleteError(result.error);
         return;
       }
       setReplies((current) => current.filter((r) => r.id !== reply.id));
@@ -69,6 +73,11 @@ export default function ThreadReplies({
 
   return (
     <>
+      {deleteError && (
+        <p role="alert" className="mb-3 text-xs text-score-you">
+          {deleteError}
+        </p>
+      )}
       {replies.length === 0 ? (
         <p className="text-sm text-text-muted">No replies yet. Start it off.</p>
       ) : (

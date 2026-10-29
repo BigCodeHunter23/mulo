@@ -33,6 +33,18 @@ export function withoutFormatting(body: string): string {
   return body.replace(FORMAT, "");
 }
 
+/**
+ * What the reply box tells a screen reader about the characters left: a
+ * line on crossing 900, 950 and 1,000, the same between, so it isn't read
+ * out at every key.
+ */
+export function countAnnouncement(length: number): string {
+  if (length >= REPLY_LIMIT) return "No characters left";
+  if (length >= 950) return `${REPLY_LIMIT - 950} characters left`;
+  if (length >= COUNT_FROM) return `${REPLY_LIMIT - COUNT_FROM} characters left`;
+  return "";
+}
+
 /** Only the first five different people named in a reply count. */
 export const MENTIONS_MAX = 5;
 
