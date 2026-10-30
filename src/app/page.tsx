@@ -15,6 +15,7 @@ import DiscoverSections, { NewReleases } from "@/components/DiscoverSections";
 import RaisedOnPrompt from "@/components/RaisedOnPrompt";
 import CoverWall from "@/components/CoverWall";
 import TasteTwin from "@/components/TasteTwin";
+import NewFromArtists from "@/components/NewFromArtists";
 import ReceiptCard from "@/components/ReceiptCard";
 import { getReceipt, howLongAgo } from "@/lib/receipts";
 import { goodbyeKind } from "@/lib/goodbye";
@@ -120,6 +121,11 @@ export default async function Home({
         </Suspense>
         <Suspense fallback={null}>
           <div className="mb-14 empty:hidden">
+            <NewFromArtists userId={user.id} />
+          </div>
+        </Suspense>
+        <Suspense fallback={null}>
+          <div className="mb-14 empty:hidden">
             <TasteTwin userId={user.id} />
           </div>
         </Suspense>
@@ -145,6 +151,12 @@ export default async function Home({
       <Suspense fallback={null}>
         <div className="mb-10 empty:hidden">
           <OldScore userId={user.id} />
+        </div>
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <div className="mb-10 empty:hidden">
+          <NewFromArtists userId={user.id} />
         </div>
       </Suspense>
 
