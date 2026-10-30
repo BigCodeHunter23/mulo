@@ -1423,3 +1423,8 @@ export type AvatarResult = { ok: true; avatarUrl: string } | AppError;
  * a password. `Me.hasPassword` catches up once the app refreshes its token.
  */
 export type AccountResult = { ok: true; message: string } | AppError;
+
+// ── Following artists and new releases ─────────────────────────────────
+
+/** What counts as a release worth following: albums and EPs, never singles or live records. */
+export type ReleaseKind = "album" | "ep";
