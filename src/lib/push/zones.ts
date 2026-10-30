@@ -61,3 +61,26 @@ export function localClock(at: Date, timeZone: string): { day: string; minutes: 
     minutes: Number(part("hour")) * 60 + Number(part("minute")),
   };
 }
+
+/** The day `days` after `day`, or before it when negative: "2026-10-30" and 2 is "2026-11-01". */
+export function addDays(day: string, days: number): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The moment the clock in `timeZone` reads `minutes` past midnight on `day`:
+ * 10am on a release day, say. Guessed as if the zone were UTC, then moved by
+ * however far off the zone's own clock reads, twice over for the days the
+ * clocks change.
+ */
+export function momentAt(day: string, minutes: number, timeZone: string): Date {
+  const wanted = Date.parse(`${day}T00:00:00Z`) + minutes * 60_000;
+  let guess = wanted;
+  for (let pass = 0; pass < 2; pass += 1) {
+    const local = localClock(new Date(guess), timeZone);
+    guess += wanted - (Date.parse(`${local.day}T00:00:00Z`) + local.minutes * 60_000);
+  }
+  return new Date(guess);
+}

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canonicalZone, isTimeZone, localClock, SYDNEY, zoneOrSydney } from "@/lib/push/zones";
+import {
+  addDays,
+  canonicalZone,
+  isTimeZone,
+  localClock,
+  momentAt,
+  SYDNEY,
+  zoneOrSydney,
+} from "@/lib/push/zones";
 
 describe("time zones", () => {
   it("knows a real zone from a made-up one", () => {
@@ -44,5 +52,35 @@ describe("time zones", () => {
       day: "2026-10-29",
       minutes: 0,
     });
+  });
+});
+
+describe("addDays and momentAt", () => {
+  it("moves a day either way, across months and years", () => {
+    expect(addDays("2026-10-30", 2)).toBe("2026-11-01");
+    expect(addDays("2026-01-01", -1)).toBe("2025-12-31");
+    expect(addDays("2026-10-30", 0)).toBe("2026-10-30");
+  });
+
+  it("finds 10am on a day in each zone", () => {
+    expect(momentAt("2026-10-30", 600, "Australia/Sydney").toISOString()).toBe(
+      "2026-10-29T23:00:00.000Z",
+    );
+    expect(momentAt("2026-10-30", 600, "America/Los_Angeles").toISOString()).toBe(
+      "2026-10-30T17:00:00.000Z",
+    );
+    expect(momentAt("2026-10-30", 600, "Europe/London").toISOString()).toBe(
+      "2026-10-30T10:00:00.000Z",
+    );
+    expect(momentAt("2026-10-30", 600, "Asia/Kolkata").toISOString()).toBe(
+      "2026-10-30T04:30:00.000Z",
+    );
+  });
+
+  it("gets the day the clocks change right", () => {
+    // London goes back an hour at 2am on 25 Oct 2026, before 10am.
+    expect(momentAt("2026-10-25", 600, "Europe/London").toISOString()).toBe(
+      "2026-10-25T10:00:00.000Z",
+    );
   });
 });
