@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
 import { createPublicClient } from "@/lib/supabase/public";
-import { logQueryError } from "@/lib/supabase/errors";
+import { isMissingColumn, logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
 import type { AlbumSummary, ArtistSummary, TopRatedAlbum } from "@/lib/app-api";
 
@@ -176,16 +176,24 @@ export async function newReleases(limit = 10): Promise<AlbumSummary[]> {
   const today = new Date();
   const since = new Date(today.getTime() - 180 * 86_400_000).toISOString().slice(0, 10);
 
-  const { data } = await createPublicClient()
-    .from("releases")
-    .select(ALBUM_SELECT)
-    .gte("release_date", since)
-    .lte("release_date", today.toISOString().slice(0, 10))
-    .neq("cover_art_url", "")
-    .not("cover_art_url", "is", null)
-    .order("release_date", { ascending: false })
-    .limit(limit);
+  const recent = () =>
+    createPublicClient()
+      .from("releases")
+      .select(ALBUM_SELECT)
+      .gte("release_date", since)
+      .lte("release_date", today.toISOString().slice(0, 10))
+      .neq("cover_art_url", "")
+      .not("cover_art_url", "is", null)
+      .order("release_date", { ascending: false })
+      .limit(limit);
 
+  // Albums only, as an artist's albums row (kind is null on one cached
+  // before migration 0026); before it, every release is an album.
+  const { data, error } = await recent().or("kind.is.null,kind.eq.album");
+  if (error && isMissingColumn(error)) {
+    const { data: every } = await recent();
+    return (every ?? []).map(toAlbum);
+  }
   return (data ?? []).map(toAlbum);
 }
 
