@@ -122,8 +122,44 @@ describe("followArtists", () => {
 
   it("says so at 2,000 artists", async () => {
     fake.answer("artists", { data: [{ mbid: TYLER }], error: null });
-    fake.answer("artist_follows", { data: null, error: { code: "23514", message: "full" } });
+    fake.answer(
+      "artist_follows",
+      { data: [], error: null },
+      { data: null, error: { code: "23514", message: "full" } },
+    );
     expect(await followArtists([TYLER])).toEqual({ ok: false, error: ARTISTS_FULL });
+  });
+
+  it("adds only the ones not followed yet, so the limit isn't reached by those", async () => {
+    fake.answer("artists", { data: [{ mbid: TYLER }, { mbid: NAS }], error: null });
+    fake.answer("artist_follows", { data: [{ artist_mbid: TYLER }], error: null });
+    expect(await followArtists([TYLER, NAS])).toEqual({ ok: true });
+    const read = fake.callsOn("artist_follows");
+    expect(read).toContainEqual({ table: "artist_follows", method: "eq", args: ["user_id", "me"] });
+    expect(read).toContainEqual({
+      table: "artist_follows",
+      method: "in",
+      args: ["artist_mbid", [TYLER, NAS]],
+    });
+    expect(read.find((c) => c.method === "upsert")?.args[0]).toEqual([
+      { user_id: "me", artist_mbid: NAS },
+    ]);
+  });
+
+  it("is done at once when every one is followed already", async () => {
+    fake.answer("artists", { data: [{ mbid: TYLER }], error: null });
+    fake.answer("artist_follows", { data: [{ artist_mbid: TYLER }], error: null });
+    expect(await followArtists([TYLER])).toEqual({ ok: true });
+    expect(fake.callsOn("artist_follows").some((c) => c.method === "upsert")).toBe(false);
+  });
+
+  it("tries nothing when reading the follows fails", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fake.answer("artists", { data: [{ mbid: TYLER }], error: null });
+    fake.answer("artist_follows", { data: null, error: { code: "57014", message: "timeout" } });
+    expect((await followArtists([TYLER])).ok).toBe(false);
+    expect(fake.callsOn("artist_follows").some((c) => c.method === "upsert")).toBe(false);
+    spy.mockRestore();
   });
 });
 

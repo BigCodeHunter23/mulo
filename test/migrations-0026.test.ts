@@ -107,6 +107,22 @@ describe("0026 following artists", () => {
     ).rejects.toThrow(/artist follows full/);
   });
 
+  it("lets somebody at 2,000 add an artist they follow already, which changes nothing", async () => {
+    await as(
+      U(3),
+      `insert into public.artist_follows (user_id, artist_mbid) values ('${U(3)}', ${A(1)})
+       on conflict do nothing`,
+    );
+    // Plainly, it's the follow that's already there, not the limit.
+    await expect(
+      as(
+        U(3),
+        `insert into public.artist_follows (user_id, artist_mbid) values ('${U(3)}', ${A(1)})`,
+      ),
+    ).rejects.toThrow(/duplicate key/);
+    expect(await follows(U(3))).toBe(2000);
+  });
+
   it("goes with the account", async () => {
     await db.exec(`delete from auth.users where id = '${U(3)}'`);
     expect(await follows(U(3))).toBe(0);

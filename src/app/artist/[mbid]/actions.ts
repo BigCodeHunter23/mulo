@@ -99,8 +99,27 @@ export async function followArtists(mbids: string[]): Promise<SaveResult> {
     logQueryError("artist follows", readError);
     return { ok: false, error: TRY_AGAIN };
   }
-  const rows = (known ?? []).map((artist) => ({ user_id: user.id, artist_mbid: artist.mbid }));
-  if (rows.length === 0) return { ok: false, error: NOT_FOUND };
+  if (!known || known.length === 0) return { ok: false, error: NOT_FOUND };
+
+  // Those followed already are left out: at the limit, adding them again
+  // would otherwise be refused as one too many.
+  const { data: followed, error: followedError } = await supabase
+    .from("artist_follows")
+    .select("artist_mbid")
+    .eq("user_id", user.id)
+    .in(
+      "artist_mbid",
+      known.map((artist) => artist.mbid),
+    );
+  if (followedError) {
+    logQueryError("artist follows", followedError, "0026");
+    return { ok: false, error: TRY_AGAIN };
+  }
+  const already = new Set((followed ?? []).map((row) => row.artist_mbid));
+  const rows = known
+    .filter((artist) => !already.has(artist.mbid))
+    .map((artist) => ({ user_id: user.id, artist_mbid: artist.mbid }));
+  if (rows.length === 0) return { ok: true };
 
   const { error } = await supabase
     .from("artist_follows")

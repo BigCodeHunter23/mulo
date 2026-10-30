@@ -58,7 +58,9 @@ create policy "People unfollow artists for themselves"
 /**
  * At most 2,000 artists each. One person's follows are added one statement
  * at a time, so two at once can't both slip under the limit; a statement
- * adding several sees the rows it added before.
+ * adding several sees the rows it added before. A follow that's there
+ * already is let through, to be ignored (on conflict do nothing) or refused
+ * as a duplicate: it adds nothing, so it isn't one too many.
  */
 create or replace function public.artist_follows_cap()
 returns trigger
@@ -67,6 +69,12 @@ set search_path = ''
 as $$
 begin
   perform pg_advisory_xact_lock(hashtextextended('artist_follows:' || new.user_id::text, 0));
+  if exists (
+    select 1 from public.artist_follows f
+    where f.user_id = new.user_id and f.artist_mbid = new.artist_mbid
+  ) then
+    return new;
+  end if;
   if (select count(*) from public.artist_follows f where f.user_id = new.user_id) >= 2000 then
     raise exception 'artist follows full' using errcode = '23514';
   end if;
