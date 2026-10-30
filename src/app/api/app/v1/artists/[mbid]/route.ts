@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import type { ArtistPage } from "@/lib/app-api";
 import { appCaller, appError, appJson, appRoute, type Params } from "@/lib/app-route";
-import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
+import { getArtistFollowState } from "@/lib/artist-follows";
+import { getCachedArtist, getCachedArtistAlbums, getCachedArtistEps } from "@/lib/catalog";
 import { getSetProgress } from "@/lib/gauntlet";
 import {
   getFriendRaters,
@@ -27,29 +28,33 @@ export const GET = appRoute(async (_request: NextRequest, { params }: Params<{ m
   const artist = await getCachedArtist(mbid);
   if (!artist) return appError(404, NOT_FOUND);
 
-  const [albums, scores, own, reviews, topSongs] = await Promise.all([
+  const [albums, eps, scores, own, reviews, topSongs, follow] = await Promise.all([
     getCachedArtistAlbums(mbid),
+    getCachedArtistEps(mbid),
     getScores("artist", mbid),
     getOwnRating("artist", mbid),
     getReviews("artist", mbid),
     getTopSongs(mbid),
+    getArtistFollowState(mbid),
   ]);
   const albumMbids = albums.map((album) => album.mbid);
+  const records = [...albumMbids, ...eps.map((ep) => ep.mbid)];
   const [albumScores, myAlbumScores, albumFriends, reactions, setProgress] = await Promise.all([
-    getScoresForReleases(albumMbids),
-    getMyAlbumScores(albumMbids),
-    getFriendRaters("album", albumMbids),
+    getScoresForReleases(records),
+    getMyAlbumScores(records),
+    getFriendRaters("album", records),
     getReactions(
       "artist",
       reviews.map((review) => review.id),
     ),
-    // How much of the discography the signed-in person has rated.
+    // How much of the discography (its albums) the signed-in person has rated.
     caller.user ? getSetProgress(caller.user.id, albumMbids) : null,
   ]);
 
   return appJson<ArtistPage>({
     artist,
     albums,
+    eps,
     scores,
     own,
     reviews,
@@ -60,5 +65,7 @@ export const GET = appRoute(async (_request: NextRequest, { params }: Params<{ m
     myAlbumScores: Object.fromEntries(myAlbumScores),
     albumFriends,
     setProgress,
+    following: follow.following,
+    followers: follow.followers,
   });
 });

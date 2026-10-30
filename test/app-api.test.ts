@@ -28,6 +28,8 @@ const lib = vi.hoisted(() => ({
   getCachedRelease: vi.fn(),
   getCachedArtist: vi.fn(),
   getCachedArtistAlbums: vi.fn(),
+  getCachedArtistEps: vi.fn(),
+  getArtistFollowState: vi.fn(),
   getCachedTracks: vi.fn(),
   // ratings
   getScores: vi.fn(),
@@ -117,8 +119,10 @@ vi.mock("@/lib/catalog", () => ({
   getCachedRelease: lib.getCachedRelease,
   getCachedArtist: lib.getCachedArtist,
   getCachedArtistAlbums: lib.getCachedArtistAlbums,
+  getCachedArtistEps: lib.getCachedArtistEps,
   getCachedTracks: lib.getCachedTracks,
 }));
+vi.mock("@/lib/artist-follows", () => ({ getArtistFollowState: lib.getArtistFollowState }));
 vi.mock("@/lib/ratings", () => ({
   NO_FRIENDS: { artists: {}, albums: {} },
   getScores: lib.getScores,
@@ -510,6 +514,20 @@ describe("GET artists/[mbid]", () => {
     lib.getMyAlbumScores.mockResolvedValue(new Map());
     lib.getFriendRaters.mockResolvedValue({});
     lib.getSetProgress.mockResolvedValue({ total: 1, rated: 0, remaining: [MBID] });
+    lib.getCachedArtistEps.mockResolvedValue([]);
+    lib.getArtistFollowState.mockResolvedValue({ following: false, followers: 0 });
+  });
+
+  it("says whether you follow them and how many do, and lists their EPs with scores", async () => {
+    signIn();
+    const ep = { ...RELEASE, mbid: "ep-mbid", title: "Cherry Bomb + Instrumentals" };
+    lib.getCachedArtistEps.mockResolvedValue([ep]);
+    lib.getArtistFollowState.mockResolvedValue({ following: true, followers: 1204 });
+    const body = await (await artist()).json();
+    expect(body).toMatchObject({ eps: [ep], following: true, followers: 1204 });
+    expect(lib.getScoresForReleases).toHaveBeenCalledWith([MBID, "ep-mbid"]);
+    // The Gauntlet is albums only.
+    expect(lib.getSetProgress).toHaveBeenCalledWith(OTHER, [MBID]);
   });
 
   it("answers signed out, with album scores as plain objects", async () => {

@@ -725,19 +725,25 @@ export type AlbumTracks = { tracks: Track[]; scores: SongScores };
 export type ArtistPage = {
   artist: Artist;
   albums: Release[];
+  /** Their EPs, newest first: a row under the albums. */
+  eps: Release[];
   scores: Scores;
   own: OwnRating;
   reviews: Review[];
   reactions: Record<number, ReactionSummary>;
   topSongs: TopSong[];
-  /** Everyone's average for each album, unrated ones left out. */
+  /** Everyone's average for each album and EP, unrated ones left out. */
   albumScores: Record<string, number>;
-  /** The signed-in person's score for each album they've rated. */
+  /** The signed-in person's score for each album and EP they've rated. */
   myAlbumScores: Record<string, number>;
-  /** Who among the people you follow rated each album. */
+  /** Who among the people you follow rated each album and EP. */
   albumFriends: Record<string, FriendScore[]>;
   /** How much of the discography the signed-in person has rated. Null signed out. */
   setProgress: SetProgress | null;
+  /** Whether the signed-in person follows them (`POST`/`DELETE artists/[mbid]/follow`). */
+  following: boolean;
+  /** How many people follow them; pages show it from 3 ("1,204 followers"). */
+  followers: number;
 };
 
 /** `GET artists/[mbid]/similar` (Where Next) */
@@ -1479,3 +1485,12 @@ export type NewRelease = {
  * newest first, then up to a month ahead, soonest first. Empty: hide the shelf.
  */
 export type NewReleasesShelf = { releases: NewRelease[] };
+
+/** `POST me/artist-follows`: one to twelve artists from the suggestions card. Answers `SaveResult`. */
+export type ArtistFollowsInput = { mbids: string[] };
+
+/** `GET me/artist-suggestions`: up to 12 artists you rate highest and don't follow yet, best first. */
+export type SuggestedArtists = { artists: ArtistSummary[] };
+
+/** `GET users/[username]/artists?page=`: the artists somebody follows, newest first, 50 a page. */
+export type FollowedArtistsPage = { artists: ArtistSummary[]; hasMore: boolean };
