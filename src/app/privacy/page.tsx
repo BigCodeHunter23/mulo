@@ -124,7 +124,7 @@ export default function PrivacyPage() {
               were raised on, your GOAT, your badges, your streak, the kinds of music you score
               highest, how many records you&rsquo;ve rated, your average score, how many people you
               follow and how many follow you, and how many artists you follow. An artist&rsquo;s
-              page shows how many people follow them, never who.
+              page shows how many people follow them.
             </>,
             <>
               <strong className="text-text">Your listening diary</strong>, unless you make it
@@ -140,8 +140,14 @@ export default function PrivacyPage() {
         />
         <p>
           <strong className="text-text">The rest needs an account:</strong> everything you&rsquo;ve
-          rated in one place, your Top Shelf, your lists, who you follow and who follows you by
-          name, the artists you follow, the newest ratings from everybody, and replies.
+          rated in one place, your Top Shelf, your lists, the newest ratings from everybody, and
+          replies.
+        </p>
+        <p>
+          <strong className="text-text">Who you follow is public.</strong> The people and artists
+          you follow, and who follows you, aren&rsquo;t private. MULO&rsquo;s pages list them by
+          name to people who are signed in, but they aren&rsquo;t kept from anybody, with an account
+          or without one.
         </p>
         <p>
           <strong className="text-text">Replies</strong> are only for people who are signed in:
