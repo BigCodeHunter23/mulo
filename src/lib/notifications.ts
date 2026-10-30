@@ -2,6 +2,7 @@ import "server-only";
 import { hiddenPeople } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { diaryImportNotifications, latestDiaryImportAt } from "@/lib/diary/notifications";
+import { latestReleaseAt, releaseNotifications } from "@/lib/releases/notifications";
 import { getReplyNotifications, latestReplyActivityAt } from "@/lib/reply-notifications";
 import { getFollowingIds } from "@/lib/social";
 import {
@@ -100,8 +101,8 @@ async function alsoRated(
 
 /**
  * What's happened to somebody lately: new followers, loves and nahs on their
- * ratings, replies and mentions, the Daily Versus, and a diary import
- * finishing. Worked out from those tables on request, like the feed, so
+ * ratings, replies and mentions, the Daily Versus, a diary import
+ * finishing, and new releases by artists they follow. Worked out from those tables on request, like the feed, so
  * there's nothing extra to store or keep in step.
  */
 export async function getNotifications(userId: string, limit = 50): Promise<Notification[]> {
@@ -120,6 +121,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     shared,
     replies,
     imports,
+    releaseLines,
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -170,6 +172,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     alsoRated(supabase, userId, limit),
     getReplyNotifications(userId, limit),
     diaryImportNotifications(userId),
+    releaseNotifications(userId),
   ]);
 
   // Follows point at accounts rather than profiles, so their names come separately.
@@ -190,6 +193,7 @@ export async function getNotifications(userId: string, limit = 50): Promise<Noti
     ...shared,
     ...replies,
     ...imports,
+    ...releaseLines,
     ...followRows.flatMap((row): Notification[] => {
       const person = people.get(row.follower_id);
       return person
@@ -307,6 +311,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     versus,
     reply,
     diaryImport,
+    release,
   ] = await Promise.all([
     supabase
       .from("follows")
@@ -346,6 +351,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     // Times only; row-level security already leaves out anybody hidden.
     latestReplyActivityAt(userId),
     latestDiaryImportAt(userId),
+    latestReleaseAt(userId),
   ]);
 
   const times = [
@@ -363,6 +369,7 @@ export async function getLatestNotificationAt(userId: string): Promise<string | 
     .concat(versus ? [versus] : [])
     .concat(reply ? [reply] : [])
     .concat(diaryImport ? [diaryImport] : [])
+    .concat(release ? [release] : [])
     .sort((a, b) => Date.parse(b) - Date.parse(a));
 
   return times[0] ?? null;

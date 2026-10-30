@@ -1360,7 +1360,23 @@ export type Notification =
   /** A Versus they picked in has closed. */
   | { kind: "versus-result"; key: string; at: string; result: VersusResult }
   /** An import finished: "Your Last.fm history is in: 820 albums to rate." */
-  | { kind: "diary-import"; key: string; at: string; source: ImportSource; count: number };
+  | { kind: "diary-import"; key: string; at: string; source: ImportSource; count: number }
+  /**
+   * An artist they follow put out an album or EP. Dated 10am on its day on
+   * their clock, and listed from then; opens the album.
+   */
+  | {
+      kind: "release";
+      key: string;
+      at: string;
+      release: {
+        mbid: string;
+        title: string;
+        kind: ReleaseKind;
+        cover_art_url: string;
+        artist: { mbid: string; name: string };
+      };
+    };
 
 /** `GET notifications`; `following` marks who already gets a Follow back. */
 export type NotificationsPage = { notifications: Notification[]; following: string[] };

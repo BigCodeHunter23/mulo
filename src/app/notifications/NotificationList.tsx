@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Notification, Person } from "@/lib/notifications";
 import { leader, peopleList, shares, SIDES, type VersusResult } from "@/lib/versus-shared";
 import { SOURCE_NAME } from "@/lib/diary-shared";
+import { KIND_WORD } from "@/lib/releases/words";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/FollowButton";
 import RecordDisc from "@/components/RecordDisc";
@@ -65,6 +66,18 @@ function Icon({ item }: { item: Notification }) {
     return (
       <Link href="/diary" className="shrink-0" aria-label="Your diary">
         <RecordDisc cover={null} className="h-10 w-10" />
+      </Link>
+    );
+  }
+  // A release is the record's, not anybody's doing: its cover, opening it.
+  if (item.kind === "release") {
+    return (
+      <Link
+        href={`/album/${item.release.mbid}`}
+        className="shrink-0"
+        aria-label={item.release.title}
+      >
+        <RecordDisc cover={item.release.cover_art_url} className="h-10 w-10" />
       </Link>
     );
   }
@@ -176,6 +189,19 @@ function Text({ item }: { item: Notification }) {
             Your {SOURCE_NAME[item.source]} history is in:
           </Link>{" "}
           {item.count.toLocaleString("en")} {item.count === 1 ? "album" : "albums"} to rate.
+        </p>
+      );
+    case "release":
+      return (
+        <p>
+          New {KIND_WORD[item.release.kind]} from{" "}
+          <Link href={`/artist/${item.release.artist.mbid}`} className={strong}>
+            {item.release.artist.name}
+          </Link>
+          :{" "}
+          <Link href={`/album/${item.release.mbid}`} className={strong}>
+            {item.release.title}
+          </Link>
         </p>
       );
   }
