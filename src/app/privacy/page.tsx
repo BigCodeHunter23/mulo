@@ -51,8 +51,8 @@ export default function PrivacyPage() {
             </>,
             <>
               <strong className="text-text">What you put in:</strong> scores, reviews, replies,
-              lists, your GOAT, Versus picks and takes, who you follow, who you&rsquo;ve blocked,
-              and anything you report.
+              lists, your GOAT, Versus picks and takes, the people and artists you follow, who
+              you&rsquo;ve blocked, and anything you report.
             </>,
             <>
               <strong className="text-text">Your listening diary</strong>, if you keep one: what
@@ -66,8 +66,8 @@ export default function PrivacyPage() {
             </>,
             <>
               <strong className="text-text">Your time zone and when you were last here</strong>, so
-              streaks and reminders run on your own clock and stop if you&rsquo;ve been away a
-              while. Nobody else can see either.
+              streaks, reminders and new release alerts run on your own clock and stop if
+              you&rsquo;ve been away a while. Nobody else can see either.
             </>,
             <>
               <strong className="text-text">A little technical housekeeping:</strong> your network
@@ -105,9 +105,9 @@ export default function PrivacyPage() {
 
       <Section title="What other people can see">
         <p>
-          Your scores, reviews, replies, lists and who you follow are visible to other people on
-          MULO — that&rsquo;s the point of it. Some of it can be seen by anybody, including people
-          without an account and search engines:
+          Your scores, reviews, replies, lists and the people and artists you follow are visible to
+          other people on MULO — that&rsquo;s the point of it. Some of it can be seen by anybody,
+          including people without an account and search engines:
         </p>
         <List
           items={[
@@ -122,8 +122,9 @@ export default function PrivacyPage() {
             <>
               <strong className="text-text">Your profile:</strong> your name, picture, bio, what you
               were raised on, your GOAT, your badges, your streak, the kinds of music you score
-              highest, how many records you&rsquo;ve rated, your average score, and how many people
-              you follow and how many follow you.
+              highest, how many records you&rsquo;ve rated, your average score, how many people you
+              follow and how many follow you, and how many artists you follow. An artist&rsquo;s
+              page shows how many people follow them, never who.
             </>,
             <>
               <strong className="text-text">Your listening diary</strong>, unless you make it
@@ -140,7 +141,7 @@ export default function PrivacyPage() {
         <p>
           <strong className="text-text">The rest needs an account:</strong> everything you&rsquo;ve
           rated in one place, your Top Shelf, your lists, who you follow and who follows you by
-          name, the newest ratings from everybody, and replies.
+          name, the artists you follow, the newest ratings from everybody, and replies.
         </p>
         <p>
           <strong className="text-text">Replies</strong> are only for people who are signed in:
@@ -250,8 +251,8 @@ export default function PrivacyPage() {
           items={[
             <>
               <strong className="text-text">Download my data</strong> hands you a file with
-              everything you&rsquo;ve put in — every score, review, reply, list and follow, and your
-              listening diary — and your notification settings.
+              everything you&rsquo;ve put in — every score, review, reply, list and follow, the
+              artists you follow, and your listening diary — and your notification settings.
             </>,
             <>
               <strong className="text-text">Deleting your account</strong> removes your profile and

@@ -30,64 +30,82 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
     return null;
   });
 
-  const [profile, albums, artists, songs, lists, following, followers, picks, replies] =
-    await Promise.all([
+  const [
+    profile,
+    albums,
+    artists,
+    songs,
+    lists,
+    following,
+    followers,
+    picks,
+    replies,
+    artistFollows,
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("username, display_name, bio, avatar_url, created_at")
+      .eq("id", user.id)
+      .maybeSingle(),
+    readAll((from, to) =>
       supabase
-        .from("profiles")
-        .select("username, display_name, bio, avatar_url, created_at")
-        .eq("id", user.id)
-        .maybeSingle(),
-      readAll((from, to) =>
-        supabase
-          .from("ratings")
-          .select("release_mbid, score, review, created_at, updated_at")
-          .eq("user_id", user.id)
-          .order("release_mbid")
-          .range(from, to),
-      ),
-      readAll((from, to) =>
-        supabase
-          .from("artist_ratings")
-          .select("artist_mbid, score, review, created_at, updated_at")
-          .eq("user_id", user.id)
-          .order("artist_mbid")
-          .range(from, to),
-      ),
-      readAll((from, to) =>
-        supabase
-          .from("song_ratings")
-          .select("song_mbid, release_mbid, score, created_at, updated_at")
-          .eq("user_id", user.id)
-          .order("song_mbid")
-          .range(from, to),
-      ),
-      supabase.from("lists").select("id, title, description, created_at").eq("user_id", user.id),
-      readAll((from, to) =>
-        supabase
-          .from("follows")
-          .select("following_id, created_at")
-          .eq("follower_id", user.id)
-          .order("following_id")
-          .range(from, to),
-      ),
-      readAll((from, to) =>
-        supabase
-          .from("follows")
-          .select("follower_id, created_at")
-          .eq("following_id", user.id)
-          .order("follower_id")
-          .range(from, to),
-      ),
-      supabase.from("top_albums").select("release_mbid, position").eq("user_id", user.id),
-      readAll((from, to) =>
-        supabase
-          .from("replies")
-          .select("rating_id, artist_rating_id, versus_take_id, body, created_at")
-          .eq("user_id", user.id)
-          .order("id")
-          .range(from, to),
-      ),
-    ]);
+        .from("ratings")
+        .select("release_mbid, score, review, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("release_mbid")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("artist_ratings")
+        .select("artist_mbid, score, review, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("artist_mbid")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("song_ratings")
+        .select("song_mbid, release_mbid, score, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("song_mbid")
+        .range(from, to),
+    ),
+    supabase.from("lists").select("id, title, description, created_at").eq("user_id", user.id),
+    readAll((from, to) =>
+      supabase
+        .from("follows")
+        .select("following_id, created_at")
+        .eq("follower_id", user.id)
+        .order("following_id")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("follows")
+        .select("follower_id, created_at")
+        .eq("following_id", user.id)
+        .order("follower_id")
+        .range(from, to),
+    ),
+    supabase.from("top_albums").select("release_mbid, position").eq("user_id", user.id),
+    readAll((from, to) =>
+      supabase
+        .from("replies")
+        .select("rating_id, artist_rating_id, versus_take_id, body, created_at")
+        .eq("user_id", user.id)
+        .order("id")
+        .range(from, to),
+    ),
+    readAll((from, to) =>
+      supabase
+        .from("artist_follows")
+        .select("artist_mbid, created_at")
+        .eq("user_id", user.id)
+        .order("artist_mbid")
+        .range(from, to),
+    ),
+  ]);
 
   // Only their own lists' albums: anyone's are readable, so ask for theirs by id.
   const mine = (lists.data ?? []).map((list) => list.id);
@@ -120,6 +138,9 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
   // Before migration 0024 there are no replies to copy; that's not worth a log.
   if (replies.error && !isMissingTable(replies.error))
     logQueryError("account export", replies.error);
+  // Before migration 0026 nobody follows artists; that's not worth a log either.
+  if (artistFollows.error && !isMissingTable(artistFollows.error))
+    logQueryError("account export", artistFollows.error);
 
   const [pushCopy, diaryCopy] = await Promise.all([push, diary]);
 
@@ -137,6 +158,7 @@ export async function exportFor(user: CurrentUser): Promise<{ body: string; file
     goat: picks.data ?? [],
     following: following.data,
     followers: followers.data,
+    following_artists: artistFollows.data,
     replies: replies.data,
     push_settings: pushCopy.settings,
     push_phones: pushCopy.phones,

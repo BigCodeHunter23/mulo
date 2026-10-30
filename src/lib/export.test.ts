@@ -21,6 +21,7 @@ vi.mock("@/lib/push/store", () => push);
 vi.mock("@/lib/diary/read", () => diary);
 
 import { exportFor } from "@/lib/export";
+import { createClient } from "@/lib/supabase/server";
 
 const ME = { id: "me", email: "me@example.com" } as Parameters<typeof exportFor>[0];
 
@@ -94,5 +95,24 @@ describe("a copy of your data", () => {
     const body = JSON.parse((await exportFor(ME)).body) as Record<string, unknown>;
     expect(body.diary).toBeNull();
     expect(body.album_ratings).toEqual([]);
+  });
+
+  it("includes the artists you follow", async () => {
+    push.pushCopyOf.mockResolvedValue({ settings: null, phones: [] });
+    const follows = [{ artist_mbid: "tyler", created_at: "2026-10-30T00:00:00Z" }];
+    vi.mocked(createClient).mockResolvedValueOnce({
+      from: (table: string) =>
+        table === "artist_follows"
+          ? {
+              select: () => ({
+                eq: () => ({
+                  order: () => ({ range: async () => ({ data: follows, error: null }) }),
+                }),
+              }),
+            }
+          : query(),
+    } as never);
+    const body = JSON.parse((await exportFor(ME)).body) as Record<string, unknown>;
+    expect(body.following_artists).toEqual(follows);
   });
 });
