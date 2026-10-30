@@ -83,6 +83,39 @@ export type Database = {
         }
         Relationships: []
       }
+      artist_follows: {
+        Row: {
+          artist_mbid: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          artist_mbid: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          artist_mbid?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_follows_artist_mbid_fkey"
+            columns: ["artist_mbid"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["mbid"]
+          },
+          {
+            foreignKeyName: "artist_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artist_ratings: {
         Row: {
           artist_mbid: string
@@ -128,12 +161,31 @@ export type Database = {
           },
         ]
       }
+      artist_release_reads: {
+        Row: {
+          day: string
+          read_at: string | null
+          tries: number
+        }
+        Insert: {
+          day: string
+          read_at?: string | null
+          tries?: number
+        }
+        Update: {
+          day?: string
+          read_at?: string | null
+          tries?: number
+        }
+        Relationships: []
+      }
       artists: {
         Row: {
           albums_cached_at: string | null
           bio: string | null
           bio_url: string | null
           cached_at: string
+          eps_cached_at: string | null
           image_url: string | null
           mbid: string
           name: string
@@ -148,6 +200,7 @@ export type Database = {
           bio?: string | null
           bio_url?: string | null
           cached_at?: string
+          eps_cached_at?: string | null
           image_url?: string | null
           mbid: string
           name: string
@@ -162,6 +215,7 @@ export type Database = {
           bio?: string | null
           bio_url?: string | null
           cached_at?: string
+          eps_cached_at?: string | null
           image_url?: string | null
           mbid?: string
           name?: string
@@ -488,6 +542,50 @@ export type Database = {
           },
         ]
       }
+      new_releases: {
+        Row: {
+          artist_mbid: string
+          confirmed_at: string | null
+          found_at: string
+          kind: string
+          listed_date: string
+          refused_at: string | null
+          release_date: string
+          release_group_mbid: string
+          title: string
+        }
+        Insert: {
+          artist_mbid: string
+          confirmed_at?: string | null
+          found_at?: string
+          kind: string
+          listed_date: string
+          refused_at?: string | null
+          release_date: string
+          release_group_mbid: string
+          title: string
+        }
+        Update: {
+          artist_mbid?: string
+          confirmed_at?: string | null
+          found_at?: string
+          kind?: string
+          listed_date?: string
+          refused_at?: string | null
+          release_date?: string
+          release_group_mbid?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_releases_artist_mbid_fkey"
+            columns: ["artist_mbid"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["mbid"]
+          },
+        ]
+      }
       personal_settings: {
         Row: {
           last_seen_at: string | null
@@ -495,6 +593,7 @@ export type Database = {
           notify_drop: boolean
           notify_follows: boolean
           notify_loves: boolean
+          notify_releases: boolean
           notify_replies: boolean
           notify_streak: boolean
           notify_versus: boolean
@@ -507,6 +606,7 @@ export type Database = {
           notify_drop?: boolean
           notify_follows?: boolean
           notify_loves?: boolean
+          notify_releases?: boolean
           notify_replies?: boolean
           notify_streak?: boolean
           notify_versus?: boolean
@@ -519,6 +619,7 @@ export type Database = {
           notify_drop?: boolean
           notify_follows?: boolean
           notify_loves?: boolean
+          notify_releases?: boolean
           notify_replies?: boolean
           notify_streak?: boolean
           notify_versus?: boolean
@@ -771,6 +872,7 @@ export type Database = {
           cover_art_url: string | null
           details_cached_at: string | null
           genres: string[]
+          kind: string | null
           mbid: string
           popularity: number | null
           release_date: string | null
@@ -787,6 +889,7 @@ export type Database = {
           cover_art_url?: string | null
           details_cached_at?: string | null
           genres?: string[]
+          kind?: string | null
           mbid: string
           popularity?: number | null
           release_date?: string | null
@@ -803,6 +906,7 @@ export type Database = {
           cover_art_url?: string | null
           details_cached_at?: string | null
           genres?: string[]
+          kind?: string | null
           mbid?: string
           popularity?: number | null
           release_date?: string | null
@@ -1413,6 +1517,16 @@ export type Database = {
           votes: number | null
         }[]
       }
+      artist_suggestions: {
+        Args: {
+          p_limit: number
+        }
+        Returns: {
+          mbid: string | null
+          name: string | null
+          image_url: string | null
+        }[]
+      }
       artist_top_songs: {
         Args: {
           p_artist: string
@@ -1427,6 +1541,12 @@ export type Database = {
           average: number | null
           votes: number | null
         }[]
+      }
+      claim_release_read: {
+        Args: {
+          p_day: string
+        }
+        Returns: boolean
       }
       diary_forget_names: {
         Args: {
@@ -1489,6 +1609,30 @@ export type Database = {
       diary_waiting: {
         Args: never
         Returns: number
+      }
+      followed_among: {
+        Args: {
+          p_mbids: string[]
+        }
+        Returns: {
+          artist_mbid: string | null
+        }[]
+      }
+      followed_releases: {
+        Args: {
+          p_user: string
+          p_from: string
+          p_to: string
+        }
+        Returns: {
+          release_group_mbid: string | null
+          title: string | null
+          kind: string | null
+          release_date: string | null
+          artist_mbid: string | null
+          artist_name: string | null
+          followed_at: string | null
+        }[]
       }
       heavy_rotation: {
         Args: {
