@@ -30,6 +30,8 @@ import ListeningSection from "@/components/diary/ListeningSection";
 import { diaryHref } from "@/lib/diary-shared";
 import { SkeletonRows } from "@/components/Skeleton";
 import { buttonClass, ButtonLink, EmptyState, SectionHeading } from "@/components/ui";
+import ArtistSuggestions from "@/components/ArtistSuggestions";
+import { getArtistSuggestions } from "@/lib/artist-follows";
 
 export async function generateMetadata({
   params,
@@ -184,7 +186,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1 [grid-area:stats] sm:flex sm:gap-7">
+          <div className="grid grid-cols-5 gap-1 [grid-area:stats] sm:flex sm:gap-7">
             <Stat value={stats.ratings} label="Rated" />
             <Stat
               value={stats.followers}
@@ -195,6 +197,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
               value={stats.following}
               label="Following"
               href={`/u/${profile.username}/follows?show=following`}
+            />
+            <Stat
+              value={stats.artists}
+              label="Artists"
+              href={`/u/${profile.username}/follows?show=artists`}
             />
             {/* An average on its own says nothing until it's next to
                 everybody else's, which is what this opens. */}
@@ -301,6 +308,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
           </div>
         )}
       </header>
+
+      {followState.isSelf && (
+        <Suspense fallback={null}>
+          <div className="mb-10 empty:hidden">
+            <ProfileArtistSuggestions />
+          </div>
+        </Suspense>
+      )}
 
       <Suspense fallback={null}>
         <ProfileGoat userId={profile.id} name={name} isSelf={followState.isSelf} />
@@ -648,4 +663,13 @@ async function ProfileLists({
       </ul>
     </section>
   );
+}
+
+/**
+ * On your own profile: the artists you rate highest, to follow in one go,
+ * until you use the card or close it.
+ */
+async function ProfileArtistSuggestions() {
+  const artists = await getArtistSuggestions();
+  return artists.length > 0 ? <ArtistSuggestions artists={artists} /> : null;
 }
