@@ -356,6 +356,18 @@ export async function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {
   return mbFetch<MbReleaseGroup>(`/release-group/${mbid}?inc=artists+genres+ratings&fmt=json`);
 }
 
+/**
+ * One album, for confirming a new release on the clock: its type, credits
+ * and first date. One try after a busy answer, five seconds at most, so a
+ * slow MusicBrainz can't hold the clock up.
+ */
+export async function getReleaseGroupBrief(mbid: string): Promise<MbReleaseGroup> {
+  return mbFetch<MbReleaseGroup>(`/release-group/${mbid}?inc=artists&fmt=json`, {
+    retries: 1,
+    timeoutMs: 5_000,
+  });
+}
+
 function trackCount(edition: MbEdition) {
   return (edition.media ?? []).reduce((sum, m) => sum + (m["track-count"] ?? 0), 0);
 }
