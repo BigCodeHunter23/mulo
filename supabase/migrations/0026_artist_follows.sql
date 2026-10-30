@@ -99,6 +99,10 @@ create table if not exists public.new_releases (
   -- MusicBrainz agreed it's a new album or EP by that artist; or it didn't.
   confirmed_at timestamptz,
   refused_at timestamptz,
+  -- Failed tries at confirming it (MusicBrainz being down doesn't count),
+  -- and the last: it waits behind the rest, and is refused at the third.
+  tries smallint not null default 0 check (tries between 0 and 3),
+  last_error_at timestamptz,
   check (cardinality(artist_mbids) between 1 and 100 and artist_mbid = any (artist_mbids))
 );
 

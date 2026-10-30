@@ -10,6 +10,7 @@ import {
   followersOf,
   listedDates,
   markRead,
+  failRelease,
   pendingReleases,
   queueReleases,
   refuseRelease,
@@ -96,18 +97,40 @@ describe("the day's read", () => {
 });
 
 describe("confirming", () => {
-  it("hands out the longest waiting first", async () => {
+  it("hands out the longest waiting first, those that failed last", async () => {
     fake.answer("new_releases", {
       data: [
-        { release_group_mbid: GROUP, artist_mbids: [CLIPSE, TYLER], listed_date: "2026-10-30" },
+        {
+          release_group_mbid: GROUP,
+          artist_mbids: [CLIPSE, TYLER],
+          listed_date: "2026-10-30",
+          tries: 1,
+        },
       ],
       error: null,
     });
     expect(await pendingReleases(20)).toEqual([
-      { group: GROUP, artists: [CLIPSE, TYLER], listed: "2026-10-30" },
+      { group: GROUP, artists: [CLIPSE, TYLER], listed: "2026-10-30", tries: 1 },
     ]);
-    expect(call("new_releases", "order")).toEqual(["found_at"]);
+    const orders = fake.callsOn("new_releases").filter((c) => c.method === "order");
+    expect(orders.map((c) => c.args)).toEqual([
+      ["last_error_at", { ascending: true, nullsFirst: true }],
+      ["found_at"],
+    ]);
     expect(call("new_releases", "limit")).toEqual([20]);
+  });
+
+  it("notes a failed try, and refuses the release at the third", async () => {
+    await failRelease(GROUP, 2, AT);
+    expect(call("new_releases", "update")).toEqual([{ tries: 2, last_error_at: AT.toISOString() }]);
+    fake = fakeSupabase();
+    vi.mocked(createAdminClient).mockReturnValue(fake.client as never);
+    await failRelease(GROUP, 3, AT);
+    expect(call("new_releases", "update")).toEqual([
+      { tries: 3, last_error_at: AT.toISOString(), refused_at: AT.toISOString() },
+    ]);
+    fake.answer("new_releases", { data: null, error: { code: "57014", message: "timeout" } });
+    await expect(failRelease(GROUP, 1, AT)).rejects.toMatchObject({ code: "57014" });
   });
 
   it("puts a confirmed release in the catalogue and marks it", async () => {

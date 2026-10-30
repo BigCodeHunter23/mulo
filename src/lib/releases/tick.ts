@@ -1,5 +1,10 @@
 import "server-only";
-import { getReleaseGroupBrief, MbNotFoundError, type MbReleaseGroup } from "@/lib/musicbrainz";
+import {
+  getReleaseGroupBrief,
+  MbNotFoundError,
+  MbResponseError,
+  type MbReleaseGroup,
+} from "@/lib/musicbrainz";
 import { confirmGroup, type Confirmed, type Pending } from "@/lib/releases/confirm";
 import {
   newCandidates,
@@ -21,6 +26,8 @@ export type ReleasesTickDeps = {
   lookUp: (group: string) => Promise<MbReleaseGroup | null>;
   saveConfirmed: (group: string, confirmed: Confirmed) => Promise<void>;
   refuse: (group: string) => Promise<void>;
+  /** A failed try, `tries` being the count to keep. */
+  fail: (group: string, tries: number) => Promise<void>;
 };
 
 async function lookUp(group: string): Promise<MbReleaseGroup | null> {
@@ -43,6 +50,7 @@ const real = (): ReleasesTickDeps => ({
   lookUp,
   saveConfirmed: (group, confirmed) => store.saveConfirmed(group, confirmed),
   refuse: (group) => store.refuseRelease(group),
+  fail: (group, tries) => store.failRelease(group, tries),
 });
 
 export type ReleasesTickReport = {
@@ -71,10 +79,41 @@ async function readDay(day: string, deps: ReleasesTickDeps): Promise<number> {
   return candidates.length;
 }
 
+/** Failures in a row that look like MusicBrainz being down before a run stops. */
+const DOWN_IN_A_ROW = 2;
+
+/** A timeout, MusicBrainz's 5xx, or its rate limit outlasting the retries. */
+function looksDown(error: unknown): boolean {
+  if (error instanceof MbResponseError) return error.status >= 500 || error.status === 429;
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/** Confirms or refuses one waiting release. */
+async function confirmOne(
+  pending: Pending,
+  day: string,
+  deps: ReleasesTickDeps,
+  report: ReleasesTickReport,
+): Promise<void> {
+  const group = await deps.lookUp(pending.group);
+  const confirmed = group ? confirmGroup(group, pending, day) : null;
+  if (confirmed) {
+    await deps.saveConfirmed(pending.group, confirmed);
+    report.confirmed += 1;
+  } else {
+    await deps.refuse(pending.group);
+    report.refused += 1;
+  }
+}
+
 /**
  * Confirms waiting releases with MusicBrainz, one a second, none started
- * after `deadline`. A failed lookup stops the run: MusicBrainz is
- * struggling, and what's left waits for the next.
+ * after `deadline`. A release that fails is noted and the rest carry on: a
+ * try is counted on it, and the third refuses it (store.MAX_TRIES). A
+ * failure that looks like MusicBrainz being down isn't the release's fault
+ * and counts no try, and two of those in a row stop the run: what's left
+ * waits for the next.
  */
 async function confirmWaiting(
   day: string,
@@ -83,16 +122,23 @@ async function confirmWaiting(
   report: ReleasesTickReport,
 ): Promise<void> {
   if (Date.now() >= deadline) return;
+  let downInARow = 0;
   for (const pending of await deps.pending(PENDING_LIMIT)) {
     if (Date.now() >= deadline) return;
-    const group = await deps.lookUp(pending.group);
-    const confirmed = group ? confirmGroup(group, pending, day) : null;
-    if (confirmed) {
-      await deps.saveConfirmed(pending.group, confirmed);
-      report.confirmed += 1;
-    } else {
-      await deps.refuse(pending.group);
-      report.refused += 1;
+    try {
+      await confirmOne(pending, day, deps, report);
+      downInARow = 0;
+    } catch (error) {
+      report.errors += 1;
+      const down = looksDown(error);
+      console.error(`[releases] confirming ${pending.group} failed:`, reason(error));
+      try {
+        await deps.fail(pending.group, down ? pending.tries : pending.tries + 1);
+      } catch (noted) {
+        console.error("[releases] noting a failed try failed:", reason(noted));
+      }
+      downInARow = down ? downInARow + 1 : 0;
+      if (downInARow >= DOWN_IN_A_ROW) return;
     }
   }
 }

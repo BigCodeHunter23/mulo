@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { ReleaseKind } from "@/lib/app-api";
 import { addDays } from "@/lib/push/zones";
-import { MAX_ARTISTS } from "@/lib/releases/confirm";
+import { cleanTitle, isCalendarDay, MAX_ARTISTS } from "@/lib/releases/confirm";
 import { mbidSchema } from "@/lib/validation";
 
 /**
@@ -50,15 +50,19 @@ const KINDS: Partial<Record<string, ReleaseKind>> = { Album: "album", EP: "ep" }
 const listedRelease = z.object({
   release_group_mbid: mbidSchema,
   artist_mbids: z.array(z.string()),
-  release_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  release_date: z.string().refine(isCalendarDay),
   release_group_primary_type: z.string().nullish(),
   release_group_secondary_type: z.string().nullish(),
-  release_name: z.string().trim().min(1).max(500),
+  release_name: z.string(),
 });
 
 const answer = z.object({ payload: z.object({ releases: z.array(z.unknown()) }) });
 
-/** One listed release as MULO counts it: an album or EP with no secondary type, or null. */
+/**
+ * One listed release as MULO counts it: an album or EP with no secondary
+ * type, on a real day, with a title it can keep. Null for anything else, so
+ * one odd listing is skipped rather than failing the day's whole read.
+ */
 export function toFresh(value: unknown): FreshRelease | null {
   const parsed = listedRelease.safeParse(value);
   if (!parsed.success) return null;
@@ -68,13 +72,14 @@ export function toFresh(value: unknown): FreshRelease | null {
   const artists = [
     ...new Set(release.artist_mbids.filter((id) => mbidSchema.safeParse(id).success)),
   ].slice(0, MAX_ARTISTS);
-  if (artists.length === 0) return null;
+  const title = cleanTitle(release.release_name);
+  if (artists.length === 0 || !title) return null;
   return {
     group: release.release_group_mbid,
     artists,
     date: release.release_date,
     kind,
-    title: release.release_name,
+    title,
   };
 }
 

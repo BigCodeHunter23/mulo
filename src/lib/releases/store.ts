@@ -85,13 +85,17 @@ export async function queueReleases(candidates: Candidate[]): Promise<void> {
   }
 }
 
-/** Releases waiting for MusicBrainz, the longest waiting first. */
+/**
+ * Releases waiting for MusicBrainz, the longest waiting first, those that
+ * have failed after the rest, so one that keeps failing holds nothing up.
+ */
 export async function pendingReleases(limit: number): Promise<Pending[]> {
   const { data, error } = await db()
     .from("new_releases")
-    .select("release_group_mbid, artist_mbids, listed_date")
+    .select("release_group_mbid, artist_mbids, listed_date, tries")
     .is("confirmed_at", null)
     .is("refused_at", null)
+    .order("last_error_at", { ascending: true, nullsFirst: true })
     .order("found_at")
     .limit(limit);
   if (error) throw error;
@@ -99,7 +103,28 @@ export async function pendingReleases(limit: number): Promise<Pending[]> {
     group: row.release_group_mbid,
     artists: row.artist_mbids,
     listed: row.listed_date,
+    tries: row.tries,
   }));
+}
+
+/** The failed tries after which a release is refused. */
+export const MAX_TRIES = 3;
+
+/**
+ * A failed try at confirming a release, `tries` counting it (or not, when
+ * MusicBrainz was down). At the third it's refused, so it's left alone.
+ */
+export async function failRelease(group: string, tries: number, at = new Date()): Promise<void> {
+  const when = at.toISOString();
+  const { error } = await db()
+    .from("new_releases")
+    .update({
+      tries,
+      last_error_at: when,
+      ...(tries >= MAX_TRIES ? { refused_at: when } : {}),
+    })
+    .eq("release_group_mbid", group);
+  if (error) throw error;
 }
 
 /**

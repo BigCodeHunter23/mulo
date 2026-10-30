@@ -50,6 +50,12 @@ describe("toFresh", () => {
     expect(toFresh(listed({ artist_mbids: ["nope"] }))).toBeNull();
     expect(toFresh("nonsense")).toBeNull();
   });
+
+  it("drops a day that doesn't exist, and cuts a long title to 500 characters", () => {
+    expect(toFresh(listed({ release_date: "2026-02-30" }))).toBeNull();
+    expect(toFresh(listed({ release_name: "y".repeat(800) }))?.title).toHaveLength(500);
+    expect(toFresh(listed({ release_name: "IGOR\u0000" }))?.title).toBe("IGOR");
+  });
 });
 
 describe("readFreshReleases", () => {
@@ -89,6 +95,20 @@ describe("readFreshReleases", () => {
     expect(asked).toContain(
       `${api}?release_date=2026-10-30&days=${DAYS_AHEAD}&past=false&future=true`,
     );
+  });
+
+  it("skips the listings it can't use and keeps the rest", async () => {
+    const fetcher = answering(
+      [
+        listed({ release_date: "2026-02-30", release_group_mbid: OTHER_GROUP }),
+        { nonsense: true },
+        listed({ release_date: "2026-10-28" }),
+      ],
+      [],
+    );
+    expect(await readFreshReleases("2026-10-30", fetcher)).toEqual([
+      expect.objectContaining({ group: GROUP, date: "2026-10-28" }),
+    ]);
   });
 
   it("fails when ListenBrainz does, or answers in a shape it doesn't know", async () => {

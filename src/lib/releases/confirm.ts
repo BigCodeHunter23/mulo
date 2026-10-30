@@ -5,6 +5,9 @@ import { addDays } from "@/lib/push/zones";
 /** The most credited artists kept for a release (migration 0026 holds up to 100). */
 export const MAX_ARTISTS = 100;
 
+/** The longest title MULO keeps, in characters (migration 0026's check). */
+const TITLE_MAX = 500;
+
 /** A release waiting for MusicBrainz's say. */
 export type Pending = {
   group: string;
@@ -12,7 +15,27 @@ export type Pending = {
   artists: string[];
   /** The day ListenBrainz gave. */
   listed: string;
+  /** How many times confirming it has failed so far. */
+  tries: number;
 };
+
+/** Whether `day` is a YYYY-MM-DD that exists: no 30 February. */
+export function isCalendarDay(day: string): boolean {
+  if (!FULL_DATE.test(day)) return false;
+  const at = Date.parse(`${day}T00:00:00Z`);
+  return Number.isFinite(at) && new Date(at).toISOString().slice(0, 10) === day;
+}
+
+/**
+ * A title as it can be kept: trimmed, without the control characters
+ * Postgres refuses (NUL) or nobody should see, and cut to 500 characters,
+ * never halfway through one. Null when nothing is left.
+ */
+export function cleanTitle(title: string): string | null {
+  const plain = title.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
+  if (!plain) return null;
+  return Array.from(plain).slice(0, TITLE_MAX).join("").trim();
+}
 
 /** What MusicBrainz confirmed, for the catalogue and the alerts. */
 export type Confirmed = {
@@ -33,10 +56,12 @@ const FULL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const KINDS: Partial<Record<string, ReleaseKind>> = { Album: "album", EP: "ep" };
 
-/** MusicBrainz's first date, or ListenBrainz's when MusicBrainz has only the year or month it falls in. */
+/**
+ * MusicBrainz's first date, or ListenBrainz's when MusicBrainz has only the
+ * year or month it falls in, or a day that doesn't exist.
+ */
 function dateOf(first: string | undefined, listed: string): string | null {
-  if (!first) return listed;
-  if (FULL_DATE.test(first)) return first;
+  if (!first || FULL_DATE.test(first)) return first && isCalendarDay(first) ? first : listed;
   return listed.startsWith(first) ? listed : null;
 }
 
@@ -48,7 +73,7 @@ function dateOf(first: string | undefined, listed: string): string | null {
  */
 export function confirmGroup(
   group: MbReleaseGroup,
-  pending: Pending,
+  pending: Pick<Pending, "artists" | "listed">,
   today: string,
 ): Confirmed | null {
   const kind = KINDS[group["primary-type"] ?? ""];
@@ -56,10 +81,11 @@ export function confirmGroup(
   const credit = group["artist-credit"] ?? [];
   const primary = credit[0]?.artist;
   if (!primary || !credit.some((c) => pending.artists.includes(c.artist.id))) return null;
+  const title = cleanTitle(group.title);
   const date = dateOf(group["first-release-date"], pending.listed);
-  if (!date || date < addDays(today, -NEWS_DAYS)) return null;
+  if (!title || !date || date < addDays(today, -NEWS_DAYS)) return null;
   return {
-    title: group.title,
+    title,
     kind,
     date,
     primary: { id: primary.id, name: primary.name },

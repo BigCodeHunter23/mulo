@@ -31,6 +31,17 @@ describe("getReleaseGroupBrief", () => {
     const { getReleaseGroupBrief, MbNotFoundError } = await fresh();
     await expect(getReleaseGroupBrief("g")).rejects.toBeInstanceOf(MbNotFoundError);
   });
+
+  it("says what MusicBrainz answered when it fails", async () => {
+    answering(500, {});
+    const { getReleaseGroupBrief, MbResponseError } = await fresh();
+    const failed = getReleaseGroupBrief("g");
+    await expect(failed).rejects.toBeInstanceOf(MbResponseError);
+    await expect(failed).rejects.toMatchObject({
+      status: 500,
+      message: "MusicBrainz request failed (500): /release-group/g?inc=artists&fmt=json",
+    });
+  });
 });
 
 describe("getArtistReleaseGroups", () => {

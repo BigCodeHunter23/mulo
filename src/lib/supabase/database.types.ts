@@ -549,11 +549,13 @@ export type Database = {
           confirmed_at: string | null
           found_at: string
           kind: string
+          last_error_at: string | null
           listed_date: string
           refused_at: string | null
           release_date: string
           release_group_mbid: string
           title: string
+          tries: number
         }
         Insert: {
           artist_mbid: string
@@ -561,11 +563,13 @@ export type Database = {
           confirmed_at?: string | null
           found_at?: string
           kind: string
+          last_error_at?: string | null
           listed_date: string
           refused_at?: string | null
           release_date: string
           release_group_mbid: string
           title: string
+          tries?: number
         }
         Update: {
           artist_mbid?: string
@@ -573,11 +577,13 @@ export type Database = {
           confirmed_at?: string | null
           found_at?: string
           kind?: string
+          last_error_at?: string | null
           listed_date?: string
           refused_at?: string | null
           release_date?: string
           release_group_mbid?: string
           title?: string
+          tries?: number
         }
         Relationships: [
           {

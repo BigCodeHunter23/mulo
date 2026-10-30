@@ -20,6 +20,17 @@ function throttle<T>(fn: () => Promise<T>): Promise<T> {
 /** Thrown when MusicBrainz has no such artist or release. */
 export class MbNotFoundError extends Error {}
 
+/** Thrown when MusicBrainz answers with a failure: `status` says which. */
+export class MbResponseError extends Error {
+  constructor(
+    readonly status: number,
+    path: string,
+  ) {
+    super(`MusicBrainz request failed (${status}): ${path}`);
+    this.name = "MbResponseError";
+  }
+}
+
 type FetchOptions = {
   /** Retries when MusicBrainz says it's busy. Patient work can wait; search can't. */
   retries?: number;
@@ -55,7 +66,7 @@ async function mbFetch<T>(path: string, options: FetchOptions = {}, attempt = 1)
   }
 
   if (!response.ok) {
-    throw new Error(`MusicBrainz request failed (${response.status}): ${path}`);
+    throw new MbResponseError(response.status, path);
   }
 
   return response.json() as Promise<T>;
