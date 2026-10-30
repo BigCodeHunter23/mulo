@@ -137,6 +137,7 @@ describe("newCandidates", () => {
         title: "CHROMAKOPIA",
         kind: "album",
         listed: "2026-10-30",
+        moved: false,
       },
     ]);
     expect(newCandidates([fresh()], new Set(), new Map(), "2026-10-30")).toEqual([]);
@@ -149,7 +150,7 @@ describe("newCandidates", () => {
     ).toEqual([]);
     expect(
       newCandidates([fresh()], followed, new Map([[GROUP, "2026-11-06"]]), "2026-10-30"),
-    ).toHaveLength(1);
+    ).toEqual([expect.objectContaining({ group: GROUP, listed: "2026-10-30", moved: true })]);
   });
 
   it("keeps to the week behind and the month ahead", () => {

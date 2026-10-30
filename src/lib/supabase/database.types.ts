@@ -551,6 +551,7 @@ export type Database = {
           kind: string
           last_error_at: string | null
           listed_date: string
+          recheck: boolean
           refused_at: string | null
           release_date: string
           release_group_mbid: string
@@ -565,6 +566,7 @@ export type Database = {
           kind: string
           last_error_at?: string | null
           listed_date: string
+          recheck?: boolean
           refused_at?: string | null
           release_date: string
           release_group_mbid: string
@@ -579,6 +581,7 @@ export type Database = {
           kind?: string
           last_error_at?: string | null
           listed_date?: string
+          recheck?: boolean
           refused_at?: string | null
           release_date?: string
           release_group_mbid?: string

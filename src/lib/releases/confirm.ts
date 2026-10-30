@@ -17,7 +17,15 @@ export type Pending = {
   listed: string;
   /** How many times confirming it has failed so far. */
   tries: number;
+  /**
+   * Confirmed already, and listed on another day since: checked again, and
+   * refused only if MusicBrainz now says it isn't an album or EP.
+   */
+  recheck: boolean;
 };
+
+/** The failed tries after which a release is given up on. */
+export const MAX_TRIES = 3;
 
 /** Whether `day` is a YYYY-MM-DD that exists: no 30 February. */
 export function isCalendarDay(day: string): boolean {
@@ -65,25 +73,50 @@ function dateOf(first: string | undefined, listed: string): string | null {
   return listed.startsWith(first) ? listed : null;
 }
 
+/** What MusicBrainz says of a listed release: confirmed, or why not. */
+export type Check =
+  { ok: true; confirmed: Confirmed } | { ok: false; why: "type" | "artist" | "title" | "date" };
+
 /**
  * Whether MusicBrainz agrees a listed release is a new album or EP: Album or
  * EP, no secondary type (live, compilation, remix…), one of the artists
  * ListenBrainz listed credited, and first out no more than a week before
- * `today`, so a reissue of an old record isn't news. Null when it doesn't.
+ * `today`, so a reissue of an old record isn't news.
  */
+export function checkGroup(
+  group: MbReleaseGroup,
+  pending: Pick<Pending, "artists" | "listed">,
+  today: string,
+): Check {
+  const kind = KINDS[group["primary-type"] ?? ""];
+  if (!kind || (group["secondary-types"] ?? []).length > 0) return { ok: false, why: "type" };
+  const credit = group["artist-credit"] ?? [];
+  const primary = credit[0]?.artist;
+  if (!primary || !credit.some((c) => pending.artists.includes(c.artist.id))) {
+    return { ok: false, why: "artist" };
+  }
+  const title = cleanTitle(group.title);
+  if (!title) return { ok: false, why: "title" };
+  const date = dateOf(group["first-release-date"], pending.listed);
+  if (!date || date < addDays(today, -NEWS_DAYS)) return { ok: false, why: "date" };
+  return { ok: true, confirmed: confirmedAs(credit, primary, { kind, title, date }) };
+}
+
+/** The confirmed release, or null when MusicBrainz doesn't agree it's new. */
 export function confirmGroup(
   group: MbReleaseGroup,
   pending: Pick<Pending, "artists" | "listed">,
   today: string,
 ): Confirmed | null {
-  const kind = KINDS[group["primary-type"] ?? ""];
-  if (!kind || (group["secondary-types"] ?? []).length > 0) return null;
-  const credit = group["artist-credit"] ?? [];
-  const primary = credit[0]?.artist;
-  if (!primary || !credit.some((c) => pending.artists.includes(c.artist.id))) return null;
-  const title = cleanTitle(group.title);
-  const date = dateOf(group["first-release-date"], pending.listed);
-  if (!title || !date || date < addDays(today, -NEWS_DAYS)) return null;
+  const check = checkGroup(group, pending, today);
+  return check.ok ? check.confirmed : null;
+}
+
+function confirmedAs(
+  credit: NonNullable<MbReleaseGroup["artist-credit"]>,
+  primary: { id: string; name: string },
+  { kind, title, date }: { kind: ReleaseKind; title: string; date: string },
+): Confirmed {
   return {
     title,
     kind,

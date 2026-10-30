@@ -11,6 +11,7 @@ import {
   listedDates,
   markRead,
   failRelease,
+  keepRelease,
   pendingReleases,
   queueReleases,
   refuseRelease,
@@ -66,17 +67,18 @@ describe("the day's read", () => {
     expect(fake.callsOn("new_releases").filter((c) => c.method === "in")).toHaveLength(2);
   });
 
-  it("files releases to confirm, asking again about one whose day moved", async () => {
-    await queueReleases([
-      {
-        group: GROUP,
-        artist: TYLER,
-        artists: [CLIPSE, TYLER],
-        title: "CHROMAKOPIA",
-        kind: "album",
-        listed: "2026-10-30",
-      },
-    ]);
+  const candidate = {
+    group: GROUP,
+    artist: TYLER,
+    artists: [CLIPSE, TYLER],
+    title: "CHROMAKOPIA",
+    kind: "album" as const,
+    listed: "2026-10-30",
+    moved: false,
+  };
+
+  it("files new releases to confirm, leaving any already there alone", async () => {
+    await queueReleases([candidate]);
     expect(call("new_releases", "upsert")).toEqual([
       [
         {
@@ -87,12 +89,48 @@ describe("the day's read", () => {
           kind: "album",
           release_date: "2026-10-30",
           listed_date: "2026-10-30",
-          confirmed_at: null,
-          refused_at: null,
         },
       ],
-      { onConflict: "release_group_mbid" },
+      { onConflict: "release_group_mbid", ignoreDuplicates: true },
     ]);
+    expect(call("new_releases", "update")).toBeUndefined();
+  });
+
+  it("keeps a confirmed release whose day moved, to be checked again", async () => {
+    await queueReleases([{ ...candidate, listed: "2026-11-06", moved: true }]);
+    expect(call("new_releases", "upsert")).toBeUndefined();
+    const updates = fake.callsOn("new_releases").filter((c) => c.method === "update");
+    expect(updates.map((c) => c.args[0])).toEqual([
+      // Confirmed: still confirmed, on its day, until MusicBrainz says otherwise.
+      { listed_date: "2026-11-06", recheck: true },
+      // Waiting or refused: asked about afresh.
+      {
+        listed_date: "2026-11-06",
+        release_date: "2026-11-06",
+        artist_mbid: TYLER,
+        artist_mbids: [CLIPSE, TYLER],
+        title: "CHROMAKOPIA",
+        kind: "album",
+        refused_at: null,
+        tries: 0,
+        last_error_at: null,
+      },
+    ]);
+    const filters = fake.callsOn("new_releases").filter((c) => c.method !== "update");
+    expect(filters.map((c) => [c.method, ...c.args])).toEqual([
+      ["from", "new_releases"],
+      ["eq", "release_group_mbid", GROUP],
+      ["not", "confirmed_at", "is", null],
+      ["from", "new_releases"],
+      ["eq", "release_group_mbid", GROUP],
+      ["is", "confirmed_at", null],
+    ]);
+  });
+
+  it("throws a failed write", async () => {
+    const failure = { code: "57014", message: "timeout" };
+    fake.answer("new_releases", { data: null, error: failure });
+    await expect(queueReleases([{ ...candidate, moved: true }])).rejects.toBe(failure);
   });
 });
 
@@ -105,13 +143,16 @@ describe("confirming", () => {
           artist_mbids: [CLIPSE, TYLER],
           listed_date: "2026-10-30",
           tries: 1,
+          recheck: true,
         },
       ],
       error: null,
     });
     expect(await pendingReleases(20)).toEqual([
-      { group: GROUP, artists: [CLIPSE, TYLER], listed: "2026-10-30", tries: 1 },
+      { group: GROUP, artists: [CLIPSE, TYLER], listed: "2026-10-30", tries: 1, recheck: true },
     ]);
+    expect(call("new_releases", "is")).toEqual(["refused_at", null]);
+    expect(call("new_releases", "or")).toEqual(["confirmed_at.is.null,recheck.is.true"]);
     const orders = fake.callsOn("new_releases").filter((c) => c.method === "order");
     expect(orders.map((c) => c.args)).toEqual([
       ["last_error_at", { ascending: true, nullsFirst: true }],
@@ -172,13 +213,26 @@ describe("confirming", () => {
         artist_mbids: [TYLER, CLIPSE],
         confirmed_at: AT.toISOString(),
         refused_at: null,
+        recheck: false,
+        tries: 0,
+        last_error_at: null,
       },
+    ]);
+  });
+
+  it("keeps a confirmed release as it is when checking it again changes nothing", async () => {
+    await keepRelease(GROUP);
+    expect(call("new_releases", "update")).toEqual([
+      { recheck: false, tries: 0, last_error_at: null },
     ]);
   });
 
   it("marks one MusicBrainz refused, and throws a failed write", async () => {
     await refuseRelease(GROUP, AT);
-    expect(call("new_releases", "update")).toEqual([{ refused_at: AT.toISOString() }]);
+    // One confirmed before comes off the shelf and the bell.
+    expect(call("new_releases", "update")).toEqual([
+      { refused_at: AT.toISOString(), confirmed_at: null, recheck: false },
+    ]);
     const failure = { code: "57014", message: "timeout" };
     fake.answer("new_releases", { data: null, error: failure });
     await expect(refuseRelease(GROUP, AT)).rejects.toBe(failure);

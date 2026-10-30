@@ -1,7 +1,7 @@
 import "server-only";
 import type { ReleaseKind } from "@/lib/app-api";
 import { coverArtUrl } from "@/lib/musicbrainz";
-import type { Confirmed, Pending } from "@/lib/releases/confirm";
+import { MAX_TRIES, type Confirmed, type Pending } from "@/lib/releases/confirm";
 import type { Candidate } from "@/lib/releases/fresh";
 import { toKind } from "@/lib/releases/words";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -62,9 +62,15 @@ export async function listedDates(groups: string[]): Promise<Map<string, string>
   return found;
 }
 
-/** Files releases to confirm; one listed on a new day is asked about again. */
+/**
+ * Files releases to confirm. A new one waits for MusicBrainz. One listed on
+ * a new day keeps what it had if it was confirmed (still on the shelf, on
+ * its day, until a check with MusicBrainz moves or refuses it); one waiting
+ * or refused is asked about afresh.
+ */
 export async function queueReleases(candidates: Candidate[]): Promise<void> {
-  for (const chunk of chunks(candidates)) {
+  const fresh = candidates.filter((c) => !c.moved);
+  for (const chunk of chunks(fresh)) {
     const { error } = await db()
       .from("new_releases")
       .upsert(
@@ -76,25 +82,49 @@ export async function queueReleases(candidates: Candidate[]): Promise<void> {
           kind: c.kind,
           release_date: c.listed,
           listed_date: c.listed,
-          confirmed_at: null,
-          refused_at: null,
         })),
-        { onConflict: "release_group_mbid" },
+        { onConflict: "release_group_mbid", ignoreDuplicates: true },
       );
     if (error) throw error;
+  }
+  // Few move on any one day, so one at a time.
+  for (const c of candidates.filter((candidate) => candidate.moved)) {
+    const confirmed = await db()
+      .from("new_releases")
+      .update({ listed_date: c.listed, recheck: true })
+      .eq("release_group_mbid", c.group)
+      .not("confirmed_at", "is", null);
+    if (confirmed.error) throw confirmed.error;
+    const others = await db()
+      .from("new_releases")
+      .update({
+        listed_date: c.listed,
+        release_date: c.listed,
+        artist_mbid: c.artist,
+        artist_mbids: c.artists,
+        title: c.title,
+        kind: c.kind,
+        refused_at: null,
+        tries: 0,
+        last_error_at: null,
+      })
+      .eq("release_group_mbid", c.group)
+      .is("confirmed_at", null);
+    if (others.error) throw others.error;
   }
 }
 
 /**
- * Releases waiting for MusicBrainz, the longest waiting first, those that
- * have failed after the rest, so one that keeps failing holds nothing up.
+ * Releases waiting for MusicBrainz (confirmed ones listed on a new day
+ * among them), the longest waiting first, those that have failed after the
+ * rest, so one that keeps failing holds nothing up.
  */
 export async function pendingReleases(limit: number): Promise<Pending[]> {
   const { data, error } = await db()
     .from("new_releases")
-    .select("release_group_mbid, artist_mbids, listed_date, tries")
-    .is("confirmed_at", null)
+    .select("release_group_mbid, artist_mbids, listed_date, tries, recheck")
     .is("refused_at", null)
+    .or("confirmed_at.is.null,recheck.is.true")
     .order("last_error_at", { ascending: true, nullsFirst: true })
     .order("found_at")
     .limit(limit);
@@ -104,11 +134,9 @@ export async function pendingReleases(limit: number): Promise<Pending[]> {
     artists: row.artist_mbids,
     listed: row.listed_date,
     tries: row.tries,
+    recheck: row.recheck,
   }));
 }
-
-/** The failed tries after which a release is refused. */
-export const MAX_TRIES = 3;
 
 /**
  * A failed try at confirming a release, `tries` counting it (or not, when
@@ -174,16 +202,31 @@ export async function saveConfirmed(
       artist_mbids: confirmed.artists,
       confirmed_at: at.toISOString(),
       refused_at: null,
+      recheck: false,
+      tries: 0,
+      last_error_at: null,
     })
     .eq("release_group_mbid", group);
   if (marked.error) throw marked.error;
 }
 
-/** A release MusicBrainz doesn't agree is a new album or EP: kept, so it isn't asked about again. */
+/**
+ * A release MusicBrainz doesn't agree is a new album or EP: kept, so it
+ * isn't asked about again, and off the shelf and the bell if it was on them.
+ */
 export async function refuseRelease(group: string, at = new Date()): Promise<void> {
   const { error } = await db()
     .from("new_releases")
-    .update({ refused_at: at.toISOString() })
+    .update({ refused_at: at.toISOString(), confirmed_at: null, recheck: false })
+    .eq("release_group_mbid", group);
+  if (error) throw error;
+}
+
+/** A confirmed release checked again and left as it was. */
+export async function keepRelease(group: string): Promise<void> {
+  const { error } = await db()
+    .from("new_releases")
+    .update({ recheck: false, tries: 0, last_error_at: null })
     .eq("release_group_mbid", group);
   if (error) throw error;
 }

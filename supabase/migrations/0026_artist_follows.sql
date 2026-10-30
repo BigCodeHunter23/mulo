@@ -103,6 +103,9 @@ create table if not exists public.new_releases (
   -- and the last: it waits behind the rest, and is refused at the third.
   tries smallint not null default 0 check (tries between 0 and 3),
   last_error_at timestamptz,
+  -- Confirmed, then listed on another day: checked with MusicBrainz again,
+  -- staying confirmed meanwhile, refused only if it's no longer an album or EP.
+  recheck boolean not null default false,
   check (cardinality(artist_mbids) between 1 and 100 and artist_mbid = any (artist_mbids))
 );
 
@@ -111,7 +114,8 @@ create index if not exists new_releases_artists_idx
 create index if not exists new_releases_day_idx
   on public.new_releases (release_date) where confirmed_at is not null;
 create index if not exists new_releases_waiting_idx
-  on public.new_releases (found_at) where confirmed_at is null and refused_at is null;
+  on public.new_releases (found_at)
+  where refused_at is null and (confirmed_at is null or recheck);
 
 alter table public.new_releases enable row level security;
 revoke all on public.new_releases from anon, authenticated;

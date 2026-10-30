@@ -43,6 +43,8 @@ export type Candidate = {
   kind: ReleaseKind;
   /** The day ListenBrainz gave. */
   listed: string;
+  /** Known before on another day. */
+  moved: boolean;
 };
 
 const KINDS: Partial<Record<string, ReleaseKind>> = { Album: "album", EP: "ep" };
@@ -156,6 +158,7 @@ export function newCandidates(
         title: release.title,
         kind: release.kind,
         listed: release.date,
+        moved: known.has(release.group),
       },
     ];
   });

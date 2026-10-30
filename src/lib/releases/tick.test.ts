@@ -22,11 +22,12 @@ const album = (over: Partial<MbReleaseGroup> = {}): MbReleaseGroup => ({
   ...over,
 });
 
-const waiting = (group: string, tries = 0) => ({
+const waiting = (group: string, tries = 0, recheck = false) => ({
   group,
   artists: [TYLER],
   listed: "2026-10-30",
   tries,
+  recheck,
 });
 
 function deps(over: Partial<ReleasesTickDeps> = {}): ReleasesTickDeps {
@@ -45,13 +46,12 @@ function deps(over: Partial<ReleasesTickDeps> = {}): ReleasesTickDeps {
     followedAmong: vi.fn(async () => new Set([TYLER])),
     listedDates: vi.fn(async () => new Map<string, string>()),
     queue: vi.fn(async () => {}),
-    pending: vi.fn(async () => [
-      { group: GROUP, artists: [TYLER], listed: "2026-10-30", tries: 0 },
-    ]),
+    pending: vi.fn(async () => [waiting(GROUP)]),
     lookUp: vi.fn(async () => album()),
     saveConfirmed: vi.fn(async () => {}),
     refuse: vi.fn(async () => {}),
     fail: vi.fn(async () => {}),
+    keep: vi.fn(async () => {}),
     ...over,
   };
 }
@@ -76,6 +76,7 @@ describe("runReleasesTick", () => {
         title: "CHROMAKOPIA",
         kind: "album",
         listed: "2026-10-30",
+        moved: false,
       },
     ]);
     expect(d.markRead).toHaveBeenCalledWith("2026-10-30");
@@ -122,6 +123,61 @@ describe("runReleasesTick", () => {
     });
     expect(d.claimRead).not.toHaveBeenCalled();
     expect(d.lookUp).not.toHaveBeenCalled();
+  });
+
+  describe("a confirmed release whose day moved", () => {
+    const moved = { ...waiting(GROUP, 0, true), listed: "2026-11-06" };
+    const recheck = (group: MbReleaseGroup) =>
+      deps({
+        claimRead: vi.fn(async () => false),
+        pending: vi.fn(async () => [moved]),
+        lookUp: vi.fn(async () => group),
+      });
+
+    it("takes MusicBrainz's new day, so it's alerted on that day", async () => {
+      const d = recheck(album({ "first-release-date": "2026-11-06" }));
+      expect(await runReleasesTick(AT, later(), d)).toMatchObject({ confirmed: 1, refused: 0 });
+      expect(d.saveConfirmed).toHaveBeenCalledWith(
+        GROUP,
+        expect.objectContaining({ date: "2026-11-06" }),
+      );
+    });
+
+    it("is refused only when MusicBrainz now says it isn't an album or EP", async () => {
+      const single = recheck(album({ "primary-type": "Single" }));
+      expect(await runReleasesTick(AT, later(), single)).toMatchObject({ refused: 1 });
+      expect(single.refuse).toHaveBeenCalledWith(GROUP);
+
+      const live = recheck(album({ "secondary-types": ["Live"] }));
+      expect(await runReleasesTick(AT, later(), live)).toMatchObject({ refused: 1 });
+    });
+
+    it("stays confirmed when MusicBrainz has it no longer, or on an older day", async () => {
+      for (const group of [null, album({ "first-release-date": "2026-09-01" })]) {
+        const d = deps({
+          claimRead: vi.fn(async () => false),
+          pending: vi.fn(async () => [moved]),
+          lookUp: vi.fn(async () => group),
+        });
+        expect(await runReleasesTick(AT, later(), d)).toMatchObject({ confirmed: 0, refused: 0 });
+        expect(d.refuse).not.toHaveBeenCalled();
+        expect(d.saveConfirmed).not.toHaveBeenCalled();
+        expect(d.keep).toHaveBeenCalledWith(GROUP);
+      }
+    });
+
+    it("stays confirmed, unchecked, after its third failed try", async () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const d = deps({
+        claimRead: vi.fn(async () => false),
+        pending: vi.fn(async () => [{ ...moved, tries: 2 }]),
+        lookUp: vi.fn(async () => Promise.reject(new Error("odd"))),
+      });
+      await runReleasesTick(AT, later(), d);
+      expect(d.keep).toHaveBeenCalledWith(GROUP);
+      expect(d.fail).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
   });
 
   describe("when one release fails", () => {
