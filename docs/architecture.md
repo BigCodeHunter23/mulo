@@ -196,8 +196,9 @@ token.
 
 A push starts one of two ways. A follow or a love fires one straight away:
 the action saves, then `later()` runs `events.ts` after the response, so
-nobody waits on it. Everything timed (today's Versus, the week's Drop, a
-streak about to end) comes from the clock: Supabase's `pg_cron` calls
+nobody waits on it. Everything timed (today's Versus, an artist's new
+release, the week's Drop, a streak about to end) comes from the clock:
+Supabase's `pg_cron` calls
 `/api/app/v1/push/tick` every 15 minutes with a shared secret, and `tick.ts`
 works out who is due. "Due" is judged on each person's own clock: their time
 zone comes from the app when it registers and from the browser
@@ -208,8 +209,8 @@ pushes after 30 days away.
 Each push claims a row in `push_log` before it's sent, keyed by person, kind
 and a key that says how often that kind may go: a follow once a day per
 follower, a love once an hour per rating or take, a reply once an hour per
-thread, Versus and streaks once per local day, the Drop once a week. A
-repeated run or a retry can't send it twice. Nobody gets more than ten
+thread, Versus, release day and streaks once per local day, the Drop once
+a week. A repeated run or a retry can't send it twice. Nobody gets more than ten
 follow, love and reply pushes in an hour; past that they still show in the
 bell. The clock claims and sends up to 100 phones at a time and starts no
 batch (of pushes or receipts) after its 40-second budget, so what it leaves
@@ -227,7 +228,7 @@ src/lib/push/
   receipts.ts    checks Expo's receipts and drops phones that are gone
   events.ts      notifyFollow, notifyLove, notifyReply, and the limit of ten an hour
   later.ts       runs a task after the response
-  tick.ts        the clock's run: Versus, Drop, streak, receipts, pruning
+  tick.ts        the clock's run: Versus, release day, Drop, streak, receipts, pruning
   tick-auth.ts   checks the clock's secret
 ```
 
@@ -401,6 +402,54 @@ never a connect's state. The app API: `GET diary/{username}?before=`,
 diary/entries/{id}`, `POST diary/entries/{id}/album` (Which album is this),
 `DELETE diary/sources/{source}`, `POST diary/lastfm/start` (with an
 optional `{ timeZone }`), and `GET/PATCH me/diary` (Show my diary).
+
+## Following artists and new releases
+
+People follow artists as they follow people (migration 0026, `artist_follows`):
+public, their own to add and remove, at most 2,000 each (a trigger, which
+answers `23514`, shown as "You follow as many artists as MULO allows.").
+`src/app/artist/[mbid]/actions.ts` holds the writes (`setArtistFollowing`,
+which caches an artist MULO hasn't got and answers `first: true` on somebody's
+first artist; `followArtists`, up to 12 at once), on the `write` limit like
+following people. `src/lib/artist-follows.ts` reads: whether you follow an
+artist and how many do (pages show "1,204 followers" from three), how many
+and which artists somebody follows, and the suggestions card's artists,
+ranked by the database's `artist_suggestions` from your artist ratings, high
+album ratings, GOAT and diary.
+
+New releases are found, not derived, so they're stored: `new_releases` holds
+albums and EPs by followed artists. The clock (`push/tick`) runs
+`src/lib/releases/tick.ts` after the pushes. Once a UTC day
+(`claim_release_read`, up to four tries, in `artist_release_reads`) it reads
+ListenBrainz's fresh releases (`fresh.ts`: the week behind and the month
+ahead, two small requests), keeps albums and EPs with no secondary type by
+artists somebody follows (`followed_among`), and files the ones new to MULO,
+or listed on a new day, unconfirmed. Then, for as long as its slice of the
+run allows, it asks MusicBrainz about each (`confirm.ts`: Album or EP, no
+secondary type, the followed artist credited, first out within the week),
+one a second; what's confirmed goes into the catalogue too, so its album and
+artist pages show it at once, and what's refused stays refused.
+
+The release push goes at 10am on the release day where each person is
+(`SLOTS.release`), to everyone following the artist then, under the New
+releases switch: "Tyler, the Creator's new album is out today", or "3 new
+releases from artists you follow", opening Home. It's keyed by the person's
+day in `push_log`, so one goes a day. A release found after its day gets no
+push. The bell lists releases from the last 30 days (`releases/notifications.ts`),
+each from 10am on its day and only from the day somebody followed; Home's "New
+from artists you follow" (`releases/shelf.ts`) reads the last four weeks and
+the month ahead through `followed_releases`, dated on the viewer's own clock.
+
+An artist's EPs sit under their albums: `releases.kind` tells them apart
+(null is an album cached before 0026), and `artists.eps_cached_at` marks an
+artist whose EPs have been read from MusicBrainz, once, as `albums_cached_at`
+does for albums. The album list and The Gauntlet leave EPs out.
+
+The app API: `POST`/`DELETE artists/{mbid}/follow`, `GET artists/{mbid}`
+(with `eps`, `following` and `followers`), `GET users/{username}/artists`,
+`GET me/new-releases`, `GET me/artist-suggestions`, `POST me/artist-follows`,
+and `releases` in `me/notifications`. The data copy includes the artists you
+follow.
 
 ## The database schema
 

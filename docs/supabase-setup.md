@@ -255,3 +255,21 @@ fine). A quarter of an hour later, the clock's answer includes `diary`: in
 the SQL Editor,
 `select content from net._http_response order by created desc limit 1;`
 should show `"diary":{…}`.
+
+## 10. Following artists
+
+Turns on following artists, the new release alerts, Home's "New from artists
+you follow", and the EPs row on artist pages. Until you do this, artist pages
+show no EPs and nobody can follow an artist; nothing else changes. Pushes
+(section 7) should be set up first: finding new releases runs on the same
+clock.
+
+1. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0026_artist_follows.sql` and run it. Safe to run
+   twice.
+2. Nothing else: ListenBrainz's fresh releases need no token.
+
+Check: in the SQL Editor, `select count(*) from artist_follows;` answers (0
+is fine). After the first run of the clock past midnight UTC,
+`select * from artist_release_reads order by day desc limit 1;` shows today
+with `read_at` filled in.
