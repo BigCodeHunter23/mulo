@@ -9,8 +9,8 @@ async function fresh() {
 }
 
 function answering(status: number, body: unknown) {
-  const fetcher = vi.fn(
-    async (_input: string, _init?: RequestInit) => new Response(JSON.stringify(body), { status }),
+  const fetcher = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+    async () => new Response(JSON.stringify(body), { status }),
   );
   vi.stubGlobal("fetch", fetcher);
   return fetcher;
