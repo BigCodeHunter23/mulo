@@ -268,22 +268,31 @@ export type DayRelease = {
   artistName: string;
 };
 
-/** The confirmed releases out on any of these days. */
+/**
+ * The confirmed releases out on any of these days, read a page at a time:
+ * PostgREST answers at most 1,000 rows and says nothing of the rest.
+ */
 export async function releasesOn(days: string[]): Promise<DayRelease[]> {
   if (days.length === 0) return [];
-  const { data, error } = await db()
-    .from("new_releases")
-    .select(
-      "release_group_mbid, title, kind, release_date, artist_mbid, artist_mbids, artists!inner ( name )",
-    )
-    .in("release_date", days)
-    .not("confirmed_at", "is", null);
+  const { data, error } = await readAll(
+    (from, to) =>
+      db()
+        .from("new_releases")
+        .select(
+          "release_group_mbid, title, kind, release_date, artist_mbid, artist_mbids, artists!inner ( name )",
+        )
+        .in("release_date", days)
+        .not("confirmed_at", "is", null)
+        .order("release_group_mbid")
+        .range(from, to),
+    20_000,
+  );
   if (error) {
     // Before migration 0026 there's nothing to tell anybody.
     if (isMissingTable(error)) return [];
     throw error;
   }
-  return (data ?? []).flatMap((row): DayRelease[] => {
+  return data.flatMap((row): DayRelease[] => {
     const kind = toKind(row.kind);
     return kind
       ? [

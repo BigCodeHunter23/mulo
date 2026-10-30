@@ -316,6 +316,42 @@ describe("alerts", () => {
     expect(call("new_releases", "not")).toEqual(["confirmed_at", "is", null]);
   });
 
+  it("reads them a page at a time, so none past PostgREST's 1,000 rows are left out", async () => {
+    const row = (n: number) => ({
+      release_group_mbid: `g${String(n).padStart(4, "0")}`,
+      title: `Record ${n}`,
+      kind: "album",
+      release_date: "2026-10-30",
+      artist_mbid: TYLER,
+      artist_mbids: [TYLER],
+      artists: { name: "Tyler, the Creator" },
+    });
+    fake.answer(
+      "new_releases",
+      { data: Array.from({ length: 1000 }, (_, n) => row(n)), error: null },
+      { data: Array.from({ length: 5 }, (_, n) => row(1000 + n)), error: null },
+    );
+    const releases = await releasesOn(["2026-10-30"]);
+    expect(releases).toHaveLength(1005);
+    expect(releases.at(-1)?.mbid).toBe("g1004");
+    const asked = fake.callsOn("new_releases");
+    expect(asked.filter((c) => c.method === "range").map((c) => c.args)).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+    // Pages hold still only in an order nothing shares.
+    expect(asked.filter((c) => c.method === "order").map((c) => c.args)).toEqual([
+      ["release_group_mbid"],
+      ["release_group_mbid"],
+    ]);
+  });
+
+  it("throws when a page fails", async () => {
+    const failure = { code: "57014", message: "timeout" };
+    fake.answer("new_releases", { data: null, error: failure });
+    await expect(releasesOn(["2026-10-30"])).rejects.toMatchObject(failure);
+  });
+
   it("reads nothing before migration 0026, and nothing for no days", async () => {
     fake.answer("new_releases", { data: null, error: { code: "42P01", message: "missing" } });
     expect(await releasesOn(["2026-10-30"])).toEqual([]);
