@@ -55,4 +55,12 @@ describe("who gets what", () => {
     expect(ALL_ON.diary).toBe(true);
     expect(wants({ ...ALL_ON, diary: false }, "diary")).toBe(false);
   });
+
+  it("has a New releases switch, and a slot at 10am", () => {
+    expect(ALL_ON.releases).toBe(true);
+    expect(wants({ ...ALL_ON, releases: false }, "release")).toBe(false);
+    // 23:05 UTC on 29 Oct is 10:05 on the 30th in Sydney.
+    expect(inSlot(new Date("2026-10-29T23:05:00Z"), "Australia/Sydney", SLOTS.release)).toBe(true);
+    expect(inSlot(new Date("2026-10-29T22:05:00Z"), "Australia/Sydney", SLOTS.release)).toBe(false);
+  });
 });

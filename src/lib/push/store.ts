@@ -43,26 +43,34 @@ export async function readTimeZone(userId: string): Promise<string | null> {
   }
 }
 
-const SETTINGS =
-  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak, notify_diary";
-/** The switches before migration 0025 added Diary's. */
-const SETTINGS_BEFORE_DIARY =
-  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak";
-type Switches = typeof SETTINGS | typeof SETTINGS_BEFORE_DIARY;
+/**
+ * The switches, newest first: all of them, then without New releases'
+ * (before migration 0026), then without Diary's too (before 0025).
+ */
+const SWITCH_SETS = [
+  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak, notify_diary, notify_releases",
+  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak, notify_diary",
+  "notify_follows, notify_loves, notify_replies, notify_versus, notify_drop, notify_streak",
+] as const;
+type Switches = (typeof SWITCH_SETS)[number];
 
 /**
- * Runs a read of the switches, and runs it again without Diary's when the
- * database doesn't have that column yet: the website may go live before
- * migration 0025 runs, and that mustn't stop every other push. Diary then
- * counts as on. The column list is one of two, which the client's query
- * parser can't type, so each read names its row (`StoredSwitches` and the
- * other columns it asks for).
+ * Runs a read of the switches, and runs it again with fewer while the
+ * database lacks a newer column: the website may go live before migration
+ * 0025 or 0026 runs, and that mustn't stop every other push. A missing
+ * switch counts as on. The column list is one of three, which the client's
+ * query parser can't type, so each read names its row (`StoredSwitches` and
+ * the other columns it asks for).
  */
 async function readingSwitches<T extends { error: { code?: string } | null }>(
   read: (switches: Switches) => PromiseLike<T>,
 ): Promise<T> {
-  const result = await read(SETTINGS);
-  return isMissingColumn(result.error) ? read(SETTINGS_BEFORE_DIARY) : result;
+  let result = await read(SWITCH_SETS[0]);
+  for (const fewer of SWITCH_SETS.slice(1)) {
+    if (!isMissingColumn(result.error)) return result;
+    result = await read(fewer);
+  }
+  return result;
 }
 
 type SettingsRow = {
@@ -73,6 +81,7 @@ type SettingsRow = {
   notify_drop: boolean;
   notify_streak: boolean;
   notify_diary: boolean;
+  notify_releases: boolean;
 };
 
 const COLUMN = {
@@ -83,10 +92,14 @@ const COLUMN = {
   drop: "notify_drop",
   streak: "notify_streak",
   diary: "notify_diary",
+  releases: "notify_releases",
 } as const satisfies Record<keyof NotificationSettings, keyof SettingsRow>;
 
-/** A row read before migration 0025, which has no Diary switch. */
-type StoredSwitches = Omit<SettingsRow, "notify_diary"> & { notify_diary?: boolean };
+/** A row read before migration 0025 or 0026, without Diary's switch or New releases'. */
+type StoredSwitches = Omit<SettingsRow, "notify_diary" | "notify_releases"> & {
+  notify_diary?: boolean;
+  notify_releases?: boolean;
+};
 type Clock = { time_zone: string | null; last_seen_at: string | null };
 
 /** A missing row means nothing was ever switched off. */
@@ -100,6 +113,7 @@ export function toSettings(row: StoredSwitches | null | undefined): Notification
     drop: row.notify_drop,
     streak: row.notify_streak,
     diary: row.notify_diary ?? true,
+    releases: row.notify_releases ?? true,
   };
 }
 
@@ -124,8 +138,8 @@ export async function readSettings(userId: string): Promise<NotificationSettings
 }
 
 /**
- * Writes only the switches given, so before migration 0025 every switch but
- * Diary's still saves.
+ * Writes only the switches given, so before migrations 0025 and 0026 every
+ * other switch still saves.
  */
 export async function saveSettings(
   userId: string,
@@ -167,7 +181,9 @@ export async function pushCopyOf(userId: string): Promise<PushCopy> {
   if (settings.error) throw settings.error;
   if (phones.error) throw phones.error;
   return {
-    settings: settings.data ? { notify_diary: true, ...settings.data } : null,
+    settings: settings.data
+      ? { notify_diary: true, notify_releases: true, ...settings.data }
+      : null,
     phones: phones.data ?? [],
   };
 }

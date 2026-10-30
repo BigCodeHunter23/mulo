@@ -22,6 +22,7 @@ const store = vi.hoisted(() => ({
     drop: true,
     streak: true,
     diary: true,
+    releases: true,
   })),
   saveSettings: vi.fn(async () => {}),
 }));
@@ -159,6 +160,12 @@ describe("me/notifications", () => {
     const res = await settings.PATCH(req("PATCH", { diary: false }));
     expect(await res.json()).toEqual({ ok: true });
     expect(store.saveSettings).toHaveBeenCalledWith("me", { diary: false });
+  });
+
+  it("takes the New releases switch", async () => {
+    const res = await settings.PATCH(req("PATCH", { releases: false }));
+    expect(await res.json()).toEqual({ ok: true });
+    expect(store.saveSettings).toHaveBeenCalledWith("me", { releases: false });
   });
 
   it("refuses an empty or unknown change", async () => {

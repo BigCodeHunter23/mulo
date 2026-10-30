@@ -14,6 +14,7 @@ const change = z
     drop: z.boolean(),
     streak: z.boolean(),
     diary: z.boolean(),
+    releases: z.boolean(),
   })
   .partial()
   .strict()

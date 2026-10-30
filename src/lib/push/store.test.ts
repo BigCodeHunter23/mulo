@@ -88,7 +88,24 @@ describe("toSettings, toColumns and logKey", () => {
       drop: true,
       streak: false,
       diary: false,
+      releases: true,
     });
+  });
+
+  it("reads the New releases switch, and maps it to its column", () => {
+    expect(
+      toSettings({
+        notify_follows: true,
+        notify_loves: true,
+        notify_replies: true,
+        notify_versus: true,
+        notify_drop: true,
+        notify_streak: true,
+        notify_diary: true,
+        notify_releases: false,
+      }).releases,
+    ).toBe(false);
+    expect(toColumns({ releases: false })).toEqual({ notify_releases: false });
   });
 
   it("maps only the switches given to their columns", () => {
@@ -229,6 +246,7 @@ describe("pushCopyOf", () => {
       notify_drop: true,
       notify_streak: false,
       notify_diary: true,
+      notify_releases: true,
     };
     const phones = [
       { platform: "ios", created_at: "2026-10-01T00:00:00Z", last_seen_at: "2026-10-29T08:00:00Z" },
@@ -535,7 +553,7 @@ describe("repliedIn", () => {
   });
 });
 
-describe("before migration 0025", () => {
+describe("before migrations 0025 and 0026", () => {
   const OLD = {
     notify_follows: false,
     notify_loves: true,
@@ -570,8 +588,8 @@ describe("before migration 0025", () => {
     return selects;
   }
 
-  it("reads the switches again without Diary's, and counts Diary as on", async () => {
-    const selects = answering(missing, { data: OLD, error: null });
+  it("reads the switches again with fewer, counting the missing ones as on", async () => {
+    const selects = answering(missing, missing, { data: OLD, error: null });
     expect(await readSettings("u")).toEqual({
       follows: false,
       loves: true,
@@ -580,23 +598,38 @@ describe("before migration 0025", () => {
       drop: false,
       streak: true,
       diary: true,
+      releases: true,
     });
-    expect(selects[0]).toContain("notify_diary");
-    expect(selects[1]).not.toContain("notify_diary");
-    expect(selects[1]).toContain("notify_streak");
+    expect(selects[0]).toContain("notify_releases");
+    expect(selects[1]).toContain("notify_diary");
+    expect(selects[1]).not.toContain("notify_releases");
+    expect(selects[2]).not.toContain("notify_diary");
+    expect(selects[2]).toContain("notify_streak");
   });
 
-  it("keeps sending: readSwitches and the data copy manage without it too", async () => {
-    answering(missing, { data: [{ user_id: "u", ...OLD }], error: null });
-    expect((await readSwitches(["u"])).get("u")).toMatchObject({ follows: false, diary: true });
+  it("before 0026 alone, reads Diary's switch and counts New releases as on", async () => {
+    const selects = answering(missing, { data: { ...OLD, notify_diary: false }, error: null });
+    expect(await readSettings("u")).toMatchObject({ diary: false, releases: true });
+    expect(selects).toHaveLength(2);
+  });
 
-    // The settings, then the phones (read alongside), then the settings again.
-    answering(
-      missing,
-      { data: [], error: null },
-      { data: { time_zone: null, last_seen_at: null, ...OLD }, error: null },
-    );
-    expect((await pushCopyOf("u")).settings).toMatchObject({ notify_diary: true });
+  it("keeps sending: readSwitches and the data copy manage without them too", async () => {
+    answering(missing, missing, { data: [{ user_id: "u", ...OLD }], error: null });
+    expect((await readSwitches(["u"])).get("u")).toMatchObject({
+      follows: false,
+      diary: true,
+      releases: true,
+    });
+
+    // The settings, then the phones (read alongside), then the settings twice more.
+    answering(missing, { data: [], error: null }, missing, {
+      data: { time_zone: null, last_seen_at: null, ...OLD },
+      error: null,
+    });
+    expect((await pushCopyOf("u")).settings).toMatchObject({
+      notify_diary: true,
+      notify_releases: true,
+    });
   });
 
   it("PostgREST's own code for a missing column counts too", async () => {
@@ -604,7 +637,7 @@ describe("before migration 0025", () => {
       { data: null, error: { code: "PGRST204", message: "no column" } },
       { data: OLD, error: null },
     );
-    expect((await readSettings("u")).diary).toBe(true);
+    expect((await readSettings("u")).releases).toBe(true);
   });
 
   it("still throws any other failure", async () => {

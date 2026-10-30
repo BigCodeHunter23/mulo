@@ -669,6 +669,8 @@ export type NotificationSettings = {
   streak: boolean;
   /** A finished import: "Your Last.fm history is in". */
   diary: boolean;
+  /** An artist they follow put out an album or EP: "Tyler, the Creator's new album is out today". */
+  releases: boolean;
 };
 
 export type PushPlatform = "ios" | "android";
