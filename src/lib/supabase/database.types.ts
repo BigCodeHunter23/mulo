@@ -545,6 +545,7 @@ export type Database = {
       new_releases: {
         Row: {
           artist_mbid: string
+          artist_mbids: string[]
           confirmed_at: string | null
           found_at: string
           kind: string
@@ -556,6 +557,7 @@ export type Database = {
         }
         Insert: {
           artist_mbid: string
+          artist_mbids: string[]
           confirmed_at?: string | null
           found_at?: string
           kind: string
@@ -567,6 +569,7 @@ export type Database = {
         }
         Update: {
           artist_mbid?: string
+          artist_mbids?: string[]
           confirmed_at?: string | null
           found_at?: string
           kind?: string

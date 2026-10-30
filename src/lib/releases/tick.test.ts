@@ -38,7 +38,7 @@ function deps(over: Partial<ReleasesTickDeps> = {}): ReleasesTickDeps {
     followedAmong: vi.fn(async () => new Set([TYLER])),
     listedDates: vi.fn(async () => new Map<string, string>()),
     queue: vi.fn(async () => {}),
-    pending: vi.fn(async () => [{ group: GROUP, artist: TYLER, listed: "2026-10-30" }]),
+    pending: vi.fn(async () => [{ group: GROUP, artists: [TYLER], listed: "2026-10-30" }]),
     lookUp: vi.fn(async () => album()),
     saveConfirmed: vi.fn(async () => {}),
     refuse: vi.fn(async () => {}),
@@ -59,7 +59,14 @@ describe("runReleasesTick", () => {
     expect(d.claimRead).toHaveBeenCalledWith("2026-10-30");
     expect(d.followedAmong).toHaveBeenCalledWith([TYLER]);
     expect(d.queue).toHaveBeenCalledWith([
-      { group: GROUP, artist: TYLER, title: "CHROMAKOPIA", kind: "album", listed: "2026-10-30" },
+      {
+        group: GROUP,
+        artist: TYLER,
+        artists: [TYLER],
+        title: "CHROMAKOPIA",
+        kind: "album",
+        listed: "2026-10-30",
+      },
     ]);
     expect(d.markRead).toHaveBeenCalledWith("2026-10-30");
     expect(d.saveConfirmed).toHaveBeenCalledWith(
@@ -88,8 +95,8 @@ describe("runReleasesTick", () => {
   it("refuses what MusicBrainz doesn't agree with, or doesn't have", async () => {
     const d = deps({
       pending: vi.fn(async () => [
-        { group: GROUP, artist: TYLER, listed: "2026-10-30" },
-        { group: OTHER, artist: TYLER, listed: "2026-10-30" },
+        { group: GROUP, artists: [TYLER], listed: "2026-10-30" },
+        { group: OTHER, artists: [TYLER], listed: "2026-10-30" },
       ]),
       lookUp: vi.fn(async (group: string) =>
         group === GROUP ? album({ "secondary-types": ["Live"] }) : null,
@@ -115,8 +122,8 @@ describe("runReleasesTick", () => {
     const d = deps({
       claimRead: vi.fn(async () => false),
       pending: vi.fn(async () => [
-        { group: GROUP, artist: TYLER, listed: "2026-10-30" },
-        { group: OTHER, artist: TYLER, listed: "2026-10-30" },
+        { group: GROUP, artists: [TYLER], listed: "2026-10-30" },
+        { group: OTHER, artists: [TYLER], listed: "2026-10-30" },
       ]),
       lookUp: vi.fn(async () => Promise.reject(new Error("MusicBrainz request failed (503)"))),
     });

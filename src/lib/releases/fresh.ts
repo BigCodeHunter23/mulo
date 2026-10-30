@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { ReleaseKind } from "@/lib/app-api";
 import { addDays } from "@/lib/push/zones";
+import { MAX_ARTISTS } from "@/lib/releases/confirm";
 import { mbidSchema } from "@/lib/validation";
 
 /**
@@ -28,11 +29,16 @@ export type FreshRelease = {
   title: string;
 };
 
-/** A release by a followed artist, to confirm with MusicBrainz. */
+/** A release crediting a followed artist, to confirm with MusicBrainz. */
 export type Candidate = {
   group: string;
-  /** The first credited artist somebody follows: whose followers hear about it. */
+  /**
+   * The first credited artist somebody follows: MULO has them, so the row
+   * can point at them until MusicBrainz names the first credited artist.
+   */
   artist: string;
+  /** Every credited artist, followed or not: the followers of each hear about it. */
+  artists: string[];
   title: string;
   kind: ReleaseKind;
   /** The day ListenBrainz gave. */
@@ -59,7 +65,9 @@ export function toFresh(value: unknown): FreshRelease | null {
   const release = parsed.data;
   const kind = KINDS[release.release_group_primary_type ?? ""];
   if (!kind || release.release_group_secondary_type) return null;
-  const artists = release.artist_mbids.filter((id) => mbidSchema.safeParse(id).success);
+  const artists = [
+    ...new Set(release.artist_mbids.filter((id) => mbidSchema.safeParse(id).success)),
+  ].slice(0, MAX_ARTISTS);
   if (artists.length === 0) return null;
   return {
     group: release.release_group_mbid,
@@ -139,6 +147,7 @@ export function newCandidates(
       {
         group: release.group,
         artist,
+        artists: release.artists,
         title: release.title,
         kind: release.kind,
         listed: release.date,

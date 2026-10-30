@@ -71,6 +71,7 @@ export async function queueReleases(candidates: Candidate[]): Promise<void> {
         chunk.map((c) => ({
           release_group_mbid: c.group,
           artist_mbid: c.artist,
+          artist_mbids: c.artists,
           title: c.title,
           kind: c.kind,
           release_date: c.listed,
@@ -88,7 +89,7 @@ export async function queueReleases(candidates: Candidate[]): Promise<void> {
 export async function pendingReleases(limit: number): Promise<Pending[]> {
   const { data, error } = await db()
     .from("new_releases")
-    .select("release_group_mbid, artist_mbid, listed_date")
+    .select("release_group_mbid, artist_mbids, listed_date")
     .is("confirmed_at", null)
     .is("refused_at", null)
     .order("found_at")
@@ -96,7 +97,7 @@ export async function pendingReleases(limit: number): Promise<Pending[]> {
   if (error) throw error;
   return (data ?? []).map((row) => ({
     group: row.release_group_mbid,
-    artist: row.artist_mbid,
+    artists: row.artist_mbids,
     listed: row.listed_date,
   }));
 }
@@ -104,8 +105,8 @@ export async function pendingReleases(limit: number): Promise<Pending[]> {
 /**
  * A confirmed release: into the catalogue, so its album page and its
  * artist's page show it at once, and marked confirmed with MusicBrainz's
- * title, kind and date. One already cached keeps its details and takes the
- * date and kind.
+ * title, kind, date and credits (shown as its first credited artist). One
+ * already cached keeps its details and takes the date and kind.
  */
 export async function saveConfirmed(
   group: string,
@@ -144,6 +145,8 @@ export async function saveConfirmed(
       title: confirmed.title,
       kind: confirmed.kind,
       release_date: confirmed.date,
+      artist_mbid: confirmed.primary.id,
+      artist_mbids: confirmed.artists,
       confirmed_at: at.toISOString(),
       refused_at: null,
     })
@@ -166,7 +169,10 @@ export type DayRelease = {
   title: string;
   kind: ReleaseKind;
   day: string;
+  /** The first credited artist, whom alerts name. */
   artistMbid: string;
+  /** Every credited artist: the followers of each hear about it. */
+  artistMbids: string[];
   artistName: string;
 };
 
@@ -175,7 +181,9 @@ export async function releasesOn(days: string[]): Promise<DayRelease[]> {
   if (days.length === 0) return [];
   const { data, error } = await db()
     .from("new_releases")
-    .select("release_group_mbid, title, kind, release_date, artist_mbid, artists!inner ( name )")
+    .select(
+      "release_group_mbid, title, kind, release_date, artist_mbid, artist_mbids, artists!inner ( name )",
+    )
     .in("release_date", days)
     .not("confirmed_at", "is", null);
   if (error) {
@@ -193,6 +201,7 @@ export async function releasesOn(days: string[]): Promise<DayRelease[]> {
             kind,
             day: row.release_date,
             artistMbid: row.artist_mbid,
+            artistMbids: row.artist_mbids,
             artistName: row.artists.name,
           },
         ]

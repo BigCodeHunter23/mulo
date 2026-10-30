@@ -115,8 +115,9 @@ describe("0026 following artists", () => {
   it("shows new releases to anyone and lets only the service role write them", async () => {
     await db.exec(`
       insert into public.new_releases
-        (release_group_mbid, artist_mbid, title, kind, release_date, listed_date, confirmed_at)
-      values ('${CHROMAKOPIA}', '${TYLER}', 'CHROMAKOPIA', 'album', '2026-10-30', '2026-10-30', now());
+        (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date, confirmed_at)
+      values ('${CHROMAKOPIA}', '${TYLER}', array['${TYLER}'::uuid], 'CHROMAKOPIA', 'album',
+        '2026-10-30', '2026-10-30', now());
     `);
     expect(await as(null, "select title from public.new_releases")).toEqual([
       { title: "CHROMAKOPIA" },
@@ -124,15 +125,22 @@ describe("0026 following artists", () => {
     await expect(
       as(
         U(1),
-        `insert into public.new_releases (release_group_mbid, artist_mbid, title, kind, release_date, listed_date)
-         values (${A(9)}, '${TYLER}', 'X', 'album', '2026-10-30', '2026-10-30')`,
+        `insert into public.new_releases (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date)
+         values (${A(9)}, '${TYLER}', array['${TYLER}'::uuid], 'X', 'album', '2026-10-30', '2026-10-30')`,
       ),
     ).rejects.toThrow();
     await expect(as(U(1), "delete from public.new_releases")).rejects.toThrow();
     await expect(
       db.exec(
-        `insert into public.new_releases (release_group_mbid, artist_mbid, title, kind, release_date, listed_date)
-         values (${A(9)}, '${TYLER}', 'Single', 'single', '2026-10-30', '2026-10-30')`,
+        `insert into public.new_releases (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date)
+         values (${A(9)}, '${TYLER}', array['${TYLER}'::uuid], 'Single', 'single', '2026-10-30', '2026-10-30')`,
+      ),
+    ).rejects.toThrow();
+    // The artist it shows as is always one of those credited.
+    await expect(
+      db.exec(
+        `insert into public.new_releases (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date)
+         values (${A(9)}, '${TYLER}', array['${CLIPSE}'::uuid], 'X', 'album', '2026-10-30', '2026-10-30')`,
       ),
     ).rejects.toThrow();
   });
@@ -173,8 +181,8 @@ describe("0026 following artists", () => {
   it("lists confirmed releases by the artists somebody follows, with when they followed", async () => {
     await db.exec(`
       insert into public.new_releases
-        (release_group_mbid, artist_mbid, title, kind, release_date, listed_date)
-      values (${A(10)}, '${TYLER}', 'Waiting', 'ep', '2026-10-30', '2026-10-30');
+        (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date)
+      values (${A(10)}, '${TYLER}', array['${TYLER}'::uuid], 'Waiting', 'ep', '2026-10-30', '2026-10-30');
     `);
     const rows = await as<{ title: string; release_date: string; artist_name: string }>(
       U(2),
@@ -190,6 +198,43 @@ describe("0026 following artists", () => {
         `select title from public.followed_releases('${U(1)}', '2026-11-01', '2026-11-30')`,
       ),
     ).toEqual([]);
+  });
+
+  it("lists a release for the followers of each credited artist, followed before or after", async () => {
+    // Credited to Nas and Clipse, shown as Nas's. U(1) follows neither; U(2)
+    // follows Nas; then, after it was found, U(1) follows Clipse.
+    await db.exec(`
+      insert into public.new_releases
+        (release_group_mbid, artist_mbid, artist_mbids, title, kind, release_date, listed_date, confirmed_at)
+      values (${A(11)}, '${NAS}', array['${NAS}'::uuid, '${CLIPSE}'::uuid], 'Together', 'album',
+        '2026-10-29', '2026-10-29', now());
+      insert into public.artist_follows (user_id, artist_mbid) values ('${U(2)}', '${NAS}');
+    `);
+    const together = (user: string) =>
+      as<{ title: string; artist_name: string }>(
+        null,
+        `select title, artist_name from public.followed_releases('${user}', '2026-10-29', '2026-10-29')`,
+      );
+    expect(await together(U(2))).toEqual([{ title: "Together", artist_name: "Nas" }]);
+    expect(await together(U(1))).toEqual([]);
+    await db.exec(
+      `insert into public.artist_follows (user_id, artist_mbid, created_at)
+       values ('${U(1)}', '${CLIPSE}', now() + interval '1 day')`,
+    );
+    expect(await together(U(1))).toEqual([{ title: "Together", artist_name: "Nas" }]);
+    // Following two of its artists still lists it once, from the first follow.
+    await db.exec(
+      `insert into public.artist_follows (user_id, artist_mbid) values ('${U(2)}', '${CLIPSE}')`,
+    );
+    const once = await db.query<{ followed_at: Date }>(
+      `select followed_at from public.followed_releases('${U(2)}', '2026-10-29', '2026-10-29')`,
+    );
+    expect(once.rows).toHaveLength(1);
+    await db.exec(
+      `delete from public.artist_follows where artist_mbid = '${CLIPSE}';
+       delete from public.artist_follows where user_id = '${U(2)}';
+       delete from public.new_releases where release_group_mbid = ${A(11)};`,
+    );
   });
 
   it("suggests the artists somebody rates highest, leaving out those they follow", async () => {

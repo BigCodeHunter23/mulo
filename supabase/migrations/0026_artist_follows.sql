@@ -4,9 +4,10 @@
 -- count and list them, artist pages count them. Each person adds and
 -- removes their own, up to 2,000 (a trigger keeps the limit).
 --
--- new_releases: albums and EPs by followed artists, found once a day in
--- ListenBrainz's fresh releases by the clock (push/tick) and confirmed with
--- MusicBrainz. Anyone may read them; only the service role writes.
+-- new_releases: albums and EPs crediting at least one followed artist, with
+-- every artist credited, found once a day in ListenBrainz's fresh releases
+-- by the clock (push/tick) and confirmed with MusicBrainz. Anyone may read
+-- them; only the service role writes.
 --
 -- artist_release_reads: the clock's daily read of fresh releases and its
 -- tries. Service role only.
@@ -83,8 +84,12 @@ create trigger artist_follows_cap
 
 create table if not exists public.new_releases (
   release_group_mbid uuid primary key,
-  -- The followed artist it's news for: the first credited one somebody follows.
+  -- The artist it shows as: MusicBrainz's first credited, once confirmed.
+  -- Until then the first credited artist somebody follows, whom MULO has.
   artist_mbid uuid not null references public.artists (mbid) on delete cascade,
+  -- Every credited artist, followed or not: the followers of each hear about
+  -- it, people who follow one only later included.
+  artist_mbids uuid[] not null,
   title text not null check (char_length(title) between 1 and 500),
   kind text not null check (kind in ('album', 'ep')),
   release_date date not null,
@@ -93,11 +98,12 @@ create table if not exists public.new_releases (
   found_at timestamptz not null default now(),
   -- MusicBrainz agreed it's a new album or EP by that artist; or it didn't.
   confirmed_at timestamptz,
-  refused_at timestamptz
+  refused_at timestamptz,
+  check (cardinality(artist_mbids) between 1 and 100 and artist_mbid = any (artist_mbids))
 );
 
-create index if not exists new_releases_artist_day_idx
-  on public.new_releases (artist_mbid, release_date) where confirmed_at is not null;
+create index if not exists new_releases_artists_idx
+  on public.new_releases using gin (artist_mbids) where confirmed_at is not null;
 create index if not exists new_releases_day_idx
   on public.new_releases (release_date) where confirmed_at is not null;
 create index if not exists new_releases_waiting_idx
@@ -156,8 +162,10 @@ revoke execute on function public.followed_among(uuid[]) from public, anon, auth
 grant execute on function public.followed_among(uuid[]) to service_role;
 
 /**
- * Confirmed releases between two days by the artists somebody follows, with
- * when they followed each: Home's shelf and the bell's lines.
+ * Confirmed releases between two days credited to any artist somebody
+ * follows, once each, with when they first followed one of its artists:
+ * Home's shelf and the bell's lines. Each is named for its first credited
+ * artist, whichever of them they follow.
  */
 create or replace function public.followed_releases(p_user uuid, p_from date, p_to date)
 returns table (
@@ -173,13 +181,17 @@ language sql
 stable
 set search_path = ''
 as $$
-  select n.release_group_mbid, n.title, n.kind, n.release_date, n.artist_mbid, a.name, f.created_at
+  -- "artist_mbids @> array[x]" is "x = any (artist_mbids)" in the form the
+  -- GIN index answers.
+  select n.release_group_mbid, n.title, n.kind, n.release_date, n.artist_mbid, a.name,
+    min(f.created_at)
   from public.artist_follows f
-  join public.new_releases n on n.artist_mbid = f.artist_mbid
+  join public.new_releases n on n.artist_mbids @> array[f.artist_mbid]
   join public.artists a on a.mbid = n.artist_mbid
   where f.user_id = p_user
     and n.confirmed_at is not null
     and n.release_date between p_from and p_to
+  group by n.release_group_mbid, a.name
   order by n.release_date desc, n.title
   limit 200
 $$;

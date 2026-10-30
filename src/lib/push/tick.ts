@@ -142,7 +142,7 @@ async function dropPushes(people: Candidate[], at: Date, deps: TickDeps): Promis
 
 /**
  * Release day, at 10am where each person is: the releases out on their day
- * by artists they follow. A release found after its day gets no push; the
+ * crediting artists they follow. A release found after its day gets no push; the
  * bell still lists it.
  */
 async function releasePushes(
@@ -154,7 +154,7 @@ async function releasePushes(
   if (releases.length === 0) return [];
   const due = await notLogged("release", people, at, deps);
   if (due.length === 0) return [];
-  const followers = await deps.followersOf([...new Set(releases.map((r) => r.artistMbid))]);
+  const followers = await deps.followersOf([...new Set(releases.flatMap((r) => r.artistMbids))]);
   return releaseAlerts(
     due.map(({ person, day }) => ({ userId: person.userId, day })),
     releases,

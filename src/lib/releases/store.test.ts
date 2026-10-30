@@ -18,6 +18,7 @@ import {
 } from "@/lib/releases/store";
 
 const TYLER = "f6beac20-5dfe-4d1f-ae02-0b0a740aafd6";
+const CLIPSE = "0e05ba8a-56a7-4ea6-9d11-8f4f2d10e2d1";
 const GROUP = "6ca2762c-ffb5-4ea1-a8c6-2f25993fc99a";
 const AT = new Date("2026-10-30T00:10:00Z");
 
@@ -66,13 +67,21 @@ describe("the day's read", () => {
 
   it("files releases to confirm, asking again about one whose day moved", async () => {
     await queueReleases([
-      { group: GROUP, artist: TYLER, title: "CHROMAKOPIA", kind: "album", listed: "2026-10-30" },
+      {
+        group: GROUP,
+        artist: TYLER,
+        artists: [CLIPSE, TYLER],
+        title: "CHROMAKOPIA",
+        kind: "album",
+        listed: "2026-10-30",
+      },
     ]);
     expect(call("new_releases", "upsert")).toEqual([
       [
         {
           release_group_mbid: GROUP,
           artist_mbid: TYLER,
+          artist_mbids: [CLIPSE, TYLER],
           title: "CHROMAKOPIA",
           kind: "album",
           release_date: "2026-10-30",
@@ -89,11 +98,13 @@ describe("the day's read", () => {
 describe("confirming", () => {
   it("hands out the longest waiting first", async () => {
     fake.answer("new_releases", {
-      data: [{ release_group_mbid: GROUP, artist_mbid: TYLER, listed_date: "2026-10-30" }],
+      data: [
+        { release_group_mbid: GROUP, artist_mbids: [CLIPSE, TYLER], listed_date: "2026-10-30" },
+      ],
       error: null,
     });
     expect(await pendingReleases(20)).toEqual([
-      { group: GROUP, artist: TYLER, listed: "2026-10-30" },
+      { group: GROUP, artists: [CLIPSE, TYLER], listed: "2026-10-30" },
     ]);
     expect(call("new_releases", "order")).toEqual(["found_at"]);
     expect(call("new_releases", "limit")).toEqual([20]);
@@ -107,6 +118,7 @@ describe("confirming", () => {
         kind: "album",
         date: "2026-10-28",
         primary: { id: TYLER, name: "Tyler, the Creator" },
+        artists: [TYLER, CLIPSE],
         credit: "Tyler, the Creator",
       },
       AT,
@@ -133,6 +145,8 @@ describe("confirming", () => {
         title: "CHROMAKOPIA",
         kind: "album",
         release_date: "2026-10-28",
+        artist_mbid: TYLER,
+        artist_mbids: [TYLER, CLIPSE],
         confirmed_at: AT.toISOString(),
         refused_at: null,
       },
@@ -158,6 +172,7 @@ describe("alerts", () => {
           kind: "album",
           release_date: "2026-10-30",
           artist_mbid: TYLER,
+          artist_mbids: [TYLER, CLIPSE],
           artists: { name: "Tyler, the Creator" },
         },
         {
@@ -166,6 +181,7 @@ describe("alerts", () => {
           kind: "single",
           release_date: "2026-10-30",
           artist_mbid: TYLER,
+          artist_mbids: [TYLER],
           artists: { name: "Tyler, the Creator" },
         },
       ],
@@ -178,6 +194,7 @@ describe("alerts", () => {
         kind: "album",
         day: "2026-10-30",
         artistMbid: TYLER,
+        artistMbids: [TYLER, CLIPSE],
         artistName: "Tyler, the Creator",
       },
     ]);

@@ -108,9 +108,16 @@ describe("newCandidates", () => {
     ...over,
   });
 
-  it("keeps releases by a followed artist, for the first credited one followed", () => {
+  it("keeps releases by a followed artist, with every credited artist, followed or not", () => {
     expect(newCandidates([fresh()], new Set([TYLER]), new Map(), "2026-10-30")).toEqual([
-      { group: GROUP, artist: TYLER, title: "CHROMAKOPIA", kind: "album", listed: "2026-10-30" },
+      {
+        group: GROUP,
+        artist: TYLER,
+        artists: [CLIPSE, TYLER],
+        title: "CHROMAKOPIA",
+        kind: "album",
+        listed: "2026-10-30",
+      },
     ]);
     expect(newCandidates([fresh()], new Set(), new Map(), "2026-10-30")).toEqual([]);
   });

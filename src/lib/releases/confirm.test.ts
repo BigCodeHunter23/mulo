@@ -16,7 +16,7 @@ const group = (over: Partial<MbReleaseGroup> = {}): MbReleaseGroup => ({
   "artist-credit": [tyler],
   ...over,
 });
-const pending = { group: "g", artist: TYLER, listed: "2026-10-30" };
+const pending = { group: "g", artists: [TYLER], listed: "2026-10-30" };
 const today = "2026-10-30";
 
 describe("confirmGroup", () => {
@@ -26,6 +26,7 @@ describe("confirmGroup", () => {
       kind: "album",
       date: "2026-10-30",
       primary: { id: TYLER, name: "Tyler, the Creator" },
+      artists: [TYLER],
       credit: "Tyler, the Creator",
     });
     expect(confirmGroup(group({ "primary-type": "EP" }), pending, today)?.kind).toBe("ep");
@@ -52,10 +53,19 @@ describe("confirmGroup", () => {
     expect(confirmGroup(group({ "first-release-date": "1995-03-02" }), pending, today)).toBeNull();
   });
 
-  it("needs the followed artist on the credits, and files it under the first credit", () => {
-    expect(confirmGroup(group(), { ...pending, artist: CLIPSE }, today)).toBeNull();
+  it("needs a listed artist on the credits, and files it under the first credit", () => {
+    expect(confirmGroup(group(), { ...pending, artists: [CLIPSE] }, today)).toBeNull();
     const together = confirmGroup(group({ "artist-credit": [clipse, tyler] }), pending, today);
     expect(together?.primary).toEqual({ id: CLIPSE, name: "Clipse" });
     expect(together?.credit).toBe("Clipse & Tyler, the Creator");
+  });
+
+  it("keeps every credited artist, once each", () => {
+    const twice = confirmGroup(
+      group({ "artist-credit": [clipse, tyler, { ...clipse, joinphrase: "" }] }),
+      pending,
+      today,
+    );
+    expect(twice?.artists).toEqual([CLIPSE, TYLER]);
   });
 });

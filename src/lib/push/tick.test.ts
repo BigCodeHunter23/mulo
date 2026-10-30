@@ -305,6 +305,7 @@ describe("release day", () => {
     kind: "album" as const,
     day: "2026-10-30",
     artistMbid: "tyler",
+    artistMbids: ["tyler", "clipse"],
     artistName: "Tyler, the Creator",
   };
   const onTheDay = vi.fn(async (days: string[]) =>
@@ -327,6 +328,14 @@ describe("release day", () => {
         url: "/album/m1",
       }),
     ]);
+  });
+
+  it("asks for the followers of every credited artist", async () => {
+    const followersOf = vi.fn(async () => new Map([["clipse", new Set(["a"])]]));
+    const d = deps({ releasesOn: onTheDay, followersOf });
+    await runTick(TEN, d);
+    expect(followersOf).toHaveBeenCalledWith(["tyler", "clipse"]);
+    expect(d.sent).toEqual([expect.objectContaining({ userId: "a", kind: "release" })]);
   });
 
   it("reaches Los Angeles at its own 10am, not Sydney's", async () => {
