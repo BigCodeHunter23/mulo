@@ -145,20 +145,44 @@ describe("0026 following artists", () => {
     ).rejects.toThrow();
   });
 
+  const claim = async (day: string) =>
+    (await db.query<{ ok: boolean }>(`select public.claim_release_read('${day}') as ok`)).rows[0]
+      ?.ok;
+  /** A run that ended without reading: its claim let go, as the clock does. */
+  const letGo = (day: string) =>
+    db.exec(`update public.artist_release_reads set claimed_at = null where day = '${day}'`);
+
+  it("gives the day's read to one run at a time, for five minutes at most", async () => {
+    expect(await claim("2026-10-29")).toBe(true);
+    // A second run while the first is reading.
+    expect(await claim("2026-10-29")).toBe(false);
+    // A run that died without letting go holds it five minutes.
+    await db.exec(
+      `update public.artist_release_reads set claimed_at = now() - interval '4 minutes'
+       where day = '2026-10-29'`,
+    );
+    expect(await claim("2026-10-29")).toBe(false);
+    await db.exec(
+      `update public.artist_release_reads set claimed_at = now() - interval '6 minutes'
+       where day = '2026-10-29'`,
+    );
+    expect(await claim("2026-10-29")).toBe(true);
+    const row = await db.query<{ tries: number }>(
+      "select tries from public.artist_release_reads where day = '2026-10-29'",
+    );
+    expect(row.rows).toEqual([{ tries: 2 }]);
+  });
+
   it("claims the day's read up to four times, and never once it's done", async () => {
-    const claim = async (day: string) =>
-      (await db.query<{ ok: boolean }>(`select public.claim_release_read('${day}') as ok`)).rows[0]
-        ?.ok;
-    expect([
-      await claim("2026-10-30"),
-      await claim("2026-10-30"),
-      await claim("2026-10-30"),
-      await claim("2026-10-30"),
-      await claim("2026-10-30"),
-    ]).toEqual([true, true, true, true, false]);
+    const tries: (boolean | undefined)[] = [];
+    for (let i = 0; i < 5; i++) {
+      tries.push(await claim("2026-10-30"));
+      await letGo("2026-10-30");
+    }
+    expect(tries).toEqual([true, true, true, true, false]);
     expect(await claim("2026-10-31")).toBe(true);
     await db.exec(
-      "update public.artist_release_reads set read_at = now() where day = '2026-10-31'",
+      "update public.artist_release_reads set read_at = now(), claimed_at = null where day = '2026-10-31'",
     );
     expect(await claim("2026-10-31")).toBe(false);
   });

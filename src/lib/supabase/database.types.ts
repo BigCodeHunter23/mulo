@@ -163,16 +163,19 @@ export type Database = {
       }
       artist_release_reads: {
         Row: {
+          claimed_at: string | null
           day: string
           read_at: string | null
           tries: number
         }
         Insert: {
+          claimed_at?: string | null
           day: string
           read_at?: string | null
           tries?: number
         }
         Update: {
+          claimed_at?: string | null
           day?: string
           read_at?: string | null
           tries?: number

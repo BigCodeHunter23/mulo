@@ -129,6 +129,9 @@ create policy "New releases are publicly readable"
 create table if not exists public.artist_release_reads (
   day date primary key,
   tries smallint not null default 0 check (tries between 0 and 4),
+  -- When a run took its try: while it reads, other runs keep off for up to
+  -- five minutes. A run lets go when it's done or fails.
+  claimed_at timestamptz,
   read_at timestamptz
 );
 
@@ -137,7 +140,10 @@ revoke all on public.artist_release_reads from anon, authenticated;
 
 /**
  * Claims one try at a UTC day's read of fresh releases: true while it isn't
- * done and has had fewer than four tries.
+ * done, has had fewer than four tries, and no other run has claimed it in
+ * the last five minutes (a run that died without letting go holds it that
+ * long). Two runs at once: the second waits on the row, then sees the
+ * first's claim.
  */
 create or replace function public.claim_release_read(p_day date)
 returns boolean
@@ -145,9 +151,10 @@ language sql
 set search_path = ''
 as $$
   with claimed as (
-    insert into public.artist_release_reads as r (day, tries) values (p_day, 1)
-    on conflict (day) do update set tries = r.tries + 1
+    insert into public.artist_release_reads as r (day, tries, claimed_at) values (p_day, 1, now())
+    on conflict (day) do update set tries = r.tries + 1, claimed_at = now()
       where r.read_at is null and r.tries < 4
+        and (r.claimed_at is null or r.claimed_at < now() - interval '5 minutes')
     returning 1
   )
   select exists (select 1 from claimed)

@@ -17,6 +17,7 @@ import * as store from "@/lib/releases/store";
 export type ReleasesTickDeps = {
   claimRead: (day: string) => Promise<boolean>;
   markRead: (day: string) => Promise<void>;
+  letGoOfRead: (day: string) => Promise<void>;
   readFresh: (day: string) => Promise<FreshRelease[]>;
   followedAmong: (artists: string[]) => Promise<Set<string>>;
   listedDates: (groups: string[]) => Promise<Map<string, string>>;
@@ -44,6 +45,7 @@ async function lookUp(group: string): Promise<MbReleaseGroup | null> {
 const real = (): ReleasesTickDeps => ({
   claimRead: store.claimRead,
   markRead: (day) => store.markRead(day),
+  letGoOfRead: store.letGoOfRead,
   readFresh: (day) => readFreshReleases(day),
   followedAmong: store.followedAmong,
   listedDates: store.listedDates,
@@ -162,8 +164,8 @@ async function confirmWaiting(
 
 /**
  * The clock's releases job (push/tick, every 15 minutes): once a UTC day,
- * ListenBrainz's fresh releases, tried again on the next run when it fails,
- * up to four times; then confirmations with MusicBrainz for as long as the
+ * ListenBrainz's fresh releases, one run at a time, tried again on the next
+ * run when it fails, up to four times; then confirmations with MusicBrainz for as long as the
  * deadline allows. A failure in one is logged and counted, and the other
  * still runs.
  */
@@ -180,14 +182,18 @@ export async function runReleasesTick(
     errors: 0,
   };
   const day = at.toISOString().slice(0, 10);
+  let claimed = false;
   try {
     if (Date.now() < deadline && (await deps.claimRead(day))) {
+      claimed = true;
       report.queued = await readDay(day, deps);
       report.read = true;
     }
   } catch (error) {
     report.errors += 1;
     console.error("[releases] the day's read failed:", reason(error));
+    // Left alone, the claim would lapse after five minutes anyway.
+    if (claimed) await deps.letGoOfRead(day).catch(() => undefined);
   }
   try {
     await confirmWaiting(day, deadline, deps, report);

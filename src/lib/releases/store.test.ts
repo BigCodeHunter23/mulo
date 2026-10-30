@@ -12,6 +12,7 @@ import {
   markRead,
   failRelease,
   keepRelease,
+  letGoOfRead,
   pendingReleases,
   queueReleases,
   refuseRelease,
@@ -47,7 +48,18 @@ describe("the day's read", () => {
       { p_day: "2026-10-30" },
     ]);
     await markRead("2026-10-30", AT);
-    expect(call("artist_release_reads", "update")).toEqual([{ read_at: AT.toISOString() }]);
+    expect(call("artist_release_reads", "update")).toEqual([
+      { read_at: AT.toISOString(), claimed_at: null },
+    ]);
+  });
+
+  it("lets go of a claim when the read fails, so the next run can try", async () => {
+    await letGoOfRead("2026-10-30");
+    expect(call("artist_release_reads", "update")).toEqual([{ claimed_at: null }]);
+    expect(call("artist_release_reads", "eq")).toEqual(["day", "2026-10-30"]);
+    const failure = { code: "57014", message: "timeout" };
+    fake.answer("artist_release_reads", { data: null, error: failure });
+    await expect(letGoOfRead("2026-10-30")).rejects.toBe(failure);
   });
 
   it("finds which artists somebody follows, and what's known already, a hundred at a time", async () => {

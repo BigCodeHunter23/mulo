@@ -34,6 +34,7 @@ function deps(over: Partial<ReleasesTickDeps> = {}): ReleasesTickDeps {
   return {
     claimRead: vi.fn(async () => true),
     markRead: vi.fn(async () => {}),
+    letGoOfRead: vi.fn(async () => {}),
     readFresh: vi.fn(async () => [
       {
         group: GROUP,
@@ -101,6 +102,13 @@ describe("runReleasesTick", () => {
       confirmed: 1,
     });
     expect(d.markRead).not.toHaveBeenCalled();
+    expect(d.letGoOfRead).toHaveBeenCalledWith("2026-10-30");
+  });
+
+  it("lets go of nothing it didn't claim", async () => {
+    const d = deps({ claimRead: vi.fn(async () => false) });
+    await runReleasesTick(AT, later(), d);
+    expect(d.letGoOfRead).not.toHaveBeenCalled();
   });
 
   it("refuses what MusicBrainz doesn't agree with, or doesn't have", async () => {

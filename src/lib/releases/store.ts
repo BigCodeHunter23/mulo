@@ -25,7 +25,10 @@ function chunks<T>(items: T[]): T[][] {
   return out;
 }
 
-/** Claims one try at a UTC day's read: false once it's done, or tried four times. */
+/**
+ * Claims one try at a UTC day's read: false once it's done, or tried four
+ * times, or while another run holds it (for five minutes at most).
+ */
 export async function claimRead(day: string): Promise<boolean> {
   const { data, error } = await db().rpc("claim_release_read", { p_day: day });
   if (error) throw error;
@@ -35,7 +38,16 @@ export async function claimRead(day: string): Promise<boolean> {
 export async function markRead(day: string, at = new Date()): Promise<void> {
   const { error } = await db()
     .from("artist_release_reads")
-    .update({ read_at: at.toISOString() })
+    .update({ read_at: at.toISOString(), claimed_at: null })
+    .eq("day", day);
+  if (error) throw error;
+}
+
+/** A run whose read failed lets go of its claim, so the next run tries again at once. */
+export async function letGoOfRead(day: string): Promise<void> {
+  const { error } = await db()
+    .from("artist_release_reads")
+    .update({ claimed_at: null })
     .eq("day", day);
   if (error) throw error;
 }
