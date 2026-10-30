@@ -49,6 +49,11 @@ vi.mock("@/lib/diary/notifications", () => ({
   diaryImportNotifications: vi.fn(async () => []),
   latestDiaryImportAt: vi.fn(async () => null),
 }));
+// A release line is a record's, nobody's doing, so a block never touches it either.
+vi.mock("@/lib/releases/notifications", () => ({
+  releaseNotifications: vi.fn(async () => []),
+  latestReleaseAt: vi.fn(async () => null),
+}));
 vi.mock("@/lib/social", () => ({ getFollowingIds: vi.fn(async () => []) }));
 vi.mock("@/lib/versus", () => ({
   getLatestVersusAt: vi.fn(async () => null),
