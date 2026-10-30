@@ -272,4 +272,7 @@ clock.
 Check: in the SQL Editor, `select count(*) from artist_follows;` answers (0
 is fine). After the first run of the clock past midnight UTC,
 `select * from artist_release_reads order by day desc limit 1;` shows today
-with `read_at` filled in.
+with `read_at` filled in. Releases still waiting for MusicBrainz, and any
+that have failed (`tries`, refused at 3): `select release_group_mbid, title,
+tries, last_error_at from new_releases where confirmed_at is null and
+refused_at is null order by found_at;`.
