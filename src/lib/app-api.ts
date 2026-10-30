@@ -1437,3 +1437,29 @@ export type ReleaseKind = "album" | "ep";
  */
 export type ArtistFollowResult =
   { ok: true; first?: true } | { ok: false; error: string; needsLogin?: boolean };
+
+/** A record on Home's "New from artists you follow". */
+export type NewRelease = {
+  /** The release group: the album page's address. */
+  mbid: string;
+  title: string;
+  kind: ReleaseKind;
+  /** "2026-10-30" */
+  release_date: string;
+  cover_art_url: string;
+  artist: { mbid: string; name: string };
+  /**
+   * When, on the viewer's own clock: "Today", the weekday for one out in the
+   * six days before ("Wednesday"), otherwise its date ("12 Oct"); a date for
+   * one coming soon too.
+   */
+  when: string;
+  /** Not out yet: shown after the rest, dimmed. */
+  soon: boolean;
+};
+
+/**
+ * `GET me/new-releases`: the last four weeks by the artists you follow,
+ * newest first, then up to a month ahead, soonest first. Empty: hide the shelf.
+ */
+export type NewReleasesShelf = { releases: NewRelease[] };
