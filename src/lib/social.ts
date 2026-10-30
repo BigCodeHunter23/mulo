@@ -23,9 +23,14 @@ export async function getProfileByUsername(username: string): Promise<PublicProf
 export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const supabase = await createClient();
 
-  const [followers, following, ratings] = await Promise.all([
+  const [followers, following, artists, ratings] = await Promise.all([
     supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", userId),
     supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", userId),
+    // Nothing before migration 0026: the count just comes back empty.
+    supabase
+      .from("artist_follows")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId),
     // Albums, artists and songs all count, totalled by the database
     // (migration 0018) so nobody's stats stop at a thousand ratings.
     supabase.rpc("profile_rating_stats", { p_user: userId }).maybeSingle(),
@@ -35,6 +40,7 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
   return {
     followers: followers.count ?? 0,
     following: following.count ?? 0,
+    artists: artists.count ?? 0,
     ratings: ratings.data?.ratings ?? 0,
     averageScore: ratings.data?.average ?? null,
   };

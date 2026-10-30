@@ -1250,6 +1250,7 @@ describe("GET users/[username]", () => {
     lib.getProfileStats.mockResolvedValue({
       followers: 1,
       following: 2,
+      artists: 4,
       ratings: 3,
       averageScore: 7,
     });

@@ -234,6 +234,8 @@ export type PublicProfile = {
 export type ProfileStats = {
   followers: number;
   following: number;
+  /** How many artists they follow. */
+  artists: number;
   ratings: number;
   averageScore: number | null;
 };
