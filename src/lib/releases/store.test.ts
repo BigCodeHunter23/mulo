@@ -89,6 +89,31 @@ describe("the day's read", () => {
     moved: false,
   };
 
+  it("asks which artists are followed 500 at a time, so no answer reaches PostgREST's 1,000 rows", async () => {
+    const artists = Array.from({ length: 1200 }, (_, i) => `a${i}`);
+    fake.answer(
+      "rpc:followed_among",
+      { data: artists.slice(0, 500).map((artist_mbid) => ({ artist_mbid })), error: null },
+      { data: [{ artist_mbid: "a700" }], error: null },
+      { data: [{ artist_mbid: "a1199" }], error: null },
+    );
+    const followed = await followedAmong(artists);
+    expect(followed.size).toBe(502);
+    expect(followed.has("a1199")).toBe(true);
+    const sent = fake
+      .callsOn("rpc:followed_among")
+      .map((c) => (c.args[1] as { p_mbids: string[] }).p_mbids);
+    expect(sent.map((ids) => ids.length)).toEqual([500, 500, 200]);
+    expect(sent.flat()).toEqual(artists);
+  });
+
+  it("throws when asking which artists are followed fails", async () => {
+    const failure = { code: "57014", message: "timeout" };
+    fake.answer("rpc:followed_among", { data: null, error: failure });
+    await expect(followedAmong(["a"])).rejects.toBe(failure);
+    expect(await followedAmong([])).toEqual(new Set());
+  });
+
   it("files new releases to confirm, leaving any already there alone", async () => {
     await queueReleases([candidate]);
     expect(call("new_releases", "upsert")).toEqual([

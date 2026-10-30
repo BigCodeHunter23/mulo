@@ -19,11 +19,20 @@ const db = () => createAdminClient();
 /** `.in()` puts every id in the address, so long lists go this many at a time. */
 const CHUNK = 100;
 
-function chunks<T>(items: T[]): T[][] {
+function chunks<T>(items: T[], size = CHUNK): T[][] {
   const out: T[][] = [];
-  for (let i = 0; i < items.length; i += CHUNK) out.push(items.slice(i, i + CHUNK));
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
 }
+
+/**
+ * How many artists followed_among is asked about at once. It answers with at
+ * most as many rows as it's sent, so staying under PostgREST's 1,000-row cap
+ * (PAGE_SIZE in read-all), which cuts a function's answer off quietly as it
+ * does a table's, means nothing is ever left out. Sent in the request's
+ * body, so the address stays short.
+ */
+const FOLLOWED_CHUNK = 500;
 
 /**
  * Claims one try at a UTC day's read: false once it's done, or tried four
@@ -54,10 +63,13 @@ export async function letGoOfRead(day: string): Promise<void> {
 
 /** Of these artists, the ones at least one person follows. */
 export async function followedAmong(artists: string[]): Promise<Set<string>> {
-  if (artists.length === 0) return new Set();
-  const { data, error } = await db().rpc("followed_among", { p_mbids: artists });
-  if (error) throw error;
-  return new Set((data ?? []).flatMap((row) => (row.artist_mbid ? [row.artist_mbid] : [])));
+  const followed = new Set<string>();
+  for (const chunk of chunks(artists, FOLLOWED_CHUNK)) {
+    const { data, error } = await db().rpc("followed_among", { p_mbids: chunk });
+    if (error) throw error;
+    for (const row of data ?? []) if (row.artist_mbid) followed.add(row.artist_mbid);
+  }
+  return followed;
 }
 
 /** The day each of these release groups was last listed on, for those MULO has. */
