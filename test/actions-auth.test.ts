@@ -130,6 +130,14 @@ describe("over the rate limit", () => {
       "setFollowing",
       async () => (await import("@/app/u/[username]/actions")).setFollowing(MBID, "alex", true),
     ],
+    [
+      "setArtistFollowing",
+      async () => (await import("@/app/artist/[mbid]/actions")).setArtistFollowing(MBID, true),
+    ],
+    [
+      "followArtists",
+      async () => (await import("@/app/artist/[mbid]/actions")).followArtists([MBID]),
+    ],
     ["createList", async () => (await import("@/app/lists/actions")).createList({ title: "Mine" })],
     ["addToList", async () => (await import("@/app/lists/actions")).addToList(1, MBID)],
     ["postTake", async () => (await import("@/app/versus/actions")).postTake(1, "Obviously")],
@@ -474,6 +482,14 @@ describe("signed out, every action refuses before touching the database", () => 
       async () => (await import("@/app/u/[username]/actions")).setFollowing(OTHER, "alex", true),
     ],
     [
+      "setArtistFollowing",
+      async () => (await import("@/app/artist/[mbid]/actions")).setArtistFollowing(MBID, true),
+    ],
+    [
+      "followArtists",
+      async () => (await import("@/app/artist/[mbid]/actions")).followArtists([MBID]),
+    ],
+    [
       "saveRaisedOn",
       async () =>
         (await import("@/app/raised-on/actions")).saveRaisedOn({
@@ -561,6 +577,12 @@ describe("signed out, every action refuses before touching the database", () => 
     await call();
     expect(session.db.touched).toBe(0);
   });
+
+  it("artistSuggestions answers none, touching nothing", async () => {
+    const { artistSuggestions } = await import("@/app/artist/[mbid]/actions");
+    expect(await artistSuggestions()).toEqual([]);
+    expect(session.db.touched).toBe(0);
+  });
 });
 
 describe("signed in, but not the owner", () => {
@@ -627,6 +649,10 @@ describe("bad input is refused before anything else", () => {
       "a follow of a non-id",
       async () =>
         (await import("@/app/u/[username]/actions")).setFollowing("not-a-user", "x", true),
+    ],
+    [
+      "an artist follow of a non-id",
+      async () => (await import("@/app/artist/[mbid]/actions")).setArtistFollowing("../x", true),
     ],
   ])("%s", async (_name, call) => {
     const result = (await call()) as { ok: boolean };

@@ -1430,3 +1430,10 @@ export type AccountResult = { ok: true; message: string } | AppError;
 
 /** What counts as a release worth following: albums and EPs, never singles or live records. */
 export type ReleaseKind = "album" | "ep";
+
+/**
+ * `POST` and `DELETE artists/[mbid]/follow`. `first` marks somebody's first
+ * artist follow: the suggestions card is offered once, there and then.
+ */
+export type ArtistFollowResult =
+  { ok: true; first?: true } | { ok: false; error: string; needsLogin?: boolean };
