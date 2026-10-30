@@ -7,21 +7,51 @@ import {
   getArtist,
   getArtistReleaseGroups,
   getReleaseGroup,
+  type MbReleaseGroup,
   getTracklist,
   seedFrom,
   wikidataQid,
   MbNotFoundError,
 } from "@/lib/musicbrainz";
 import { getArtistExtras } from "@/lib/wikidata";
+import { isMissingColumn, logQueryError } from "@/lib/supabase/errors";
 import { mbidSchema } from "@/lib/validation";
 // New albums and artists cost a MusicBrainz request, which bans addresses that
 // ask too often; limit how many one visitor can set off.
 import { allowAddress, RateLimitedError } from "@/lib/rate-limit";
-import type { Artist, Release, Track } from "@/lib/app-api";
+import type { Artist, Release, ReleaseKind, Track } from "@/lib/app-api";
 
 export type { Artist, Release, Track };
 
 const RELEASE_COLUMNS = "mbid, title, artist_mbid, release_date, cover_art_url, genres";
+
+type Reader = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * An artist's albums or EPs as cached, newest first. `kind` is null on
+ * albums cached before migration 0026 told the two apart, so those count as
+ * albums; until it runs, every release is an album and there are no EPs.
+ */
+async function readArtistReleases(
+  supabase: Reader,
+  artistMbid: string,
+  kind: ReleaseKind,
+): Promise<Release[]> {
+  const base = () =>
+    supabase.from("releases").select(RELEASE_COLUMNS).eq("artist_mbid", artistMbid);
+  const newest = { ascending: false, nullsFirst: false } as const;
+  const { data, error } = await (
+    kind === "album" ? base().or("kind.is.null,kind.eq.album") : base().eq("kind", "ep")
+  ).order("release_date", newest);
+  if (!error) return data ?? [];
+  if (!isMissingColumn(error)) {
+    logQueryError("catalog", error);
+    return [];
+  }
+  if (kind === "ep") return [];
+  const { data: every } = await base().order("release_date", newest);
+  return every ?? [];
+}
 
 /** Newest first, with undated entries last. */
 function byNewest(a: Release, b: Release) {
@@ -194,31 +224,27 @@ export async function getCachedArtistAlbums(artistMbid: string): Promise<Release
   if (!isMbid(artistMbid)) return [];
   const supabase = await createClient();
 
-  const [{ data: artist }, { data: cached }] = await Promise.all([
+  const [{ data: artist }, cached] = await Promise.all([
     supabase.from("artists").select("albums_cached_at").eq("mbid", artistMbid).maybeSingle(),
-    supabase
-      .from("releases")
-      .select(RELEASE_COLUMNS)
-      .eq("artist_mbid", artistMbid)
-      .order("release_date", { ascending: false, nullsFirst: false }),
+    readArtistReleases(supabase, artistMbid, "album"),
   ]);
 
   // Albums get cached one at a time as people open them, so having some is
   // not the same as having all of them. Only trust the list once the whole
   // discography has been fetched.
-  if (artist?.albums_cached_at) return cached ?? [];
+  if (artist?.albums_cached_at) return cached;
   // Too many new lookups from this address: the albums known so far will do.
-  if (!(await allowAddress("catalog"))) return cached ?? [];
+  if (!(await allowAddress("catalog"))) return cached;
 
   let groups;
   try {
-    groups = await getArtistReleaseGroups(artistMbid);
+    groups = await getArtistReleaseGroups(artistMbid, "album");
   } catch (error) {
-    if (cached && cached.length > 0) return cached;
+    if (cached.length > 0) return cached;
     throw error;
   }
 
-  const presentIds = new Set((cached ?? []).map((r) => r.mbid));
+  const presentIds = new Set(cached.map((r) => r.mbid));
   const fresh = groups
     .filter((g) => !presentIds.has(g.id))
     .map((g) => ({
@@ -240,7 +266,7 @@ export async function getCachedArtistAlbums(artistMbid: string): Promise<Release
     .eq("mbid", artistMbid);
 
   const releases: Release[] = [
-    ...(cached ?? []),
+    ...cached,
     ...fresh.map((r) => ({
       mbid: r.mbid,
       title: r.title,
@@ -252,6 +278,68 @@ export async function getCachedArtistAlbums(artistMbid: string): Promise<Release
   ];
 
   return releases.sort(byNewest);
+}
+
+/**
+ * An artist's EPs (MusicBrainz's primary type EP, nothing secondary), for
+ * the row under their albums. Read from MusicBrainz once per artist, as
+ * their albums are, and marked by `eps_cached_at` (migration 0026): artists
+ * whose albums were cached before it get their EPs read on their next
+ * visit. Before the migration runs there are none.
+ */
+export async function getCachedArtistEps(artistMbid: string): Promise<Release[]> {
+  if (!isMbid(artistMbid)) return [];
+  const supabase = await createClient();
+
+  const [artist, cached] = await Promise.all([
+    supabase.from("artists").select("eps_cached_at").eq("mbid", artistMbid).maybeSingle(),
+    readArtistReleases(supabase, artistMbid, "ep"),
+  ]);
+  if (artist.error) {
+    if (!isMissingColumn(artist.error)) logQueryError("catalog", artist.error);
+    return [];
+  }
+  if (!artist.data || artist.data.eps_cached_at) return cached;
+  if (!(await allowAddress("catalog"))) return cached;
+
+  let groups;
+  try {
+    groups = await getArtistReleaseGroups(artistMbid, "ep");
+  } catch {
+    // The EPs known so far will do; they're asked for again next visit.
+    return cached;
+  }
+  await saveEps(artistMbid, groups);
+  return readArtistReleases(supabase, artistMbid, "ep");
+}
+
+/** An artist's EPs: new ones saved whole, ones cached before (opened on their own) marked as EPs. */
+async function saveEps(artistMbid: string, groups: MbReleaseGroup[]): Promise<void> {
+  const admin = createAdminClient();
+  const rows = groups.map((g) => ({
+    mbid: g.id,
+    title: g.title,
+    artist_mbid: artistMbid,
+    release_date: g["first-release-date"] || null,
+    cover_art_url: coverArtUrl(g.id),
+    artist_credit: creditText(g["artist-credit"]),
+    kind: "ep" as const,
+  }));
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100);
+    await admin.from("releases").upsert(chunk, { onConflict: "mbid", ignoreDuplicates: true });
+    await admin
+      .from("releases")
+      .update({ kind: "ep" })
+      .in(
+        "mbid",
+        chunk.map((row) => row.mbid),
+      );
+  }
+  await admin
+    .from("artists")
+    .update({ eps_cached_at: new Date().toISOString() })
+    .eq("mbid", artistMbid);
 }
 
 export async function getCachedRelease(mbid: string): Promise<Release | null> {

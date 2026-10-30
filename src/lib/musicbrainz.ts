@@ -324,12 +324,15 @@ export function wikidataQid(artist: MbArtist): string | null {
 const MAX_ALBUM_PAGES = 3;
 
 /**
- * An artist's studio albums, following further pages for prolific artists.
- * MusicBrainz lumps live albums, bootlegs, compilations and interviews in
- * with studio albums; anything carrying a secondary type isn't what people
- * mean by "an album", so those are dropped.
+ * An artist's studio albums, or their EPs, following further pages for
+ * prolific artists. MusicBrainz lumps live albums, bootlegs, compilations and
+ * interviews in with studio albums; anything carrying a secondary type isn't
+ * what people mean by "an album" (or "an EP"), so those are dropped.
  */
-export async function getArtistReleaseGroups(mbid: string): Promise<MbReleaseGroup[]> {
+export async function getArtistReleaseGroups(
+  mbid: string,
+  type: "album" | "ep" = "album",
+): Promise<MbReleaseGroup[]> {
   const albums: MbReleaseGroup[] = [];
 
   for (let page = 0; page < MAX_ALBUM_PAGES; page++) {
@@ -338,7 +341,7 @@ export async function getArtistReleaseGroups(mbid: string): Promise<MbReleaseGro
       "release-groups": MbReleaseGroup[];
       "release-group-count"?: number;
     }>(
-      `/release-group?artist=${mbid}&type=album&inc=artist-credits&limit=100&offset=${offset}&fmt=json`,
+      `/release-group?artist=${mbid}&type=${type}&inc=artist-credits&limit=100&offset=${offset}&fmt=json`,
     );
 
     const groups = data["release-groups"] ?? [];
