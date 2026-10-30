@@ -1,4 +1,5 @@
 import "server-only";
+import { readCapped } from "@/lib/read-capped";
 import { siteUrl } from "@/lib/site";
 
 /**
@@ -63,33 +64,10 @@ export function isAllowedImageUrl(value: string, own: string[] = ownHosts()): bo
 
 export type FetchedImage = { type: string; data: ArrayBuffer; url: string };
 
-/** Reads a body, giving up past the limit rather than holding it all. */
-async function readCapped(response: Response): Promise<ArrayBuffer | null> {
-  const declared = Number(response.headers.get("content-length"));
-  if (declared > MAX_BYTES) return null;
+/** Reads a picture's body, giving up past the limit rather than holding it all. */
+async function readPicture(response: Response): Promise<ArrayBuffer | null> {
   if (!response.body) return null;
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return out.buffer;
+  return (await readCapped(response, MAX_BYTES))?.buffer ?? null;
 }
 
 /** A picture from one of the allowed places, or null for anything else. */
@@ -115,7 +93,7 @@ export async function fetchImage(start: string): Promise<FetchedImage | null> {
       const type = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
       if (!response.ok || !IMAGE_TYPES.includes(type)) return null;
 
-      const data = await readCapped(response);
+      const data = await readPicture(response);
       return data ? { type, data, url } : null;
     }
   } catch {

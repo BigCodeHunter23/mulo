@@ -1,8 +1,12 @@
+import { readJsonCapped } from "@/lib/read-capped";
+
 const API = "https://musicbrainz.org/ws/2";
 // MusicBrainz requires requests to identify the app and a way to reach it.
 // The site address serves as the contact rather than a personal email.
 const USER_AGENT = "MULO/0.1 ( https://mulo-plum.vercel.app )";
 const MIN_INTERVAL_MS = 1100;
+/** The most of one answer read: the biggest, a box set's track list, is about a megabyte. */
+const MAX_BYTES = 5 * 1024 * 1024;
 
 // MusicBrainz allows ~1 request/second. Chain every call through a single
 // promise so concurrent callers queue instead of firing in parallel.
@@ -69,7 +73,7 @@ async function mbFetch<T>(path: string, options: FetchOptions = {}, attempt = 1)
     throw new MbResponseError(response.status, path);
   }
 
-  return response.json() as Promise<T>;
+  return (await readJsonCapped(response, MAX_BYTES, "MusicBrainz")) as T;
 }
 
 export type MbCredit = {

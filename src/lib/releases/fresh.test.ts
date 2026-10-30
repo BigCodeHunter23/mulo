@@ -111,6 +111,16 @@ describe("readFreshReleases", () => {
     ]);
   });
 
+  it("won't read an answer over 20 MB", async () => {
+    const huge = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ payload: { releases: [] } }), {
+          headers: { "content-length": String(20 * 1024 * 1024 + 1) },
+        }),
+    );
+    await expect(readFreshReleases("2026-10-30", huge)).rejects.toThrow(/more than/);
+  });
+
   it("fails when ListenBrainz does, or answers in a shape it doesn't know", async () => {
     await expect(readFreshReleases("2026-10-30", answering([], [], 503))).rejects.toThrow(/503/);
     const odd = vi.fn(async () => new Response(JSON.stringify({ releases: [] })));

@@ -32,6 +32,15 @@ describe("getReleaseGroupBrief", () => {
     await expect(getReleaseGroupBrief("g")).rejects.toBeInstanceOf(MbNotFoundError);
   });
 
+  it("won't read an answer over 5 MB", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(`"${"x".repeat(5 * 1024 * 1024)}"`)),
+    );
+    const { getReleaseGroupBrief } = await fresh();
+    await expect(getReleaseGroupBrief("g")).rejects.toThrow(/more than/);
+  });
+
   it("says what MusicBrainz answered when it fails", async () => {
     answering(500, {});
     const { getReleaseGroupBrief, MbResponseError } = await fresh();

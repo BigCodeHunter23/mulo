@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { ReleaseKind } from "@/lib/app-api";
 import { addDays } from "@/lib/push/zones";
+import { readJsonCapped } from "@/lib/read-capped";
 import { cleanTitle, isCalendarDay, MAX_ARTISTS } from "@/lib/releases/confirm";
 import { mbidSchema } from "@/lib/validation";
 
@@ -16,6 +17,8 @@ const API = "https://api.listenbrainz.org/1/explore/fresh-releases/";
 /** How far back the daily read looks, and how far ahead. ListenBrainz allows up to 90 days. */
 export const DAYS_BACK = 7;
 export const DAYS_AHEAD = 30;
+/** The most of an answer read: a month ahead runs to a few megabytes. */
+const MAX_BYTES = 20 * 1024 * 1024;
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -103,7 +106,9 @@ async function readWindow(
     signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`ListenBrainz answered ${response.status} for fresh releases`);
-  const parsed = answer.safeParse(await response.json());
+  const parsed = answer.safeParse(
+    await readJsonCapped(response, MAX_BYTES, "ListenBrainz's fresh releases"),
+  );
   if (!parsed.success) {
     throw new Error("ListenBrainz's fresh releases came back in a shape MULO doesn't know");
   }
