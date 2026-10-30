@@ -19,6 +19,7 @@ vi.mock("@/lib/drop", () => ({
   }),
 }));
 vi.mock("@/lib/streak", () => ({}));
+vi.mock("@/lib/releases/store", () => ({}));
 
 const sydney = (userId: string, over = {}) => ({
   userId,
@@ -62,6 +63,8 @@ function deps(over: Partial<TickDeps> = {}): TickDeps & { sent: PushMessage[] } 
     }),
     checkReceipts: vi.fn(async () => 0),
     pruneLog: vi.fn(async () => {}),
+    releasesOn: vi.fn(async () => []),
+    followersOf: vi.fn(async () => new Map<string, Set<string>>()),
     ...over,
   };
 }
@@ -292,5 +295,79 @@ describe("a run that goes wrong", () => {
     await runTick(SEVEN, d);
     expect(peak).toBe(5);
     expect(d.sent).toHaveLength(12);
+  });
+});
+
+describe("release day", () => {
+  const chromakopia = {
+    mbid: "m1",
+    title: "CHROMAKOPIA",
+    kind: "album" as const,
+    day: "2026-10-30",
+    artistMbid: "tyler",
+    artistName: "Tyler, the Creator",
+  };
+  const onTheDay = vi.fn(async (days: string[]) =>
+    days.includes(chromakopia.day) ? [chromakopia] : [],
+  );
+  const followedBy = (...ids: string[]) => vi.fn(async () => new Map([["tyler", new Set(ids)]]));
+  // 10:05 on 30 Oct in Sydney.
+  const TEN = new Date("2026-10-29T23:05:00Z");
+
+  it("tells a follower at 10am on the day, their time", async () => {
+    const d = deps({ releasesOn: onTheDay, followersOf: followedBy("a") });
+    await runTick(TEN, d);
+    expect(onTheDay).toHaveBeenCalledWith(["2026-10-30"]);
+    expect(d.sent).toEqual([
+      expect.objectContaining({
+        userId: "a",
+        kind: "release",
+        key: "2026-10-30",
+        title: "Tyler, the Creator's new album is out today",
+        url: "/album/m1",
+      }),
+    ]);
+  });
+
+  it("reaches Los Angeles at its own 10am, not Sydney's", async () => {
+    const d = deps({
+      candidates: vi.fn(async () => [sydney("b", { timeZone: "America/Los_Angeles" })]),
+      releasesOn: onTheDay,
+      followersOf: followedBy("b"),
+    });
+    await runTick(TEN, d);
+    expect(d.sent).toEqual([]);
+    // 10:05 on 30 Oct in Los Angeles.
+    await runTick(new Date("2026-10-30T17:05:00Z"), d);
+    expect(d.sent).toEqual([expect.objectContaining({ userId: "b", key: "2026-10-30" })]);
+  });
+
+  it("sends nothing for a release found after its day", async () => {
+    const d = deps({ releasesOn: onTheDay, followersOf: followedBy("a") });
+    // 10:05 on 31 Oct in Sydney: CHROMAKOPIA was the day before.
+    await runTick(new Date("2026-10-30T23:05:00Z"), d);
+    expect(d.sent).toEqual([]);
+  });
+
+  it("keeps to the New releases switch, the log, and who follows now", async () => {
+    const off = deps({
+      candidates: vi.fn(async () => [sydney("a", { settings: { ...ALL_ON, releases: false } })]),
+      releasesOn: onTheDay,
+      followersOf: followedBy("a"),
+    });
+    await runTick(TEN, off);
+    expect(off.sent).toEqual([]);
+
+    const logged = deps({
+      releasesOn: onTheDay,
+      followersOf: followedBy("a"),
+      loggedAlready: vi.fn(async () => new Set(["a"])),
+    });
+    await runTick(TEN, logged);
+    expect(logged.sent).toEqual([]);
+
+    const unfollowed = deps({ releasesOn: onTheDay, followersOf: followedBy() });
+    await runTick(TEN, unfollowed);
+    expect(unfollowed.sent).toEqual([]);
   });
 });

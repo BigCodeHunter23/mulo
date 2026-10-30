@@ -1,6 +1,8 @@
 import { SOURCE_NAME, type ImportSource } from "@/lib/diary-shared";
 import { threadHref } from "@/lib/replies-shared";
 import type { PushKind } from "@/lib/push/who";
+import type { ReleaseKind } from "@/lib/app-api";
+import { KIND_WORD } from "@/lib/releases/words";
 
 /**
  * The words of every push, in MULO's voice (docs/voice.md): short, plain, no
@@ -117,6 +119,26 @@ export function diaryMessage(source: ImportSource, count: number): PushContent {
     body: `${count.toLocaleString("en")} album${count === 1 ? "" : "s"} to rate.`,
     url: "/diary",
   };
+}
+
+/** A release by an artist somebody follows, as its push names it. */
+export type ReleaseLine = { mbid: string; title: string; kind: ReleaseKind; artistName: string };
+
+/**
+ * "Tyler, the Creator's new album is out today", opening the album; several
+ * on one day go as one: "3 new releases from artists you follow", opening
+ * Home, whose shelf lists them.
+ */
+export function releaseMessage(releases: ReleaseLine[]): PushContent {
+  const [only] = releases;
+  if (only && releases.length === 1) {
+    return {
+      title: `${title(only.artistName)}'s new ${KIND_WORD[only.kind]} is out today`,
+      body: title(only.title),
+      url: `/album/${only.mbid}`,
+    };
+  }
+  return { title: `${releases.length} new releases from artists you follow`, url: "/" };
 }
 
 /** What a reply was on. `id` is the review's or take's own id. */

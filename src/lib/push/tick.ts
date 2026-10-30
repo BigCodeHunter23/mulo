@@ -9,6 +9,8 @@ import { currentDrop } from "@/lib/drop";
 import { getStreak } from "@/lib/streak";
 import { countPicks, getMatchupForDay, getTodaysMatchup, shiftDay, sydneyDay } from "@/lib/versus";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { releaseAlerts } from "@/lib/releases/alerts";
+import * as releasesStore from "@/lib/releases/store";
 import type { Streak } from "@/lib/app-api";
 import type { VersusMatchup } from "@/lib/versus-shared";
 
@@ -24,6 +26,8 @@ export type TickDeps = {
   send: (messages: PushMessage[], deadline: number) => Promise<number>;
   checkReceipts: (at: Date, deadline: number) => Promise<number>;
   pruneLog: (at: Date) => Promise<void>;
+  releasesOn: typeof releasesStore.releasesOn;
+  followersOf: typeof releasesStore.followersOf;
 };
 
 const real = (): TickDeps => ({
@@ -38,6 +42,8 @@ const real = (): TickDeps => ({
   send: (messages, deadline) => sendPushes(messages, undefined, { deadline }),
   checkReceipts: (at, deadline) => checkReceipts(at, undefined, { deadline }),
   pruneLog: store.pruneLog,
+  releasesOn: releasesStore.releasesOn,
+  followersOf: releasesStore.followersOf,
 });
 
 export type TickReport = { due: number; sent: number; receipts: number; errors: number };
@@ -134,6 +140,28 @@ async function dropPushes(people: Candidate[], at: Date, deps: TickDeps): Promis
     .map((p) => ({ userId: p.userId, kind: "drop", key, ...dropMessage() }));
 }
 
+/**
+ * Release day, at 10am where each person is: the releases out on their day
+ * by artists they follow. A release found after its day gets no push; the
+ * bell still lists it.
+ */
+async function releasePushes(
+  people: Candidate[],
+  at: Date,
+  deps: TickDeps,
+): Promise<PushMessage[]> {
+  const releases = await deps.releasesOn([...byLocalDay(people, at).keys()]);
+  if (releases.length === 0) return [];
+  const due = await notLogged("release", people, at, deps);
+  if (due.length === 0) return [];
+  const followers = await deps.followersOf([...new Set(releases.map((r) => r.artistMbid))]);
+  return releaseAlerts(
+    due.map(({ person, day }) => ({ userId: person.userId, day })),
+    releases,
+    followers,
+  );
+}
+
 /** Runs `work` over `items`, at most `limit` at once, none started after `deadline`. */
 async function paced<T>(
   items: T[],
@@ -181,7 +209,8 @@ async function streakPushes(
 
 /**
  * One run of the clock, every 15 minutes: the timed pushes due where each
- * person is, then Expo's receipts and a tidy of the log. A failure in one step
+ * person is (Versus, release day, the Drop, streaks), then Expo's receipts
+ * and a tidy of the log. A failure in one step
  * is logged and counted, and the rest carry on.
  */
 export async function runTick(
@@ -210,12 +239,16 @@ export async function runTick(
     awake.filter((p) => on(p) && inSlot(at, zoneOrSydney(p.timeZone), slot));
 
   const versus = due(SLOTS.versus, (p) => p.settings.versus);
+  const release = due(SLOTS.release, (p) => p.settings.releases);
   const drop = due(SLOTS.drop, (p) => p.settings.drop);
   const streak = due(SLOTS.streak, (p) => p.settings.streak);
 
   const messages = [
     ...(versus.length
       ? await attempt("versus pushes", () => versusPushes(versus, at, deps), [])
+      : []),
+    ...(release.length
+      ? await attempt("release pushes", () => releasePushes(release, at, deps), [])
       : []),
     ...(drop.length ? await attempt("drop pushes", () => dropPushes(drop, at, deps), []) : []),
     ...(streak.length

@@ -11,6 +11,7 @@ import {
   versusMessage,
   firstLine,
   mentionMessage,
+  releaseMessage,
   replyMessage,
 } from "@/lib/push/messages";
 
@@ -185,5 +186,38 @@ describe("diaryMessage", () => {
       body: "1 album to rate.",
       url: "/diary",
     });
+  });
+});
+
+describe("releaseMessage", () => {
+  const chromakopia = {
+    mbid: "m1",
+    title: "CHROMAKOPIA",
+    kind: "album" as const,
+    artistName: "Tyler, the Creator",
+  };
+
+  it("names the artist and opens the album", () => {
+    expect(releaseMessage([chromakopia])).toEqual({
+      title: "Tyler, the Creator's new album is out today",
+      body: "CHROMAKOPIA",
+      url: "/album/m1",
+    });
+    expect(releaseMessage([{ ...chromakopia, kind: "ep" }]).title).toBe(
+      "Tyler, the Creator's new EP is out today",
+    );
+  });
+
+  it("rolls several into one that opens Home", () => {
+    expect(releaseMessage([chromakopia, chromakopia, chromakopia])).toEqual({
+      title: "3 new releases from artists you follow",
+      url: "/",
+    });
+  });
+
+  it("cleans the names before they reach a lock screen", () => {
+    expect(releaseMessage([{ ...chromakopia, artistName: "Tyler,\nthe Creator" }]).title).toBe(
+      "Tyler, the Creator's new album is out today",
+    );
   });
 });
