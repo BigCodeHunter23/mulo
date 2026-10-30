@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getCachedArtist, getCachedArtistAlbums } from "@/lib/catalog";
+import { getCachedArtist, getCachedArtistAlbums, getCachedArtistEps } from "@/lib/catalog";
+import { getArtistFollowState } from "@/lib/artist-follows";
+import ArtistFollowButton from "@/components/ArtistFollowButton";
 import {
   getOwnRating,
   getScores,
@@ -68,20 +70,21 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   const user = await getCurrentUser();
   const signedIn = Boolean(user);
 
-  const [albums, scores, ownRating, reviews, topSongs] = await Promise.all([
+  const [albums, eps, scores, ownRating, reviews, topSongs, follow] = await Promise.all([
     getCachedArtistAlbums(mbid),
+    getCachedArtistEps(mbid),
     getScores("artist", mbid),
     getOwnRating("artist", mbid),
     getReviews("artist", mbid),
     getTopSongs(mbid),
+    getArtistFollowState(mbid),
   ]);
+  // Albums and EPs both carry scores; The Gauntlet below is albums only.
+  const records = [...albums, ...eps].map((record) => record.mbid);
   const [albumScores, myScores, albumFriends, reactions] = await Promise.all([
-    getScoresForReleases(albums.map((a) => a.mbid)),
-    getMyAlbumScores(albums.map((a) => a.mbid)),
-    getFriendRaters(
-      "album",
-      albums.map((a) => a.mbid),
-    ),
+    getScoresForReleases(records),
+    getMyAlbumScores(records),
+    getFriendRaters("album", records),
     getReactions(
       "artist",
       reviews.map((review) => review.id),
@@ -147,6 +150,13 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
                   {albums.length} album{albums.length === 1 ? "" : "s"}
                 </p>
               )}
+              <ArtistFollowButton
+                key={mbid}
+                mbid={mbid}
+                signedIn={signedIn}
+                following={follow.following}
+                followers={follow.followers}
+              />
               <div className="mt-5 w-full sm:w-fit">
                 <StarScore
                   overall={scores.overall}
@@ -265,6 +275,27 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
               </li>
             ))}
           </ul>
+        )}
+
+        {eps.length > 0 && (
+          <section className="mt-12">
+            <SectionHeading>EPs</SectionHeading>
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-5">
+              {eps.map((ep) => (
+                <li key={ep.mbid}>
+                  <AlbumCard
+                    mbid={ep.mbid}
+                    title={ep.title}
+                    year={ep.release_date?.slice(0, 4) ?? null}
+                    coverUrl={ep.cover_art_url}
+                    score={albumScores.get(ep.mbid) ?? null}
+                    mine={myScores.get(ep.mbid)}
+                    friends={albumFriends[ep.mbid]}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* The end of the page shouldn't be a dead end. */}
