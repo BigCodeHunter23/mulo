@@ -85,6 +85,28 @@ describe("an artist's EPs", () => {
     });
   });
 
+  it("are asked for again next time when saving them fails", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const failure = { code: "57014", message: "timeout" };
+    for (const failing of ["upsert", "update"]) {
+      writer = fakeSupabase();
+      vi.mocked(createAdminClient).mockReturnValue(writer.client as never);
+      reader.answer("artists", { data: { eps_cached_at: null }, error: null });
+      reader.answer("releases", { data: [], error: null }, { data: [], error: null });
+      writer.answer(
+        "releases",
+        failing === "upsert" ? { data: null, error: failure } : { data: null, error: null },
+        failing === "update" ? { data: null, error: failure } : { data: null, error: null },
+      );
+      mb.getArtistReleaseGroups.mockResolvedValue([
+        { id: EP, title: row.title, "first-release-date": "2015-04-13", "artist-credit": [] },
+      ]);
+      await getCachedArtistEps(TYLER);
+      expect(writer.callsOn("artists")).toEqual([]);
+    }
+    spy.mockRestore();
+  });
+
   it("are none before migration 0026, without asking MusicBrainz", async () => {
     reader.answer("artists", { data: null, error: missingColumn });
     reader.answer("releases", { data: null, error: missingColumn });

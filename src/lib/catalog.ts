@@ -313,7 +313,11 @@ export async function getCachedArtistEps(artistMbid: string): Promise<Release[]>
   return readArtistReleases(supabase, artistMbid, "ep");
 }
 
-/** An artist's EPs: new ones saved whole, ones cached before (opened on their own) marked as EPs. */
+/**
+ * An artist's EPs: new ones saved whole, ones cached before (opened on their
+ * own) marked as EPs. Only once every write has gone in are their EPs marked
+ * read; otherwise they're asked for again next visit.
+ */
 async function saveEps(artistMbid: string, groups: MbReleaseGroup[]): Promise<void> {
   const admin = createAdminClient();
   const rows = groups.map((g) => ({
@@ -327,19 +331,24 @@ async function saveEps(artistMbid: string, groups: MbReleaseGroup[]): Promise<vo
   }));
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100);
-    await admin.from("releases").upsert(chunk, { onConflict: "mbid", ignoreDuplicates: true });
-    await admin
+    const added = await admin
+      .from("releases")
+      .upsert(chunk, { onConflict: "mbid", ignoreDuplicates: true });
+    if (added.error) return logQueryError("catalog", added.error, "0026");
+    const marked = await admin
       .from("releases")
       .update({ kind: "ep" })
       .in(
         "mbid",
         chunk.map((row) => row.mbid),
       );
+    if (marked.error) return logQueryError("catalog", marked.error, "0026");
   }
-  await admin
+  const read = await admin
     .from("artists")
     .update({ eps_cached_at: new Date().toISOString() })
     .eq("mbid", artistMbid);
+  if (read.error) logQueryError("catalog", read.error, "0026");
 }
 
 export async function getCachedRelease(mbid: string): Promise<Release | null> {
