@@ -10,6 +10,8 @@ const db = vi.hoisted(() => ({
   admin: null as unknown as FakeSupabase,
   /** The side the visitor picked in the matchup, if any. */
   pick: "left" as "left" | "right" | null,
+  /** Whether reading the visitor's pick fails. */
+  pickFails: false,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -19,6 +21,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.admin.client }));
 vi.mock("@/lib/versus", () => ({
   getPick: vi.fn(async () => db.pick),
+  hasPicked: vi.fn(async () => (db.pickFails ? null : db.pick !== null)),
   getTally: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/rate-limit", () => ({ allowUser: vi.fn(async () => true), TOO_MANY: "Slow down." }));
@@ -29,19 +32,20 @@ vi.mock("@/lib/content-filter", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { fakeSupabase } from "../../../test/fake-supabase";
-import { getPick } from "@/lib/versus";
+import { hasPicked } from "@/lib/versus";
 import { postTake } from "./actions";
 
 beforeEach(() => {
   db.fake = fakeSupabase();
   db.admin = fakeSupabase();
   db.pick = "left";
+  db.pickFails = false;
 });
 
 describe("postTake", () => {
   it("writes the take with the service role, as the signed-in person", async () => {
     expect(await postTake(12, "  Illmatic alone.  ")).toEqual({ ok: true });
-    expect(getPick).toHaveBeenCalledWith(12, ME);
+    expect(hasPicked).toHaveBeenCalledWith(12, ME);
     const insert = db.admin.callsOn("versus_takes").find((call) => call.method === "insert");
     expect(insert?.args[0]).toEqual({ matchup_id: 12, user_id: ME, body: "Illmatic alone." });
     expect(db.fake.callsOn("versus_takes")).toEqual([]);
@@ -52,6 +56,15 @@ describe("postTake", () => {
     expect(await postTake(12, "Fair.")).toEqual({
       ok: false,
       error: "Pick a side first, then make your case.",
+    });
+    expect(db.admin.calls).toEqual([]);
+  });
+
+  it("asks to try again, not to pick, when the pick can't be read", async () => {
+    db.pickFails = true;
+    expect(await postTake(12, "Fair.")).toEqual({
+      ok: false,
+      error: "Couldn't save that. Please try again.",
     });
     expect(db.admin.calls).toEqual([]);
   });
@@ -72,7 +85,7 @@ describe("postTake", () => {
       ok: false,
       error: "Please keep it respectful.",
     });
-    expect(getPick).not.toHaveBeenCalled();
+    expect(hasPicked).not.toHaveBeenCalled();
     expect(db.admin.calls).toEqual([]);
   });
 });

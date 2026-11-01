@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPick, getTally } from "@/lib/versus";
+import { getPick, getTally, hasPicked } from "@/lib/versus";
 import { TAKE_LIMIT, type VersusSideKey } from "@/lib/versus-shared";
 import type { PickResult } from "@/lib/app-api";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
@@ -80,9 +80,9 @@ export async function postTake(matchupId: number, body: string): Promise<TakeRes
   // take goes in with the service role, as the signed-in person. That skips
   // the database's own rule that only somebody who picked may post, so it's
   // checked here first.
-  if (!(await getPick(matchupId, user.id))) {
-    return { ok: false, error: "Pick a side first, then make your case." };
-  }
+  const picked = await hasPicked(matchupId, user.id);
+  if (picked === null) return { ok: false, error: TRY_AGAIN };
+  if (!picked) return { ok: false, error: "Pick a side first, then make your case." };
 
   const { error } = await createAdminClient()
     .from("versus_takes")

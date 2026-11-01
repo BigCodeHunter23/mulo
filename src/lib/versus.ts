@@ -206,6 +206,23 @@ export async function getPick(matchupId: number, userId: string): Promise<Versus
   return (data?.pick as VersusSideKey | undefined) ?? null;
 }
 
+/**
+ * Whether somebody picked a side in a matchup, or null when that couldn't be
+ * read, so a failed read isn't mistaken for no pick.
+ */
+export async function hasPicked(matchupId: number, userId: string): Promise<boolean | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("versus_votes")
+    .select("pick")
+    .eq("matchup_id", matchupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) return null;
+  return data !== null;
+}
+
 /** The split, and how the people somebody follows went. */
 export async function getTally(matchupId: number, userId: string | null): Promise<VersusTally> {
   const [counts, followingIds] = await Promise.all([

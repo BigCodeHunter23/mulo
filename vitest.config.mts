@@ -17,5 +17,8 @@ export default defineConfig({
     // The first test to import a server action loads its whole module graph,
     // which can take several seconds on a slow or synced disk.
     testTimeout: 20_000,
+    // A migration test's setup replays every migration on PGlite, which takes
+    // well over the default 10 seconds when the machine is busy.
+    hookTimeout: 60_000,
   },
 });

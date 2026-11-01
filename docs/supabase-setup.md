@@ -310,8 +310,9 @@ where has_column_privilege(r.role, format('public.%I', t.tbl), t.col, p.priv);
 
 Then, on the live site, save a review and change your bio: both save.
 
-If saving words fails afterwards (the deploy didn't happen, say), this puts
-things back as they were before 0027, and you can run 0027 again later:
+If saving words fails afterwards (the deploy didn't happen, say), this gives
+signed-in people back what they could write before 0027 (no policy ever let
+signed-out visitors write these tables), and you can run 0027 again later:
 
 ```sql
 grant insert, update on public.profiles, public.ratings, public.artist_ratings,
