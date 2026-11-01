@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ListResult } from "@/lib/app-api";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { LIST_LIMIT } from "@/lib/lists";
 import { mbidSchema, rowIdSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
@@ -114,8 +115,10 @@ export async function createList(input: {
   if (!isClean(title)) return { ok: false, error: NOT_CLEAN };
   if (description && !isRespectful(description)) return { ok: false, error: NOT_RESPECTFUL };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // Signed-in people can't write a list's title or description themselves
+  // (migration 0027), so the list goes in with the service role after the
+  // word filter, always as the signed-in person.
+  const { data, error } = await createAdminClient()
     .from("lists")
     .insert({ user_id: user.id, title, description, ranked: Boolean(parsed.data.ranked) })
     .select("id")
@@ -128,6 +131,7 @@ export async function createList(input: {
 
   const id = Number(data.id);
   if (parsed.data.releaseMbid) {
+    const supabase = await createClient();
     await supabase
       .from("list_items")
       .insert({ list_id: id, release_mbid: parsed.data.releaseMbid, position: 1 });
@@ -150,9 +154,13 @@ export async function updateList(
 
   const refused = await refuseUnlessOwner(id);
   if (refused) return refused;
+  // Cached for the request: the same lookup refuseUnlessOwner just made.
+  const user = await getCurrentUser();
+  if (!user) return TRY_AGAIN;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // The words go in with the service role (migration 0027), only ever on the
+  // signed-in person's own list.
+  const { data, error } = await createAdminClient()
     .from("lists")
     .update({
       title,
@@ -161,6 +169,7 @@ export async function updateList(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
+    .eq("user_id", user.id)
     .select("id");
   if (error || !data?.length) return TRY_AGAIN;
   refresh(id);
@@ -259,8 +268,10 @@ export async function setListNote(
   const refused = await refuseUnlessOwner(id);
   if (refused) return refused;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // The note goes in with the service role (migration 0027). The list is the
+  // signed-in person's own, checked just above, and a list never changes
+  // hands: its update policy holds user_id to the person both ways.
+  const { data, error } = await createAdminClient()
     .from("list_items")
     .update({ note: text })
     .eq("list_id", id)
