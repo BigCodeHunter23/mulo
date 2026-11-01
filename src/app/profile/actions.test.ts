@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FakeSupabase } from "../../../test/fake-supabase";
 
-const db = vi.hoisted(() => ({ fake: null as unknown as FakeSupabase }));
+const ME = "11111111-1111-4111-8111-111111111111";
+const OTHER = "22222222-2222-4222-8222-222222222222";
+
+const db = vi.hoisted(() => ({
+  /** The visitor's own client. */
+  fake: null as unknown as FakeSupabase,
+  /** The service role's, which alone writes names and bios (migration 0027). */
+  admin: null as unknown as FakeSupabase,
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => db.fake.client,
-  getCurrentUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", email: null }),
+  getCurrentUser: async () => ({ id: ME, email: null }),
 }));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.fake.client }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.admin.client }));
 vi.mock("@/lib/rate-limit", () => ({ allowUser: vi.fn(async () => true), TOO_MANY: "Slow down." }));
 vi.mock("@/lib/social", () => ({ getEditableProfile: vi.fn(async () => null) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -22,14 +30,54 @@ function form(fields: Record<string, string>) {
   return data;
 }
 
+/** The profile row the save wrote with the service role, or undefined. */
+function savedRow() {
+  const upsert = db.admin.callsOn("profiles").find((call) => call.method === "upsert");
+  return upsert?.args[0] as Record<string, unknown> | undefined;
+}
+
 /** The display name the save wrote, or undefined when nothing was written. */
 function savedName() {
-  const upsert = db.fake.callsOn("profiles").find((call) => call.method === "upsert");
-  return (upsert?.args[0] as { display_name?: string | null } | undefined)?.display_name;
+  return savedRow()?.display_name;
 }
 
 beforeEach(() => {
   db.fake = fakeSupabase();
+  db.admin = fakeSupabase();
+});
+
+describe("saveProfile's write", () => {
+  it("writes the words with the service role, as the signed-in person", async () => {
+    const result = await saveProfile(
+      {},
+      form({ username: "alex", display_name: "Alex", bio: "Records." }),
+    );
+    expect(result.error).toBeUndefined();
+    expect(savedRow()).toEqual({
+      id: ME,
+      username: "alex",
+      display_name: "Alex",
+      bio: "Records.",
+    });
+    expect(db.fake.callsOn("profiles")).toEqual([]);
+  });
+
+  it("takes the id from the session, never from the form", async () => {
+    await saveProfile({}, form({ id: OTHER, username: "alex" }));
+    expect(savedRow()?.id).toBe(ME);
+  });
+
+  it("leaves the bio alone when the form has none, as welcome's username pick does", async () => {
+    await saveProfile({}, form({ username: "alex" }));
+    expect(savedRow()).toEqual({ id: ME, username: "alex", display_name: null });
+  });
+
+  it("still says plainly when the username is taken", async () => {
+    db.admin.answer("profiles", { data: null, error: { code: "23505", message: "duplicate" } });
+    expect(await saveProfile({}, form({ username: "alex" }))).toEqual({
+      error: "That username is already taken. Try another.",
+    });
+  });
 });
 
 describe("saveProfile's display name", () => {

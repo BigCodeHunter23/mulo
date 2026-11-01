@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeRedirectPath } from "@/lib/redirects";
 import { displayNameSchema, field, firstError, textSchema, usernameSchema } from "@/lib/validation";
@@ -107,15 +107,19 @@ export async function saveProfile(_prev: ProfileState, formData: FormData): Prom
     avatarUrl = result.url;
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("profiles").upsert({
-    id: user.id,
-    username,
-    display_name: display_name || null,
-    // The welcome step has no bio field; don't wipe one on its account.
-    ...(formData.has("bio") ? { bio: bio || null } : {}),
-    ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-  });
+  // Signed-in people can't write their own name or bio (migration 0027), so
+  // the words go in with the service role, after every check above, and
+  // always as the signed-in person: the id is the session's, never the form's.
+  const { error } = await createAdminClient()
+    .from("profiles")
+    .upsert({
+      id: user.id,
+      username,
+      display_name: display_name || null,
+      // The welcome step has no bio field; don't wipe one on its account.
+      ...(formData.has("bio") ? { bio: bio || null } : {}),
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+    });
 
   if (error) {
     if (error.code === "23505") {
