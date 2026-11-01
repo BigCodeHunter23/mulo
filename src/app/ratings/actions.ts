@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { RATING_TABLES, reviewedTable, type RatingKind } from "@/lib/rating-kinds";
 import { mbidSchema } from "@/lib/validation";
 import { allowUser, TOO_MANY } from "@/lib/rate-limit";
@@ -192,8 +193,10 @@ export async function saveReview(
   const { column } = RATING_TABLES[kind];
   const table = reviewedTable(kind);
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  // Signed-in people can't write reviews themselves (migration 0027), so the
+  // review goes in with the service role after the word filter, only ever on
+  // the signed-in person's own rating.
+  const { data, error } = await createAdminClient()
     .from(table)
     .update({ review: text || null })
     .eq("user_id", user.id)
