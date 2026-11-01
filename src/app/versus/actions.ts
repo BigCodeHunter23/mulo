@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getPick, getTally } from "@/lib/versus";
 import { TAKE_LIMIT, type VersusSideKey } from "@/lib/versus-shared";
 import type { PickResult } from "@/lib/app-api";
@@ -75,18 +76,21 @@ export async function postTake(matchupId: number, body: string): Promise<TakeRes
   if (!user) return { ok: false, error: "Log in to post a take." };
   if (!(await allowUser("post", user.id))) return { ok: false, error: TOO_MANY };
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  // Signed-in people can't write takes themselves (migration 0027), so the
+  // take goes in with the service role, as the signed-in person. That skips
+  // the database's own rule that only somebody who picked may post, so it's
+  // checked here first.
+  if (!(await getPick(matchupId, user.id))) {
+    return { ok: false, error: "Pick a side first, then make your case." };
+  }
+
+  const { error } = await createAdminClient()
     .from("versus_takes")
     .insert({ matchup_id: matchupId, user_id: user.id, body: text });
 
   if (error) {
     if (error.code === "23505") {
       return { ok: false, error: "You've already had your say on this one." };
-    }
-    // The database only takes a take from somebody who picked a side.
-    if (error.code === "42501") {
-      return { ok: false, error: "Pick a side first, then make your case." };
     }
     return { ok: false, error: TRY_AGAIN };
   }
