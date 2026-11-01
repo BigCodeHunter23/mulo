@@ -276,3 +276,44 @@ with `read_at` filled in. Releases still waiting for MusicBrainz, and any
 that have failed (`tries`, refused at 3): `select release_group_mbid, title,
 tries, last_error_at from new_releases where confirmed_at is null and
 refused_at is null order by found_at;`.
+
+## 11. The word filter, held by the database
+
+Stops anyone writing names, bios, reviews, takes or list words straight
+into the database with their own login, which skipped the word filter. Only
+the website writes them now, after its checks. Scores, follows, picks and
+everything else work as before.
+
+**The order matters.** Run it before the new website is live and nobody can
+save a review, bio, take or list until it is.
+
+1. Merge `fix/security-updates` and let getmulo.com deploy. Wait until
+   Vercel shows the deployment as Ready.
+2. If section 10 (0026) isn't done yet, do it now.
+3. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0027_words_through_the_website.sql` and run it.
+   Safe to run twice.
+
+Check: in the SQL Editor, this lists every locked column signed-in or
+signed-out people can still write. It should come back with **no rows**:
+
+```sql
+select t.tbl, t.col, r.role, p.priv
+from (values ('profiles', 'username'), ('profiles', 'display_name'),
+  ('profiles', 'bio'), ('ratings', 'review'), ('artist_ratings', 'review'),
+  ('versus_takes', 'body'), ('lists', 'title'), ('lists', 'description'),
+  ('list_items', 'note')) t(tbl, col)
+cross join (values ('anon'), ('authenticated')) r(role)
+cross join (values ('INSERT'), ('UPDATE')) p(priv)
+where has_column_privilege(r.role, format('public.%I', t.tbl), t.col, p.priv);
+```
+
+Then, on the live site, save a review and change your bio: both save.
+
+If saving words fails afterwards (the deploy didn't happen, say), this puts
+things back as they were before 0027, and you can run 0027 again later:
+
+```sql
+grant insert, update on public.profiles, public.ratings, public.artist_ratings,
+  public.versus_takes, public.lists, public.list_items to authenticated;
+```

@@ -90,8 +90,24 @@ two standards. `isClean` (names, usernames, bios, list titles) refuses
 swearing and slurs; `isRespectful` (reviews, Versus takes, list descriptions
 and notes) refuses slurs and hate only. The server actions call them
 (`saveProfile`, the list actions, `saveReview`, `postTake`), so the app API,
-which calls the same actions, is covered with no extra work. A new free-text
-field calls one of them in its action.
+which calls the same actions, is covered with no extra work.
+
+The database holds it too (migration 0027). Signed in, nobody may insert or
+update the words themselves: `profiles.username`, `display_name` and `bio`,
+`ratings.review`, `artist_ratings.review`, `versus_takes` (no inserts at
+all), `lists.title` and `description` (no list inserts), and
+`list_items.note`. So those actions write the words with the service role
+after their checks, always as the signed-in person (the id from the
+session, never from what was sent), and an update is scoped to that id.
+`postTake` checks the pick itself, the rule the insert policy used to hold.
+Everything without words stays on the person's own session: scores,
+positions, Raised On, the photo, the ranked switch, touching a list.
+Reading is untouched. Postgres can't take one column from a table-wide
+grant, so 0027 revokes those tables' insert and update whole and grants the
+other columns back to `authenticated`; a column added to one of them later
+isn't writable by signed-in people until a migration grants it. A new
+free-text field calls one of the filters in its action, writes with the
+service role, and is left out of the grants.
 
 Nothing talks to Supabase from the browser. The session cookies are
 `httpOnly`, so page scripts can't read them, and every query runs on the
@@ -106,7 +122,7 @@ schema, so a wrong table or column name fails the type check.
 | --------------------- | ------------------------------------ | --------------------------------------------------------------------- |
 | `server.ts`           | The signed-in person (their cookie, or the app's bearer token) | Almost everything: pages, actions, the app API. One per request (React `cache`). |
 | `public.ts`           | Nobody (anon key, no cookie)         | Public reads that are the same for everyone, so they can be cached.   |
-| `admin.ts`            | Service role, **bypasses RLS**       | Writing catalogue data fetched from MusicBrainz. Server only.          |
+| `admin.ts`            | Service role, **bypasses RLS**       | Catalogue data fetched from MusicBrainz, and writes made after the website's own checks: the words people write (migration 0027), replies, the diary, admin. Server only. |
 | `middleware.ts`       | The signed-in person                 | The proxy's session refresh.                                          |
 
 Settings are read through `src/lib/env.ts`, which validates them with zod

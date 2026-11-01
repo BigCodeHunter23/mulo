@@ -33,7 +33,11 @@ in plain language, and give them links and exact steps when they need to act.
   in the action that saves it: `isClean` for names, usernames, bios and list
   titles (no swearing or slurs), `isRespectful` for reviews, Versus takes,
   list descriptions and notes (slurs and hate only). A new free-text field
-  must call one of them, so the app API is covered too.
+  must call one of them, so the app API is covered too. The database holds
+  it as well (migration 0027): signed-in people can't write those columns,
+  so the action writes the words with the service role, as the signed-in
+  person (the id from the session), and a new free-text column is left out
+  of its migration's grants.
 - Supabase's Redirect URLs must list exactly `mulo://auth/callback` for the
   phone app, never `exp://`. That list is the real boundary for the app's
   social sign-in.
