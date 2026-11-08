@@ -3,21 +3,23 @@
  * flood of signed-out page loads used up the database's whole monthly allowance
  * and took the site down. These give nothing back for it.
  *
- * Search engines (Googlebot, bingbot, DuckDuckBot, Applebot) and link previews
- * (facebookexternalhit, Twitterbot, Slackbot, WhatsApp, Discordbot) are left out
- * on purpose: they're how people find an album and share it.
+ * Left out on purpose, because they're how people find an album and share it:
+ * search engines (Googlebot, bingbot, DuckDuckBot, Applebot), ChatGPT's and
+ * Perplexity's search (OAI-SearchBot, PerplexityBot) and the fetches they make
+ * for somebody asking (ChatGPT-User, Perplexity-User), and link previews
+ * (facebookexternalhit, Twitterbot, Slackbot, WhatsApp, Discordbot). GPTBot only
+ * gathers pages for OpenAI's training, and blocking it doesn't touch ChatGPT's
+ * search, so it stays on the list.
  */
 
-/** Crawlers gathering pages for AI models and AI search. */
+/** Crawlers gathering pages for AI models and other companies' AI search. */
 const AI_CRAWLERS = [
   "GPTBot",
-  "OAI-SearchBot",
   "ClaudeBot",
   "Claude-SearchBot",
   "anthropic-ai",
   "CCBot",
   "Bytespider",
-  "PerplexityBot",
   "Amazonbot",
   "meta-externalagent",
   "cohere-ai",

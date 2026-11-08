@@ -8,7 +8,6 @@ describe("isBlockedCrawler", () => {
     "Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)",
     "CCBot/2.0 (https://commonscrawl.org/faq/)",
     "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)",
-    "Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
     "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
     "gptbot",
   ])("turns away %s", (agent) => {
@@ -21,6 +20,11 @@ describe("isBlockedCrawler", () => {
     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
     "Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17 Safari/605.1.15 (Applebot/0.1)",
     "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)",
+    // How MULO turns up in ChatGPT's and Perplexity's answers, and how they read a page for somebody.
+    "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.3; +https://openai.com/searchbot",
+    "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot",
+    "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
+    "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)",
     // Link previews are what make a shared album look like one.
     "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
     "Twitterbot/1.0",

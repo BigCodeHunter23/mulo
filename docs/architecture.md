@@ -173,7 +173,8 @@ once when a server starts.
   lib functions turn a failed query into an empty answer and that mustn't be
   kept. Anything kept has to survive being written out as JSON, so no Maps.
 - **Crawlers.** `src/app/robots.ts` and the proxy share one list
-  (`src/lib/crawlers.ts`). Search engines and link previews stay welcome. The
+  (`src/lib/crawlers.ts`). Search engines, ChatGPT's and Perplexity's search and
+  link previews stay welcome; OpenAI's training crawler doesn't. The
   limit on signed-out page loads is `pageLoad` in `rate-limit.ts`; a browser
   getting linked pages ready (`sec-fetch-dest: empty`) doesn't count, as Next
   strips its own prefetch header before the proxy runs.
