@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { SHARED_CACHE_SECONDS } from "@/lib/cache-times";
+import { CATALOG_CACHE_SECONDS, SHARED_CACHE_SECONDS } from "@/lib/cache-times";
+import { keptRead } from "@/lib/shared-reads";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isMissingColumn, logQueryError } from "@/lib/supabase/errors";
 import { readAll } from "@/lib/supabase/read-all";
@@ -201,12 +202,20 @@ export async function newReleases(limit = 10): Promise<AlbumSummary[]> {
 const GENRE_DEPTH = 6;
 
 /**
- * Where to go next after an artist: other artists whose records are tagged
- * with the same genres, the closest match first. Everything comes from what
- * MULO has already cached, so there's no extra call out to MusicBrainz, and
- * the order rotates hourly so the same five names aren't always the answer.
+ * How many of the most popular records sharing those tags to weigh up. This
+ * runs on every album and artist page, so it's the biggest read the site makes:
+ * at 2,000 rows it was most of what used up the database's monthly allowance.
  */
-export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSummary[]> {
+const NEIGHBOURS = 500;
+
+type Neighbours = { lead: ArtistSummary[]; near: ArtistSummary[] };
+
+/**
+ * The artists closest to this one, and the near misses that take turns after
+ * them. Null while they have no genres, so it isn't kept: their albums' genres
+ * fill in as those are opened.
+ */
+async function readNeighbours(mbid: string, limit: number): Promise<Neighbours | null> {
   const supabase = createPublicClient();
 
   const { data: own } = await supabase
@@ -227,12 +236,7 @@ export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSum
     .slice(0, GENRE_DEPTH)
     .map(([genre]) => genre);
 
-  // No genres cached yet: fall back to artists worth exploring anyway.
-  if (mine.length === 0) {
-    return (await artistsToExplore(limit + 1))
-      .filter((artist) => artist.mbid !== mbid)
-      .slice(0, limit);
-  }
+  if (mine.length === 0) return null;
 
   // Only records people actually listen to, so the suggestions are artists
   // somebody might have heard of rather than the deepest corner of the cache.
@@ -247,7 +251,7 @@ export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSum
         .order("popularity", { ascending: false })
         .order("mbid")
         .range(from, to),
-    2000,
+    NEIGHBOURS,
   );
 
   // Matching what this artist is best known for counts for more than
@@ -276,7 +280,7 @@ export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSum
     .sort((a, b) => b.score - a.score)
     .slice(0, limit * 4);
 
-  if (ranked.length === 0) return [];
+  if (ranked.length === 0) return { lead: [], near: [] };
 
   const { data: artists } = await supabase
     .from("artists")
@@ -301,12 +305,39 @@ export async function similarArtists(mbid: string, limit = 6): Promise<ArtistSum
 
   best.sort((a, b) => b.score - a.score || (b.popularity ?? 0) - (a.popularity ?? 0));
 
+  const summary = ({ mbid: id, name, image_url }: ArtistSummary) => ({
+    mbid: id,
+    name,
+    image_url,
+  });
+  const pool = best.slice(0, limit * 2).map(summary);
+  const lead = Math.ceil(limit / 2);
+  return { lead: pool.slice(0, lead), near: pool.slice(lead) };
+}
+
+const keptNeighbours = keptRead("artist-neighbours", CATALOG_CACHE_SECONDS, readNeighbours);
+
+/**
+ * Where to go next after an artist: other artists whose records are tagged
+ * with the same genres, the closest match first. Everything comes from what
+ * MULO has already cached, so there's no extra call out to MusicBrainz, and
+ * the order rotates hourly so the same five names aren't always the answer.
+ */
+export async function similarArtists(rawMbid: string, limit = 6): Promise<ArtistSummary[]> {
+  // Any casing finds the same artist, so one spelling is kept, not thousands.
+  const mbid = rawMbid.toLowerCase();
+  const neighbours = await keptNeighbours(mbid, limit);
+
+  // No genres cached yet: fall back to artists worth exploring anyway.
+  if (!neighbours) {
+    return (await artistsToExplore(limit + 1))
+      .filter((artist) => artist.mbid !== mbid)
+      .slice(0, limit);
+  }
+
+  const { lead, near } = neighbours;
   // The closest few always lead, so the suggestions are believable; the rest
   // of the row rotates through the near misses, so coming back shows fresh
   // faces rather than the same six every time.
-  const pool = best.slice(0, limit * 2);
-  const lead = Math.ceil(limit / 2);
-  const shown = [...pool.slice(0, lead), ...rotate(pool.slice(lead), 7).slice(0, limit - lead)];
-
-  return shown.map(({ mbid: id, name, image_url }) => ({ mbid: id, name, image_url }));
+  return [...lead, ...rotate(near, 7).slice(0, limit - lead.length)];
 }
