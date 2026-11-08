@@ -81,6 +81,9 @@ in plain language, and give them links and exact steps when they need to act.
   they're used. Every setting is listed in `.env.example`.
 - **Caching:** site-wide reads that are the same for everyone use
   `unstable_cache` with `SHARED_CACHE_SECONDS`. Don't cache per-person data.
+  Album and artist pages read through `src/lib/page-reads.ts`, which shares
+  what it can between signed-out visitors; a page that a crawler could open
+  thousands of times should do the same (`docs/architecture.md`).
 - **New dependencies** need a reason in the commit message; prefer what's
   already here.
 - **Accessibility:** menus, dialogs and the search combobox follow the ARIA

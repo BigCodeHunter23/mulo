@@ -10,9 +10,11 @@ structure those features sit on.
 browser
   │
   ▼
-src/proxy.ts ─────────── refreshes the Supabase session cookie, and turns
+src/proxy.ts ─────────── turns away unwanted crawlers (src/lib/crawlers.ts),
+  │                      refreshes the Supabase session cookie, turns
   │                      signed-out visitors away from signed-in-only pages
-  ▼                      (the list is src/lib/access.ts)
+  │                      (the list is src/lib/access.ts), and slows anyone
+  ▼                      signed out opening over 60 pages a minute
 src/app/**/page.tsx ──── server components: read data, render HTML
   │
   ▼
@@ -151,6 +153,30 @@ once when a server starts.
   `SHARED_CACHE_SECONDS` (five minutes, `src/lib/cache-times.ts`). A failed
   read throws inside the cache, so a failure is never kept. Per-person data
   isn't cached between requests.
+- **Album and artist pages** cost about fifteen database requests each, and in
+  October 2026 a flood of signed-out page loads used up the database's monthly
+  allowance and took the site down. So `src/lib/page-reads.ts` keeps what it
+  can, through `src/lib/shared-reads.ts`:
+  - `keptRead`: the same for everybody. A finished catalogue entry (an album's
+    details, a tracklist, an artist's photo and bio, who's like them) is kept
+    for `CATALOG_CACHE_SECONDS`, a day. An unfinished one isn't kept, and the
+    page fetches it from MusicBrainz under that visitor's own limit.
+  - `sharedWhenSignedOut`: scores and reviews, kept for
+    `SIGNED_OUT_CACHE_SECONDS`, an hour, for signed-out visitors only. Somebody
+    signed in always reads live, as themselves. A review taken down can still
+    show to signed-out visitors until the hour's up.
+
+  Inside either, `asSignedOut` (`src/lib/supabase/signed-out-reads.ts`) makes
+  `createClient` and `getCurrentUser` act as nobody, so the same lib functions
+  run without touching cookies or headers, which Next refuses there. It also
+  notes any trouble reaching the database (a 402, a 429 or a 5xx), because the
+  lib functions turn a failed query into an empty answer and that mustn't be
+  kept. Anything kept has to survive being written out as JSON, so no Maps.
+- **Crawlers.** `src/app/robots.ts` and the proxy share one list
+  (`src/lib/crawlers.ts`). Search engines and link previews stay welcome. The
+  limit on signed-out page loads is `pageLoad` in `rate-limit.ts`; a browser
+  getting linked pages ready (`sec-fetch-dest: empty`) doesn't count, as Next
+  strips its own prefetch header before the proxy runs.
 
 ## Writing data: the server action pattern
 
