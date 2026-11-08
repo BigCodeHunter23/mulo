@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getCachedArtist, getCachedRelease, getCachedTracks } from "@/lib/catalog";
-import { getOwnRating, getScores, getSongScores } from "@/lib/ratings";
-import { getReviews } from "@/lib/reviews";
-import { getReactions } from "@/lib/reactions";
+import {
+  albumHeadline,
+  albumVoices,
+  artistFor,
+  releaseFor,
+  songScores,
+  tracksFor,
+} from "@/lib/page-reads";
+import { getOwnRating } from "@/lib/ratings";
 import { promptFor } from "@/lib/review-prompts";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { createPublicClient } from "@/lib/supabase/public";
 import StarScore from "@/components/StarScore";
 import FriendScores from "@/components/FriendScores";
 import WhereNext from "@/components/WhereNext";
@@ -29,12 +33,7 @@ export async function generateMetadata({
 }: {
   params: Promise<{ mbid: string }>;
 }): Promise<Metadata> {
-  const { mbid } = await params;
-  const { data } = await createPublicClient()
-    .from("releases")
-    .select("title, release_date, artists ( name )")
-    .eq("mbid", mbid)
-    .maybeSingle();
+  const data = await albumHeadline((await params).mbid.toLowerCase());
 
   if (!data) return { title: "Album" };
 
@@ -61,26 +60,22 @@ function totalRuntime(tracks: { duration_ms: number | null }[]) {
 }
 
 export default async function AlbumPage({ params }: { params: Promise<{ mbid: string }> }) {
-  const { mbid } = await params;
+  // Any casing finds the same album, so one spelling is kept, not thousands.
+  const mbid = (await params).mbid.toLowerCase();
 
-  const release = await getCachedRelease(mbid);
+  const release = await releaseFor(mbid);
   if (!release) notFound();
 
   const user = await getCurrentUser();
   const signedIn = Boolean(user);
 
-  const [artist, scores, ownRating, reviews, myLists] = await Promise.all([
-    release.artist_mbid ? getCachedArtist(release.artist_mbid) : null,
-    getScores("album", mbid),
+  const [artist, { scores, reviews, reactions }, ownRating, myLists] = await Promise.all([
+    release.artist_mbid ? artistFor(release.artist_mbid) : null,
+    albumVoices(signedIn, mbid),
     getOwnRating("album", mbid),
-    getReviews("album", mbid),
     user ? getMyListsFor(user.id, mbid).catch(() => []) : Promise.resolve([]),
   ]);
 
-  const reactions = await getReactions(
-    "album",
-    reviews.map((review) => review.id),
-  );
   const year = release.release_date?.slice(0, 4);
 
   return (
@@ -250,8 +245,11 @@ async function Tracklist({
   albumTitle: string;
   signedIn: boolean;
 }) {
-  const tracks = await getCachedTracks(releaseMbid);
-  const scores = await getSongScores(tracks.flatMap((t) => (t.song_mbid ? [t.song_mbid] : [])));
+  const tracks = await tracksFor(releaseMbid);
+  const scores = await songScores(
+    signedIn,
+    tracks.flatMap((t) => (t.song_mbid ? [t.song_mbid] : [])),
+  );
   const runtime = totalRuntime(tracks);
 
   return (

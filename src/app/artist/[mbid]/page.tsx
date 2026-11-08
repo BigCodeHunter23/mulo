@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getCachedArtist, getCachedArtistAlbums, getCachedArtistEps } from "@/lib/catalog";
-import { getArtistFollowState } from "@/lib/artist-follows";
-import ArtistFollowButton from "@/components/ArtistFollowButton";
 import {
-  getOwnRating,
-  getScores,
-  getScoresForReleases,
-  getMyAlbumScores,
-  getTopSongs,
-  getFriendRaters,
-} from "@/lib/ratings";
-import { getReviews } from "@/lib/reviews";
-import { getReactions } from "@/lib/reactions";
+  artistFor,
+  artistHeadline,
+  artistVoices,
+  recordScores,
+  recordsFor,
+} from "@/lib/page-reads";
+import ArtistFollowButton from "@/components/ArtistFollowButton";
+import { getOwnRating, getMyAlbumScores, getFriendRaters } from "@/lib/ratings";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { createPublicClient } from "@/lib/supabase/public";
 import AlbumCard from "@/components/AlbumCard";
 import RatingForm from "@/components/RatingForm";
 import ReviewList from "@/components/ReviewList";
@@ -36,12 +31,7 @@ export async function generateMetadata({
 }: {
   params: Promise<{ mbid: string }>;
 }): Promise<Metadata> {
-  const { mbid } = await params;
-  const { data } = await createPublicClient()
-    .from("artists")
-    .select("name, bio")
-    .eq("mbid", mbid)
-    .maybeSingle();
+  const data = await artistHeadline((await params).mbid.toLowerCase());
 
   if (!data) return { title: "Artist" };
 
@@ -61,35 +51,30 @@ export async function generateMetadata({
 }
 
 export default async function ArtistPage({ params }: { params: Promise<{ mbid: string }> }) {
-  const { mbid } = await params;
+  // Any casing finds the same artist, so one spelling is kept, not thousands.
+  const mbid = (await params).mbid.toLowerCase();
 
-  const artist = await getCachedArtist(mbid);
+  const artist = await artistFor(mbid);
   if (!artist) notFound();
   const photoPage = commonsFilePage(artist.image_url);
 
   const user = await getCurrentUser();
   const signedIn = Boolean(user);
 
-  const [albums, eps, scores, ownRating, reviews, topSongs, follow] = await Promise.all([
-    getCachedArtistAlbums(mbid),
-    getCachedArtistEps(mbid),
-    getScores("artist", mbid),
-    getOwnRating("artist", mbid),
-    getReviews("artist", mbid),
-    getTopSongs(mbid),
-    getArtistFollowState(mbid),
-  ]);
+  const [{ albums, eps }, { scores, reviews, topSongs, follow, reactions }, ownRating] =
+    await Promise.all([
+      recordsFor(signedIn, mbid),
+      artistVoices(signedIn, mbid),
+      getOwnRating("artist", mbid),
+    ]);
   // Albums and EPs both carry scores; The Gauntlet below is albums only.
   const records = [...albums, ...eps].map((record) => record.mbid);
-  const [albumScores, myScores, albumFriends, reactions] = await Promise.all([
-    getScoresForReleases(records),
+  const [scoresByRecord, myScores, albumFriends] = await Promise.all([
+    recordScores(signedIn, records),
     getMyAlbumScores(records),
     getFriendRaters("album", records),
-    getReactions(
-      "artist",
-      reviews.map((review) => review.id),
-    ),
   ]);
+  const albumScores = new Map(scoresByRecord);
 
   // How much of the discography the signed-in person has rated, and where
   // their ranking lives once it's done.

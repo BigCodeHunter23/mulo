@@ -152,6 +152,60 @@ async function readCachedArtist(mbid: string): Promise<CachedArtist | null> {
 /** An empty `bio_url` means the bio isn't Wikipedia's: nobody to credit. */
 const shown = (cached: CachedArtist): Artist => ({ ...cached, bio_url: cached.bio_url || null });
 
+/**
+ * The `readFinished…` functions answer from the database alone, and only when
+ * there's nothing left to fetch, so what they answer can be kept and shared
+ * (`src/lib/page-reads.ts`). Null means go the long way round, with
+ * `getCachedRelease` and friends.
+ */
+export async function readFinishedRelease(mbid: string) {
+  if (!isMbid(mbid)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("releases")
+    .select(`${RELEASE_COLUMNS}, details_cached_at`)
+    .eq("mbid", mbid)
+    .maybeSingle();
+  return data?.details_cached_at ? data : null;
+}
+
+export async function readFinishedArtist(mbid: string): Promise<Artist | null> {
+  if (!isMbid(mbid)) return null;
+  const cached = await readCachedArtist(mbid);
+  return cached && cached.image_url !== null && cached.bio_url !== null ? shown(cached) : null;
+}
+
+export async function readFinishedTracks(releaseMbid: string): Promise<Track[] | null> {
+  if (!isMbid(releaseMbid)) return null;
+  const supabase = await createClient();
+  const [{ data: release }, { data: tracks }] = await Promise.all([
+    supabase.from("releases").select("tracks_cached_at").eq("mbid", releaseMbid).maybeSingle(),
+    supabase
+      .from("tracks")
+      .select("position, title, duration_ms, song_mbid")
+      .eq("release_mbid", releaseMbid)
+      .order("position"),
+  ]);
+  return release?.tracks_cached_at ? (tracks ?? []) : null;
+}
+
+export async function readFinishedRecords(
+  artistMbid: string,
+): Promise<{ albums: Release[]; eps: Release[] } | null> {
+  if (!isMbid(artistMbid)) return null;
+  const supabase = await createClient();
+  const [albumsRead, epsRead, albums, eps] = await Promise.all([
+    supabase.from("artists").select("albums_cached_at").eq("mbid", artistMbid).maybeSingle(),
+    supabase.from("artists").select("eps_cached_at").eq("mbid", artistMbid).maybeSingle(),
+    readArtistReleases(supabase, artistMbid, "album"),
+    readArtistReleases(supabase, artistMbid, "ep"),
+  ]);
+  if (!albumsRead.data?.albums_cached_at) return null;
+  // Until migration 0026 there are no EPs to wait for.
+  if (epsRead.error) return isMissingColumn(epsRead.error) ? { albums, eps: [] } : null;
+  return epsRead.data?.eps_cached_at ? { albums, eps } : null;
+}
+
 export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   if (!isMbid(mbid)) return null;
   const cached = await readCachedArtist(mbid);
