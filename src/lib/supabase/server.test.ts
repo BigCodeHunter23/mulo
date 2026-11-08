@@ -102,3 +102,24 @@ describe("getCurrentUser", () => {
     expect(made.claims).toHaveBeenCalledWith();
   });
 });
+
+describe("a read kept for signed-out visitors", () => {
+  it("uses no session and looks at nothing from the request", async () => {
+    const { asSignedOut } = await import("./signed-out-reads");
+    const { cookies, headers } = await import("next/headers");
+    vi.mocked(cookies).mockClear();
+    vi.mocked(headers).mockClear();
+    made.claims.mockResolvedValue({ data: { claims: { sub: "someone" } }, error: null });
+
+    const { value } = await asSignedOut(async () => {
+      await createClient();
+      return getCurrentUser();
+    });
+
+    expect(value).toBeNull();
+    expect(cookies).not.toHaveBeenCalled();
+    expect(headers).not.toHaveBeenCalled();
+    expect(made.claims).not.toHaveBeenCalled();
+    expect(made.ssr).toBe(0);
+  });
+});

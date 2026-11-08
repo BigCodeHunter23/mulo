@@ -6,6 +6,8 @@ import type { Database } from "./database.types";
 import { supabaseUrl, supabaseAnonKey } from "@/lib/env";
 import { cookies, headers } from "next/headers";
 import { SESSION_COOKIE_OPTIONS } from "./cookies";
+import { createPublicClient } from "./public";
+import { inSignedOutRead } from "./signed-out-reads";
 
 /** The token in an `Authorization: Bearer …` header, or null for anything else. */
 export function parseBearer(header: string | null): string | null {
@@ -29,7 +31,7 @@ export async function bearerToken(): Promise<string | null> {
  * security sees the same person either way, and every lib function and
  * action works for the app unchanged.
  */
-export const createClient = cache(async () => {
+const requestClient = cache(async () => {
   const token = await bearerToken();
   if (token) {
     return createTokenClient<Database>(supabaseUrl(), supabaseAnonKey(), {
@@ -58,6 +60,15 @@ export const createClient = cache(async () => {
   });
 });
 
+/**
+ * The client for this request. Checked outside React's per-request cache, so a
+ * read kept for signed-out visitors can't pick up the visitor's own client,
+ * and the visitor's page can't pick up the keeper's.
+ */
+export async function createClient() {
+  return inSignedOutRead() ? createPublicClient() : requestClient();
+}
+
 export type CurrentUser = { id: string; email: string | null };
 
 /**
@@ -69,7 +80,7 @@ export type CurrentUser = { id: string; email: string | null };
  * cookie or the header, but in the common case it skips a network round trip
  * that getUser() would make on every page.
  */
-export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+const requestUser = cache(async (): Promise<CurrentUser | null> => {
   const [supabase, token] = await Promise.all([createClient(), bearerToken()]);
   // A token client holds no session of its own, so it's handed the token to check.
   const { data, error } = token
@@ -83,3 +94,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     email: typeof data.claims.email === "string" ? data.claims.email : null,
   };
 });
+
+/** Nobody, inside a read kept for signed-out visitors. */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  return inSignedOutRead() ? null : requestUser();
+}
