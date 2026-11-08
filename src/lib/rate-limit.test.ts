@@ -30,6 +30,16 @@ describe("rate limits", () => {
     expect(LIMITS.social.limit).toBeGreaterThan(LIMITS.login.limit);
   });
 
+  it("keeps quiet about page loads over the limit, or a flood would fill the logs", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    rpc.mockResolvedValue({ data: false, error: null });
+    const { allow } = await import("./rate-limit");
+    expect(await allow("pageLoad", "ip:203.0.113.7")).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+    expect(await allow("login", "ip:203.0.113.7")).toBe(false);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
   it("says no when Postgres does", async () => {
     rpc.mockResolvedValue({ data: false, error: null });
     const { allowUser } = await import("./rate-limit");

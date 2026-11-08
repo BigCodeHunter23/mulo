@@ -19,6 +19,11 @@ export const LIMITS = {
   social: { limit: 30, windowSeconds: 5 * 60 },
   signup: { limit: 5, windowSeconds: 60 * 60 },
   reset: { limit: 5, windowSeconds: 60 * 60 },
+  /**
+   * Per address, signed out: opening public pages. Far more than anybody reads,
+   * with room for several people sharing a mobile network's address.
+   */
+  pageLoad: { limit: 60, windowSeconds: 60 },
   /** Per address: albums and artists MULO hasn't cached, fetched from MusicBrainz. */
   catalog: { limit: 30, windowSeconds: 60 },
   /** Per address: searches passed on to MusicBrainz, and MULO's own. */
@@ -102,7 +107,10 @@ export async function allow(bucket: Bucket, subject: string): Promise<boolean> {
       }
       return true;
     }
-    if (data === false) console.warn(`[rate-limit] ${bucket} limit reached for ${subject}`);
+    // Not page loads: a flood is exactly when a line per request would fill the logs.
+    if (data === false && bucket !== "pageLoad") {
+      console.warn(`[rate-limit] ${bucket} limit reached for ${subject}`);
+    }
     return data !== false;
   } catch (error) {
     console.error("[rate-limit] check failed, allowing:", error);

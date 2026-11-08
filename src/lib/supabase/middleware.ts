@@ -3,6 +3,8 @@ import type { Database } from "./database.types";
 import { supabaseUrl, supabaseAnonKey } from "@/lib/env";
 import { NextResponse, type NextRequest } from "next/server";
 import { needsSignIn } from "@/lib/access";
+import { countsAsPageLoad, SLOW_DOWN, visitorAddress } from "@/lib/page-limit";
+import { allow } from "@/lib/rate-limit";
 import { safeRedirectPath } from "@/lib/redirects";
 import { SESSION_COOKIE_OPTIONS } from "./cookies";
 
@@ -50,6 +52,18 @@ export async function updateSession(request: NextRequest) {
     // Keep any cookie changes from the refresh above, such as a cleared session.
     supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
+  }
+
+  // A script opening page after page gets stopped before it costs a render.
+  // Somebody signed in is never counted: they're who the site is for.
+  const address = !signedIn && countsAsPageLoad(request) ? visitorAddress(request) : null;
+  if (address && !(await allow("pageLoad", `ip:${address}`))) {
+    const slowDown = new NextResponse(SLOW_DOWN, {
+      status: 429,
+      headers: { "Retry-After": "60" },
+    });
+    supabaseResponse.cookies.getAll().forEach((cookie) => slowDown.cookies.set(cookie));
+    return slowDown;
   }
 
   return supabaseResponse;
