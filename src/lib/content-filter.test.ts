@@ -41,6 +41,10 @@ describe("isRespectful (reviews, takes, list notes)", () => {
     ["a word joiner", "⁠"],
     ["a variation selector", "️"],
     ["a combining grapheme joiner", "͏"],
+    ["a Hangul filler", "ㅤ"],
+    ["a halfwidth Hangul filler", "ﾠ"],
+    ["a Hangul choseong filler", "ᅟ"],
+    ["a braille blank", "⠀"],
   ])("isn't fooled by %s between the letters", (_name, hidden) => {
     expect(isRespectful(["t", "r", "a", "n", "n", "y"].join(hidden))).toBe(false);
     expect(isClean(["s", "h", "i", "t"].join(hidden))).toBe(false);

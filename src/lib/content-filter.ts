@@ -48,10 +48,11 @@ const hateful = new RegExpMatcher({
 /**
  * The letters as somebody reads them, for matching only; what's saved stays as
  * typed. Decomposed so marks come off the letters, then rid of marks and of
- * format characters, which show as nothing and would otherwise split a word.
+ * every character that shows as nothing and would otherwise split a word: format
+ * characters, the rest of Unicode's ignorables, and the braille blank.
  */
 function asRead(text: string): string {
-  return text.normalize("NFKD").replace(/[\p{Cf}\p{Mn}]/gu, "");
+  return text.normalize("NFKD").replace(/[\p{Cf}\p{Mn}\p{DI}⠀]/gu, "");
 }
 
 /** No swearing or slurs. */

@@ -1,6 +1,6 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
-import type { createAdminClient } from "@/lib/supabase/admin";
+import type { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { readAll } from "@/lib/supabase/read-all";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Streak } from "@/lib/app-api";
@@ -111,7 +111,9 @@ export async function getStreak(
   client?: Reader,
 ): Promise<Streak> {
   const zone = zoneOrSydney(timeZone === undefined ? await readTimeZone(userId) : timeZone);
-  const supabase = client ?? (await createClient());
+  // With the service role, so it's the same whoever's looking: a pick today can't
+  // be read by somebody who hasn't picked (migration 0028). Only one person's dates.
+  const supabase = client ?? createAdminClient();
   const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
 
   const results = await Promise.all(

@@ -50,6 +50,9 @@ describe("0028 what the website keeps back, the database keeps back", () => {
       insert into public.versus_takes (matchup_id, user_id, body) values
         (${TODAY}, '${OTHER}', 'Today, unfinished.'),
         (${FINISHED}, '${OTHER}', 'Yesterday, finished.');
+      insert into public.replies (user_id, versus_take_id, body) values
+        ('${PICKER}', (select id from public.versus_takes where body like 'Today%'), 'Open reply.'),
+        ('${OTHER}', (select id from public.versus_takes where body like 'Yesterday%'), 'Done reply.');
       insert into public.diary_entries
         (user_id, day, album_key, artist_name, album_name, release_mbid, sources) values
         ('${OTHER}', '2026-10-01', 'nas|illmatic', 'Nas', 'Illmatic', '${ILLMATIC}', '{spotify}'),
@@ -98,6 +101,20 @@ describe("0028 what the website keeps back, the database keeps back", () => {
     it("opens up to somebody who has", async () => {
       expect(await as(PICKER, votes)).toHaveLength(2);
       expect(await as(PICKER, takes)).toEqual([{ body: "Today, unfinished." }]);
+    });
+
+    it("keeps its replies back too, from whoever hasn't picked", async () => {
+      const replies = "select body from public.replies order by body";
+      expect(await as(ME, replies)).toEqual([{ body: "Done reply." }]);
+      expect(await as(PICKER, replies)).toEqual([{ body: "Done reply." }, { body: "Open reply." }]);
+      expect(await as(OTHER, replies)).toEqual([{ body: "Done reply." }, { body: "Open reply." }]);
+    });
+
+    it("counts its replies the same way", async () => {
+      const count = `select count(*)::int as n from public.reply_counts('take',
+        array(select id from public.versus_takes where body like 'Today%'))`;
+      const [row] = await as<{ n: number }>(ME, count);
+      expect(row?.n).toBe(0);
     });
 
     it("lets somebody pick, and read their pick back", async () => {

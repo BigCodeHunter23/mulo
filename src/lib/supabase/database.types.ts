@@ -1741,6 +1741,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      versus_take_open_to_me: {
+        Args: {
+          p_take: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

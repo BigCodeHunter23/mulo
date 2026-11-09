@@ -323,10 +323,11 @@ grant insert, update on public.profiles, public.ratings, public.artist_ratings,
 From the security audit of 9 November 2026. The public key lets anyone read and
 write with their own login, past the website. After this:
 
-- Nobody can read how today's Versus is going, or today's takes, until they've
-  picked. Finished matchups stay public.
-- Other people see only diary albums matched to a real record, so names typed
-  into an import can't be shown to anyone. Your own diary still shows you all of it.
+- Nobody can read how today's Versus is going, today's takes or the replies to
+  them until they've picked. Finished matchups stay public.
+- Other people see only diary albums matched to a real record, so names sent in an
+  import can't be shown to anyone. Your own diary still shows you all of it. Names
+  aren't word filtered, as real records would trip it (N.W.A's *Niggaz4Life*).
 - Only the website can set a profile picture.
 - Nobody can make up the date of a score.
 
@@ -371,6 +372,15 @@ drop policy if exists "Diaries are read as their owners allow" on public.diary_e
 create policy "Diaries are read as their owners allow"
   on public.diary_entries for select to anon, authenticated
   using (public.diary_visible(user_id));
+drop policy if exists "Signed-in people read replies, except hidden people's" on public.replies;
+create policy "Signed-in people read replies, except hidden people's"
+  on public.replies for select to authenticated
+  using (
+    not exists (
+      select 1 from public.hidden_profiles((select auth.uid())) h
+      where h.id = replies.user_id or h.id = replies.thread_owner_id
+    )
+  );
 grant update (avatar_url) on public.profiles to authenticated;
 grant insert (created_at, updated_at), update (created_at, updated_at)
   on public.ratings to authenticated;

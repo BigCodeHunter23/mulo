@@ -5,7 +5,7 @@
 --
 --   Versus    Nobody sees how today's is going until they've picked, so it can't
 --             sway them, and the privacy page says takes are public once the day
---             is over. Both tables were readable by anybody all along.
+--             is over. Picks, takes and the replies to them were readable all along.
 --   Diary     Imported names are anything anybody sends, and can't be reported.
 --             Other people now see only albums matched to a real record.
 --   Pictures  avatar_url accepted a file on any Supabase project, so a picture
@@ -42,8 +42,41 @@ $$;
 revoke execute on function public.versus_open_to_me(bigint) from public;
 grant execute on function public.versus_open_to_me(bigint) to anon, authenticated, service_role;
 
+/** The same, asked of one take, for the replies under it. */
+create or replace function public.versus_take_open_to_me(p_take bigint)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.versus_takes t
+    where t.id = p_take
+      and (t.user_id = (select auth.uid()) or public.versus_open_to_me(t.matchup_id))
+  )
+$$;
+
+revoke execute on function public.versus_take_open_to_me(bigint) from public;
+grant execute on function public.versus_take_open_to_me(bigint) to authenticated, service_role;
+
 do $$
 begin
+  drop policy if exists "Signed-in people read replies, except hidden people's" on public.replies;
+  create policy "Signed-in people read replies, except hidden people's"
+    on public.replies for select to authenticated
+    using (
+      not exists (
+        select 1 from public.hidden_profiles((select auth.uid())) h
+        where h.id = replies.user_id or h.id = replies.thread_owner_id
+      )
+      and (
+        versus_take_id is null
+        or user_id = (select auth.uid())
+        or public.versus_take_open_to_me(versus_take_id)
+      )
+    );
+
   drop policy if exists "Versus votes are publicly readable" on public.versus_votes;
   drop policy if exists "Versus picks show once you've picked or it's over" on public.versus_votes;
   create policy "Versus picks show once you've picked or it's over"

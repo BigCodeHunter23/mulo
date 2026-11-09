@@ -61,25 +61,14 @@ describe("cleanDays", () => {
     ).toEqual([day({ key: "frank ocean|blonde" })]);
   });
 
-  it("drops days whose names hold a slur, hidden or not, as the rest of the site does", () => {
+  // Names aren't filtered: real records trip the filter, and somebody's listening
+  // shouldn't vanish for it. Other people see only matched albums (migration 0028).
+  it.each([
+    ["N.W.A", "Niggaz4Life", "n w a|niggaz4life"],
+    ["Spastic Ink", "Ink Compatible", "spastic ink|ink compatible"],
+  ])("keeps %s's %s, a real record the word filter would refuse", (artist, album) => {
     const now = Date.parse("2026-10-30T00:00:00Z");
-    expect(
-      cleanDays(
-        [
-          day({ artist: "tranny" }),
-          day({ album: "t‍ranny" }),
-          day({ songHint: "tranny" }),
-        ],
-        now,
-      ),
-    ).toEqual([]);
-  });
-
-  it("keeps real records with swearing in their names", () => {
-    const now = Date.parse("2026-10-30T00:00:00Z");
-    expect(cleanDays([day({ artist: "Fuck Buttons", album: "Tarot Sport" })], now)).toEqual([
-      day({ artist: "Fuck Buttons", album: "Tarot Sport", key: "fuck buttons|tarot sport" }),
-    ]);
+    expect(cleanDays([day({ artist, album })], now)).toHaveLength(1);
   });
 
   it("tidies the names as the browser does, dropping days whose names tidy to nothing", () => {

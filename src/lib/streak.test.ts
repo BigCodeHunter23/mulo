@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({})) }));
 vi.mock("@/lib/push/store", () => ({ readTimeZone: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/read-all", () => ({ readAll: vi.fn() }));
 
 import { readTimeZone } from "@/lib/push/store";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
 import { countStreak, getStreak } from "@/lib/streak";
 
@@ -73,5 +76,19 @@ describe("getStreak's time zone", () => {
   it("still answers, in Sydney's time, when the zone can't be read", async () => {
     vi.mocked(readTimeZone).mockResolvedValue(null);
     expect(await getStreak("u")).toEqual(sydney);
+  });
+});
+
+describe("somebody's streak on their profile", () => {
+  it("reads with the service role, so it's the same whoever's looking", async () => {
+    vi.mocked(createClient).mockClear();
+    vi.mocked(createAdminClient).mockClear();
+    vi.mocked(readAll).mockReset();
+    vi.mocked(readAll).mockResolvedValue({ data: [], error: null });
+
+    await getStreak("them");
+
+    expect(createAdminClient).toHaveBeenCalled();
+    expect(createClient).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { readAll } from "@/lib/supabase/read-all";
 import {
@@ -119,12 +120,14 @@ const collect = cache(async function collect(userId: string): Promise<Collected>
         .from("top_artists")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId),
-      supabase
+      // With the service role, so a board is the same whoever's looking: a pick
+      // today can't be read by somebody who hasn't picked (migration 0028).
+      createAdminClient()
         .from("versus_votes")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId),
       // Takes arrived in a later migration; before it runs this just misses.
-      supabase
+      createAdminClient()
         .from("versus_takes")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId),
