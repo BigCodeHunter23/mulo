@@ -92,7 +92,11 @@ export async function changePasswordFor(
     return { ok: false, error: "That's the password you already have. Pick a different one." };
   }
 
-  const { error } = await fresh.auth.updateUser({ password: input.data.next });
+  const { error } = await fresh.auth.updateUser({
+    password: input.data.next,
+    // Supabase's "require current password" setting needs it here too.
+    current_password: input.data.current,
+  });
   await done(fresh);
   if (error) {
     console.error("[account] password change failed:", error.message);

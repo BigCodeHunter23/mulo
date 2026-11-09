@@ -128,7 +128,11 @@ describe("changePasswordFor", () => {
       email: ME.email,
       password: "right-password",
     });
-    expect(fresh.updateUser).toHaveBeenCalledWith({ password: "brand-new" });
+    // Sent along, so it works with Supabase's "require current password" on.
+    expect(fresh.updateUser).toHaveBeenCalledWith({
+      password: "brand-new",
+      current_password: "right-password",
+    });
     expect(fresh.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
