@@ -45,12 +45,21 @@ const hateful = new RegExpMatcher({
   ...englishRecommendedTransformers,
 });
 
+/**
+ * The letters as somebody reads them, for matching only; what's saved stays as
+ * typed. Decomposed so marks come off the letters, then rid of marks and of
+ * format characters, which show as nothing and would otherwise split a word.
+ */
+function asRead(text: string): string {
+  return text.normalize("NFKD").replace(/[\p{Cf}\p{Mn}]/gu, "");
+}
+
 /** No swearing or slurs. */
 export function isClean(text: string): boolean {
-  return !everything.hasMatch(text);
+  return !everything.hasMatch(asRead(text));
 }
 
 /** No slurs or hate words; everyday swearing is fine. */
 export function isRespectful(text: string): boolean {
-  return !hateful.hasMatch(text);
+  return !hateful.hasMatch(asRead(text));
 }

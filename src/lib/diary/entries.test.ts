@@ -61,6 +61,27 @@ describe("cleanDays", () => {
     ).toEqual([day({ key: "frank ocean|blonde" })]);
   });
 
+  it("drops days whose names hold a slur, hidden or not, as the rest of the site does", () => {
+    const now = Date.parse("2026-10-30T00:00:00Z");
+    expect(
+      cleanDays(
+        [
+          day({ artist: "tranny" }),
+          day({ album: "t‍ranny" }),
+          day({ songHint: "tranny" }),
+        ],
+        now,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps real records with swearing in their names", () => {
+    const now = Date.parse("2026-10-30T00:00:00Z");
+    expect(cleanDays([day({ artist: "Fuck Buttons", album: "Tarot Sport" })], now)).toEqual([
+      day({ artist: "Fuck Buttons", album: "Tarot Sport", key: "fuck buttons|tarot sport" }),
+    ]);
+  });
+
   it("tidies the names as the browser does, dropping days whose names tidy to nothing", () => {
     const now = Date.parse("2026-10-30T00:00:00Z");
     expect(

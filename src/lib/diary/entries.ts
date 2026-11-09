@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { rate } from "@/app/ratings/actions";
 import type { DiaryBatchResult, SaveResult } from "@/lib/app-api";
+import { isRespectful } from "@/lib/content-filter";
 import {
   ANNOUNCE_MIN,
   albumKey,
@@ -61,7 +62,9 @@ export const albumDaySchema = z.object({
 
 /**
  * Imported album-days fit to keep: names tidied and the key worked out here
- * (never trusted), real days only, and only days that pass the listen rule.
+ * (never trusted), real days only, only days that pass the listen rule, and no
+ * slurs: anyone could send any words as a record's name. Records do swear, so
+ * it's the filter reviews get, not the one names get.
  */
 export function cleanDays(days: readonly AlbumDay[], now = Date.now()): AlbumDay[] {
   return days.flatMap((d) => {
@@ -74,6 +77,7 @@ export function cleanDays(days: readonly AlbumDay[], now = Date.now()): AlbumDay
     if (!isDiaryDay(d.day, now)) return [];
     if (d.songs < MIN_SONGS && d.minutes < MIN_MINUTES) return [];
     const songHint = d.songHint === null ? null : tidy(d.songHint) || null;
+    if (![artist, album, songHint ?? ""].every(isRespectful)) return [];
     return [{ ...d, key, artist, album, songHint }];
   });
 }

@@ -33,6 +33,27 @@ describe("isRespectful (reviews, takes, list notes)", () => {
   it.each(["about", "Abbott", "dyke", "shit"])("allows %s", (word) => {
     expect(isRespectful(word)).toBe(true);
   });
+  it.each([
+    ["a zero-width space", "​"],
+    ["a zero-width joiner", "‍"],
+    ["a zero-width non-joiner", "‌"],
+    ["a soft hyphen", "­"],
+    ["a word joiner", "⁠"],
+    ["a variation selector", "️"],
+    ["a combining grapheme joiner", "͏"],
+  ])("isn't fooled by %s between the letters", (_name, hidden) => {
+    expect(isRespectful(["t", "r", "a", "n", "n", "y"].join(hidden))).toBe(false);
+    expect(isClean(["s", "h", "i", "t"].join(hidden))).toBe(false);
+  });
+  it("isn't fooled by marks over the letters", () => {
+    expect(isRespectful("trànny")).toBe(false);
+    expect(isRespectful("tránny")).toBe(false);
+  });
+  it("still reads accented words as themselves", () => {
+    expect(isClean("Sigur Rós")).toBe(true);
+    expect(isClean("Beyoncé")).toBe(true);
+    expect(isRespectful("Björk")).toBe(true);
+  });
   it("has plain messages", () => {
     expect(NOT_CLEAN).toBe("Please choose something else.");
     expect(NOT_RESPECTFUL).toBe("Please keep it respectful.");
