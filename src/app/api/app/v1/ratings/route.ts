@@ -7,6 +7,7 @@ import {
   appJson,
   appRoute,
   BAD_REQUEST,
+  limitReads,
   readBody,
   signedInCaller,
 } from "@/lib/app-route";
@@ -28,6 +29,7 @@ const listing = z.object({
 export const GET = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  await limitReads(user);
 
   const search = request.nextUrl.searchParams;
   const input = listing.safeParse({

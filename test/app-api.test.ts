@@ -1763,3 +1763,37 @@ describe("PUT me/profile", () => {
     expect(actions.saveProfile).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Every read here reaches the database, so a flood runs up the same egress
+ * that took the site down in November (the crawler fix only guards pages).
+ */
+describe("the read limit", () => {
+  beforeEach(() => {
+    caller.limited = true;
+  });
+
+  it.each([
+    ["albums/[mbid]", () => import("@/app/api/app/v1/albums/[mbid]/route")],
+    ["albums/[mbid]/tracks", () => import("@/app/api/app/v1/albums/[mbid]/tracks/route")],
+    ["artists/[mbid]", () => import("@/app/api/app/v1/artists/[mbid]/route")],
+    ["artists/[mbid]/similar", () => import("@/app/api/app/v1/artists/[mbid]/similar/route")],
+  ])("holds %s signed out, before it reads anything", async (path, route) => {
+    const { GET } = await route();
+    const response = await GET(request(path), params({ mbid: MBID }));
+    expect(response.status).toBe(429);
+    expect(lib.getCachedRelease).not.toHaveBeenCalled();
+    expect(lib.getCachedArtist).not.toHaveBeenCalled();
+    expect(lib.getCachedTracks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["feed", () => import("@/app/api/app/v1/feed/route")],
+    ["people", () => import("@/app/api/app/v1/people/route")],
+    ["ratings", () => import("@/app/api/app/v1/ratings/route")],
+  ])("holds %s signed in", async (path, route) => {
+    signIn();
+    const { GET } = await route();
+    expect((await GET(request(path))).status).toBe(429);
+  });
+});

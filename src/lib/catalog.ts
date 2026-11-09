@@ -18,6 +18,7 @@ import { isMissingColumn, logQueryError } from "@/lib/supabase/errors";
 import { mbidSchema } from "@/lib/validation";
 // New albums and artists cost a MusicBrainz request, which bans addresses that
 // ask too often; limit how many one visitor can set off.
+import { isMissing, noteMissing } from "@/lib/missing-mbids";
 import { allowAddress, RateLimitedError } from "@/lib/rate-limit";
 import type { Artist, Release, ReleaseKind, Track } from "@/lib/app-api";
 
@@ -215,6 +216,7 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   // bio_url null means the bio's source was never noted (it was cached before
   // migration 0022), so it's looked up once more to credit it.
   if (cached && cached.image_url !== null && cached.bio_url !== null) return shown(cached);
+  if (!cached && isMissing(mbid)) return null;
   if (!(await allowAddress("catalog"))) {
     if (cached) return shown(cached);
     throw new RateLimitedError("catalog");
@@ -226,7 +228,10 @@ export async function getCachedArtist(mbid: string): Promise<Artist | null> {
   } catch (error) {
     // Already cached and MusicBrainz is unhappy: show what we have.
     if (cached) return shown(cached);
-    if (error instanceof MbNotFoundError) return null;
+    if (error instanceof MbNotFoundError) {
+      noteMissing(mbid);
+      return null;
+    }
     throw error;
   }
 
@@ -420,6 +425,7 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
   if (cached?.details_cached_at) {
     return cached;
   }
+  if (!cached && isMissing(mbid)) return null;
   if (!(await allowAddress("catalog"))) {
     if (cached) return cached;
     throw new RateLimitedError("catalog");
@@ -429,7 +435,10 @@ export async function getCachedRelease(mbid: string): Promise<Release | null> {
   try {
     mb = await getReleaseGroup(mbid);
   } catch (error) {
-    if (error instanceof MbNotFoundError) return null;
+    if (error instanceof MbNotFoundError) {
+      noteMissing(mbid);
+      return null;
+    }
     if (cached) return cached;
     throw error;
   }

@@ -1,7 +1,14 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import type { FeedResponse } from "@/lib/app-api";
-import { appError, appJson, appRoute, BAD_REQUEST, signedInCaller } from "@/lib/app-route";
+import {
+  appError,
+  appJson,
+  appRoute,
+  BAD_REQUEST,
+  limitReads,
+  signedInCaller,
+} from "@/lib/app-route";
 import { getFollowingFeed, getGlobalFeed } from "@/lib/feed";
 
 const scopeSchema = z.enum(["following", "everyone"]).default("following");
@@ -13,6 +20,7 @@ const scopeSchema = z.enum(["following", "everyone"]).default("following");
 export const GET = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  await limitReads(user);
 
   const scope = scopeSchema.safeParse(request.nextUrl.searchParams.get("scope") ?? undefined);
   if (!scope.success) return appError(400, BAD_REQUEST);

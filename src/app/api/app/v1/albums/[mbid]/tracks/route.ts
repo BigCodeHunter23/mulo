@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { AlbumTracks } from "@/lib/app-api";
-import { appCaller, appError, appJson, appRoute, type Params } from "@/lib/app-route";
+import { appCaller, appError, appJson, appRoute, limitReads, type Params } from "@/lib/app-route";
 import { getCachedTracks } from "@/lib/catalog";
 import { getSongScores } from "@/lib/ratings";
 import { mbidSchema } from "@/lib/validation";
@@ -13,6 +13,7 @@ import { mbidSchema } from "@/lib/validation";
 export const GET = appRoute(async (_request: NextRequest, { params }: Params<{ mbid: string }>) => {
   const caller = await appCaller();
   if (caller instanceof Response) return caller;
+  await limitReads(caller.user);
 
   const { mbid } = await params;
   if (!mbidSchema.safeParse(mbid).success) return appError(404, "We couldn't find that album.");

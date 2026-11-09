@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { PeoplePage } from "@/lib/app-api";
-import { appJson, appRoute, signedInCaller } from "@/lib/app-route";
+import { appJson, appRoute, limitReads, signedInCaller } from "@/lib/app-route";
 import { getFollowingIds, listProfiles } from "@/lib/social";
 import { pageNumber } from "@/lib/validation";
 
@@ -11,6 +11,7 @@ const PAGE_SIZE = 50;
 export const GET = appRoute(async (request: NextRequest) => {
   const user = await signedInCaller();
   if (user instanceof Response) return user;
+  await limitReads(user);
 
   const page = pageNumber(request.nextUrl.searchParams.get("page") ?? undefined);
   // One more than a page, to know whether there's another.
