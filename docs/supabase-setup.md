@@ -44,11 +44,13 @@ Check: sign up with a new address on the live site (or a preview you've
 listed). The confirmation email's link should finish signing you in and land
 on "Your profile".
 
-## 2. Recommended: email links that work in any browser
+## 2. Needed before launch: email links that work in any browser
 
 The default email templates use a one-time code that only works in the
 browser that asked for the email. Opened from a phone's mail app, it often
-lands somewhere else and fails. The app already accepts the alternative.
+lands somewhere else and fails. Somebody who joined in the app never gets a code
+the website can read, so they're told the link has run out, though their address
+is confirmed and they can log in. The website already accepts the alternative.
 
 Dashboard → **Authentication → Email Templates**, in **Confirm signup** and
 **Reset password**, replace `{{ .ConfirmationURL }}` with:
@@ -129,10 +131,12 @@ Dashboard → **Authentication → Sign In / Providers**:
   of their own, and keep a way into your account after you sign in with
   Google.
 - **Apple**: turn it on, then
-  - **Client IDs**: `com.mulo.app` (the iPhone app) and the website's
-    Services ID (the same value as `APPLE_SERVICES_ID` in Vercel), with a
-    comma between them. **Never add `host.exp.Exponent`**: that's Expo Go's
-    id, and it would let any Expo Go project's Apple sign-ins into MULO.
+  - **Client IDs**: the website's Services ID (the same value as
+    `APPLE_SERVICES_ID` in Vercel), then a comma, then `com.mulo.app` (the iPhone
+    app). **The Services ID must come first**: Supabase uses the first one for the
+    website's sign-in, and Apple refuses `com.mulo.app` there. **Never add
+    `host.exp.Exponent`**: that's Expo Go's id, and it would let any Expo Go
+    project's Apple sign-ins into MULO.
   - **Secret Key (for OAuth)**: the key Apple's instructions have you make
     from the `.p8` file. Apple lets it last **six months at most**, and when it
     runs out, signing in with Apple on the website stops working. Put a
@@ -331,11 +335,13 @@ write with their own login, past the website. After this:
 - Only the website can set a profile picture.
 - Nobody can make up the date of a score.
 
-**The order matters.** Run it before the new website is live and the Versus split
-shows 0 to 0, takes disappear, and Raised On can't set a picture.
+**The order matters while a website is running.** Run it before the new website is
+live and the Versus split shows 0 to 0, takes disappear, and Raised On can't set a
+picture. While no website is running at all (Vercel paused, say), steps 2 and 3 can
+go first, as long as the deployment that comes back is `545c01a` or later.
 
-1. Merge `fix/security-audit` and let getmulo.com deploy. Wait until Vercel shows
-   the deployment as Ready.
+1. Let getmulo.com deploy `master`. Wait until Vercel shows the deployment as
+   Ready.
 2. Dashboard → **SQL Editor**. Paste the contents of
    `supabase/migrations/0028_held_by_the_database.sql` and run it. Safe to run
    twice.
