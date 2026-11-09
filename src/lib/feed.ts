@@ -1,4 +1,5 @@
 import "server-only";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getFollowingIds } from "@/lib/social";
 import { hiddenFilter } from "@/lib/blocks";
@@ -66,6 +67,16 @@ function groupSongs(rows: SongRow[]): FeedItem[] {
   return [...groups.values()];
 }
 
+/** Picks by the given people, newest first. */
+function friendsPicks(userIds: string[], limit: number) {
+  return createAdminClient()
+    .from("versus_votes")
+    .select(`id, pick, created_at, ${AUTHOR}, versus_matchups!inner ( ${MATCHUP_SELECT} )`)
+    .in("user_id", userIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+}
+
 /**
  * Recent album, artist and song ratings, newest first, from the given people
  * or from everyone. Plain queries, not a fan-out table: at this scale that
@@ -114,21 +125,16 @@ async function loadFeed(
   }
 
   // Before picks can take reactions they have no id, and this reads nothing.
-  const picks =
-    viewerId && userIds
-      ? supabase
-          .from("versus_votes")
-          .select(`id, pick, created_at, ${AUTHOR}, versus_matchups!inner ( ${MATCHUP_SELECT} )`)
-          .in("user_id", userIds)
-          .order("created_at", newest)
-          .limit(limit)
-      : Promise.resolve({ data: null });
+  // With the service role, so a friend having picked shows while the viewer hasn't
+  // (migration 0028); which side stays here, below, until they have.
+  const picks = viewerId && userIds ? friendsPicks(userIds, limit) : null;
+  if (picks && hidden) picks.not("user_id", "in", hidden);
 
   const [albumResult, artistResult, songResult, pickResult] = await Promise.all([
     albums,
     artists,
     songs,
-    picks,
+    picks ?? { data: null },
   ]);
 
   const items: FeedItem[] = [
@@ -165,8 +171,9 @@ async function loadFeed(
       created_at: row.created_at,
       author: row.profiles,
       matchup: toMatchup(row.versus_matchups),
+      // For now: both are decided below, once the viewer's own picks are in.
       pick: sideKey(row.pick),
-      revealed: false,
+      revealed: true,
     })),
   ];
 
@@ -233,11 +240,11 @@ async function loadFeed(
       };
     }
     if (item.kind === "pick") {
-      return {
-        ...item,
-        reaction: pickReactions[item.ratingId] ?? NO_REACTIONS,
-        revealed: item.matchup.day < today || pickedIn.has(item.matchup.id),
-      };
+      const reaction = pickReactions[item.ratingId] ?? NO_REACTIONS;
+      // The side itself stays here until it may be seen, not just out of sight.
+      return item.matchup.day < today || pickedIn.has(item.matchup.id)
+        ? { ...item, reaction }
+        : { ...item, reaction, pick: null, revealed: false };
     }
     return item;
   });

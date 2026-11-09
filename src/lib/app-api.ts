@@ -215,10 +215,11 @@ export type FeedItem =
       created_at: string;
       author: Author;
       matchup: VersusMatchup;
-      pick: VersusSideKey;
-      /** Hidden until the viewer has picked too, or the matchup has closed. */
-      revealed: boolean;
-    };
+    } & (
+      | { pick: VersusSideKey; revealed: true }
+      /** Not sent until the viewer has picked too, or the matchup has closed. */
+      | { pick: null; revealed: false }
+    );
 
 // --- People (social.ts) ---
 

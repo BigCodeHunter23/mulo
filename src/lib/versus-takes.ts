@@ -3,7 +3,7 @@ import type { VersusTake } from "@/lib/app-api";
 import { hiddenFilter } from "@/lib/blocks";
 import { getReactions } from "@/lib/reactions";
 import { getReplyCounts } from "@/lib/replies";
-import { createPublicClient } from "@/lib/supabase/public";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { VersusSideKey } from "@/lib/versus-shared";
 
@@ -15,9 +15,13 @@ export type Takes = {
   takes: VersusTake[];
 };
 
-/** Everyone's take on a matchup, the most loved first, with the side each picked. */
+/**
+ * Everyone's take on a matchup, the most loved first, with the side each picked.
+ * With the service role, as nobody but those who've picked can read a matchup
+ * still open (migration 0028): callers decide who sees them (`visibleTakes`).
+ */
 export async function getTakes(matchupId: number): Promise<Takes> {
-  const supabase = createPublicClient();
+  const supabase = createAdminClient();
 
   const query = supabase
     .from("versus_takes")

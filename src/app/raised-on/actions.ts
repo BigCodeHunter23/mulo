@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCachedRelease } from "@/lib/catalog";
 import { eraForYear, findScene } from "@/lib/raised-on-shared";
 import { isRecordAvatar, recordAvatarPath } from "@/lib/record-avatar";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { z } from "zod";
 import { mbidSchema } from "@/lib/validation";
@@ -58,7 +59,9 @@ export async function saveRaisedOn(input: {
   const year = release.release_date ? Number(release.release_date.slice(0, 4)) : null;
   const eraId = scene ? era!.id : (era?.id ?? eraForYear(year));
 
-  const { error } = await supabase
+  // Pictures are the website's to set (migration 0028), so this goes in with the
+  // service role, always as the signed-in person: the id is the session's.
+  const { error } = await createAdminClient()
     .from("profiles")
     .update({
       raised_era: eraId,

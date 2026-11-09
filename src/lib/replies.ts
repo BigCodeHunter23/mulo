@@ -5,6 +5,7 @@ import { hiddenPeople } from "@/lib/blocks";
 import { getReactions, NO_REACTIONS } from "@/lib/reactions";
 import { parseMentions, THREAD_MAX, type ThreadKind } from "@/lib/replies-shared";
 import { isMissingFunction, isMissingTable, logQueryError } from "@/lib/supabase/errors";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getPick, MATCHUP_SELECT, sydneyDay, toMatchup, type MatchupRow } from "@/lib/versus";
 
@@ -143,7 +144,9 @@ async function readHead(
     };
   }
 
-  const { data, error } = await supabase
+  // With the service role, as a take on a Versus still open can't be read before
+  // picking (migration 0028), and here that has to answer "locked", not "gone".
+  const { data, error } = await createAdminClient()
     .from("versus_takes")
     .select(`id, body, created_at, user_id, ${PERSON}, versus_matchups!inner ( ${MATCHUP_SELECT} )`)
     .eq("id", id)

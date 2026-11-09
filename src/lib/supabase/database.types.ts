@@ -1735,6 +1735,12 @@ export type Database = {
           votes: number | null
         }[]
       }
+      versus_open_to_me: {
+        Args: {
+          p_matchup: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

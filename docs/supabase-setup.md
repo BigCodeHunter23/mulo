@@ -154,10 +154,9 @@ dashboard versions; look under **Sign In / Providers**, **Multi-Factor** and
 
 - **Multi-factor (TOTP and phone)**: turn enrolment **off**. MULO doesn't use
   a second factor, so nobody should be able to add one to their account.
-- **Secure password change**: turn it **on**, and **require the current
-  password** (or "reauthentication") if it's offered. Then a session left open
-  on somebody else's laptop can't quietly change the password through
-  Supabase directly.
+- **Secure password change**: turn it **on**, and **require current password**
+  too (section 12 says when). Then a session left open on somebody else's laptop
+  can't quietly change the password through Supabase directly.
 - **Secure email change**: turn it **on**. A new address then has to be
   confirmed from the old one as well, so a borrowed session can't move the
   account to an address somebody else controls.
@@ -318,3 +317,74 @@ signed-out visitors write these tables), and you can run 0027 again later:
 grant insert, update on public.profiles, public.ratings, public.artist_ratings,
   public.versus_takes, public.lists, public.list_items to authenticated;
 ```
+
+## 12. What the website keeps back, held by the database
+
+From the security audit of 9 November 2026. The public key lets anyone read and
+write with their own login, past the website. After this:
+
+- Nobody can read how today's Versus is going, or today's takes, until they've
+  picked. Finished matchups stay public.
+- Other people see only diary albums matched to a real record, so names typed
+  into an import can't be shown to anyone. Your own diary still shows you all of it.
+- Only the website can set a profile picture.
+- Nobody can make up the date of a score.
+
+**The order matters.** Run it before the new website is live and the Versus split
+shows 0 to 0, takes disappear, and Raised On can't set a picture.
+
+1. Merge `fix/security-audit` and let getmulo.com deploy. Wait until Vercel shows
+   the deployment as Ready.
+2. Dashboard → **SQL Editor**. Paste the contents of
+   `supabase/migrations/0028_held_by_the_database.sql` and run it. Safe to run
+   twice.
+3. Dashboard → **Authentication → Sign In / Providers → Email**: turn on **require
+   current password**. Do this only once step 1 is live, as older code doesn't send
+   the current password, and every password change would fail.
+
+Check: with today's Versus unpicked on one account and picked on another, the
+split and takes show only on the second, and yesterday's show on both. Change your
+picture, set a Raised On record, rate an album and a song: all save.
+
+Then look for pictures set from outside this project while anybody could. This
+lists any picture on another host, and should come back with **no rows**. Put your
+project's reference in place of `YOUR-REF`. Clear any it finds by setting their
+`avatar_url` to null.
+
+```sql
+select id, username, avatar_url from public.profiles
+where avatar_url like 'https://%'
+  and avatar_url not like 'https://YOUR-REF.supabase.co/%';
+```
+
+If something breaks and the deploy can't be fixed straight away, this puts the
+rules back as they were, and you can run 0028 again later:
+
+```sql
+drop policy if exists "Versus picks show once you've picked or it's over" on public.versus_votes;
+create policy "Versus votes are publicly readable"
+  on public.versus_votes for select using (true);
+drop policy if exists "Versus takes show once you've picked or it's over" on public.versus_takes;
+create policy "Versus takes are publicly readable"
+  on public.versus_takes for select using (true);
+drop policy if exists "Diaries are read as their owners allow" on public.diary_entries;
+create policy "Diaries are read as their owners allow"
+  on public.diary_entries for select to anon, authenticated
+  using (public.diary_visible(user_id));
+grant update (avatar_url) on public.profiles to authenticated;
+grant insert (created_at, updated_at), update (created_at, updated_at)
+  on public.ratings to authenticated;
+grant insert (created_at, updated_at), update (created_at, updated_at)
+  on public.artist_ratings to authenticated;
+grant insert, update on public.song_ratings to authenticated;
+```
+
+### Confirm email needs an email service first
+
+**Confirm email** should be on (section 5): with it off, somebody can join with
+another person's address and a password they choose, and that person's later Apple
+or Google sign-in can land in the same account. But Supabase's built-in email only
+sends to your organisation's team members, 2 emails an hour across the project. So
+before turning it on, set up custom SMTP in **Authentication → Emails → SMTP
+Settings**, then raise the limit in **Authentication → Rate Limits**. Password reset
+emails need this too, whatever Confirm email is set to.

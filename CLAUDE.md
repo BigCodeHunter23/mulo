@@ -37,7 +37,11 @@ in plain language, and give them links and exact steps when they need to act.
   it as well (migration 0027): signed-in people can't write those columns,
   so the action writes the words with the service role, as the signed-in
   person (the id from the session), and a new free-text column is left out
-  of its migration's grants.
+  of its migration's grants. A rule that keeps something back belongs in the
+  database too, as the public key reaches the tables past the website: today's
+  Versus picks and takes, unmatched diary names, pictures and scores' dates are
+  held there (migration 0028), and the website reads an open Versus with the
+  service role, then decides what the viewer gets.
 - Supabase's Redirect URLs must list exactly `mulo://auth/callback` for the
   phone app, never `exp://`. That list is the real boundary for the app's
   social sign-in.

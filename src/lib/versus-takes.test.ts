@@ -27,8 +27,8 @@ function query(rows: () => unknown[], record: boolean) {
   return builder;
 }
 
-vi.mock("@/lib/supabase/public", () => ({
-  createPublicClient: () => ({
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
     from: (table: string) =>
       table === "versus_takes" ? query(() => db.takes, true) : query(() => [], false),
   }),

@@ -154,9 +154,12 @@ export const getTodaysMatchup = cache(async (): Promise<VersusMatchup | null> =>
   return fetchMatchup(day);
 });
 
-/** How many picked each side. */
+/**
+ * How many picked each side. With the service role, as nobody but those who've
+ * picked can read a matchup still open (migration 0028); callers decide who sees it.
+ */
 export async function countPicks(matchupId: number) {
-  const supabase = createPublicClient();
+  const supabase = createAdminClient();
   const count = (pick: VersusSideKey) =>
     supabase
       .from("versus_votes")
@@ -174,7 +177,7 @@ type FriendPick = { matchup_id: number; pick: VersusSideKey; profiles: VersusPer
 async function friendPicks(matchupIds: number[], followingIds: string[]): Promise<FriendPick[]> {
   if (matchupIds.length === 0 || followingIds.length === 0) return [];
 
-  const { data } = await createPublicClient()
+  const { data } = await createAdminClient()
     .from("versus_votes")
     .select("matchup_id, pick, profiles!inner ( username, display_name, avatar_url )")
     .in("matchup_id", matchupIds)

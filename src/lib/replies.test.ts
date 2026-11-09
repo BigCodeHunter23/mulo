@@ -3,6 +3,8 @@ import type { FakeSupabase } from "../../test/fake-supabase";
 
 const db = vi.hoisted(() => ({
   fake: null as unknown as FakeSupabase,
+  /** The service role: reads a take before it's decided whether the viewer may see it. */
+  admin: null as unknown as FakeSupabase,
   user: null as { id: string; email: string | null } | null,
   hidden: new Set<string>(),
 }));
@@ -11,6 +13,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => db.fake.client,
   getCurrentUser: async () => db.user,
 }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => db.admin.client }));
 vi.mock("@/lib/blocks", () => ({ hiddenPeople: async () => db.hidden }));
 vi.mock("@/lib/reactions", () => ({
   NO_REACTIONS: { love: 0, dislike: 0, mine: null },
@@ -44,6 +47,7 @@ import { logQueryError } from "@/lib/supabase/errors";
 beforeEach(() => {
   vi.mocked(logQueryError).mockClear();
   db.fake = fakeSupabase();
+  db.admin = fakeSupabase();
   db.user = { id: "me", email: null };
   db.hidden = new Set();
 });
@@ -284,7 +288,7 @@ describe("getThread", () => {
   });
 
   it("keeps a take on today's Versus locked until you've picked", async () => {
-    db.fake.answer("versus_takes", { data: takeRow, error: null }, { data: takeRow, error: null });
+    db.admin.answer("versus_takes", { data: takeRow, error: null }, { data: takeRow, error: null });
     db.fake.answer("replies", { data: [replyRow(1)], error: null });
     // Your pick, then the take's author's.
     vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
@@ -302,7 +306,7 @@ describe("getThread", () => {
 
   it("reads a locked take by someone hidden from you as gone", async () => {
     db.hidden = new Set(["owner"]);
-    db.fake.answer("versus_takes", { data: takeRow, error: null }, { data: takeRow, error: null });
+    db.admin.answer("versus_takes", { data: takeRow, error: null }, { data: takeRow, error: null });
     vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
     expect(await getThread("take", 9)).toEqual({ state: "gone" });
     vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
@@ -311,7 +315,7 @@ describe("getThread", () => {
 
   it("never locks a take from its own author", async () => {
     db.user = { id: "owner", email: null };
-    db.fake.answer("versus_takes", { data: takeRow, error: null });
+    db.admin.answer("versus_takes", { data: takeRow, error: null });
     db.fake.answer("replies", { data: [], error: null });
     vi.mocked(getPick).mockResolvedValueOnce("left");
     expect(await open("take", 9)).toMatchObject({ head: { take: { mine: true } } });
@@ -333,7 +337,7 @@ describe("replyable", () => {
   });
 
   it("is locked for a take on today's Versus before you've picked", async () => {
-    db.fake.answer("versus_takes", { data: takeRow, error: null });
+    db.admin.answer("versus_takes", { data: takeRow, error: null });
     vi.mocked(getPick).mockResolvedValueOnce(null).mockResolvedValueOnce("left");
     expect(await replyable("take", 9)).toBe("locked");
   });
