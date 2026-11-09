@@ -158,9 +158,11 @@ dashboard versions; look under **Sign In / Providers**, **Multi-Factor** and
 
 - **Multi-factor (TOTP and phone)**: turn enrolment **off**. MULO doesn't use
   a second factor, so nobody should be able to add one to their account.
-- **Secure password change**: turn it **on**, and **require current password**
-  too (section 12 says when). Then a session left open on somebody else's laptop
-  can't quietly change the password through Supabase directly.
+- **Secure password change**: turn it **on**, and **Require current password when
+  updating** too (section 12 says when). Both are in the panel that opens when you
+  click **Email** in the Auth Providers list on **Sign In / Providers**, with
+  secure email change. Then a session left open on somebody else's laptop can't
+  quietly change the password through Supabase directly.
 - **Secure email change**: turn it **on**. A new address then has to be
   confirmed from the old one as well, so a borrowed session can't move the
   account to an address somebody else controls.
@@ -345,9 +347,10 @@ go first, as long as the deployment that comes back is `545c01a` or later.
 2. Dashboard → **SQL Editor**. Paste the contents of
    `supabase/migrations/0028_held_by_the_database.sql` and run it. Safe to run
    twice.
-3. Dashboard → **Authentication → Sign In / Providers → Email**: turn on **require
-   current password**. Do this only once step 1 is live, as older code doesn't send
-   the current password, and every password change would fail.
+3. Dashboard → **Authentication → Sign In / Providers**: click **Email** in the Auth
+   Providers list, turn on **Require current password when updating**, and save. Do
+   this only once step 1 is live, as older code doesn't send the current password,
+   and every password change would fail.
 
 Check: with today's Versus unpicked on one account and picked on another, the
 split and takes show only on the second, and yesterday's show on both. Change your
